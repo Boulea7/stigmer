@@ -65,6 +65,7 @@ const DOCUMENTS = [
   "org-admin-owner-inheritance.fga.yaml",
   "org-shared-environment.fga.yaml",
   "organization-role-assignment.fga.yaml",
+  "plan-catalog-manager.fga.yaml",
   "platform-visibility.fga.yaml",
   "plugin-owner.fga.yaml",
   "provider-standing-viewer.fga.yaml",
