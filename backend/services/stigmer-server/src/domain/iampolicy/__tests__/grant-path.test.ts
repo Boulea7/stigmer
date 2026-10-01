@@ -51,8 +51,12 @@
  *     structural link, no write at all on a duplicate grant or a revoke of
  *     a row that is not held. The organization is read before any row of
  *     the operation goes, so a cleanup that deletes a resource's scope link
- *     before its owner still names the owner row's organization. The log
- *     lines carry the same facts.
+ *     before its owner still names the owner row's organization. A row
+ *     revoked after an earlier delete removed its resource's links takes
+ *     the organization from the stored row the walk ends at (the resource,
+ *     or the session a run walks to), and records none when this server
+ *     stores no such row (stigmer#1603); a grant on a resource with no link
+ *     takes it from the same row. The log lines carry the same facts.
  *
  * The row the path builds is pinned too: the proto's apiVersion const, the
  * derived id, the caller's audit stamp — the cloud's `buildNewPolicy`
@@ -81,14 +85,15 @@ import {
 } from "../constants.js";
 import type { PolicyActor } from "../change.js";
 import { newIamPolicyGrantPath } from "../grant-path.js";
-import type { ResourceCreators } from "../grant-path.js";
+import type { StoredResources } from "../grant-path.js";
 import { DuplicatePolicyError } from "../store.js";
 import {
-  NO_RECORDED_CREATORS,
+  NO_STORED_RESOURCES,
   fakeIamPolicyStore,
   orgRole,
   recordedCreators,
   recordingLifecycle,
+  storedResources,
   triple,
 } from "./support.js";
 import type { FakeIamPolicyStore, RecordedEvent } from "./support.js";
@@ -137,11 +142,11 @@ const silentLogger = { debug() {}, info() {}, warn() {}, error() {} };
 function pathOver(
   recorded: RecordedEvent[],
   lifecycle: ResourceAuthorizationLifecycle | undefined,
-  creators: ResourceCreators = NO_RECORDED_CREATORS,
+  resources: StoredResources = NO_STORED_RESOURCES,
 ) {
   const policies = fakeIamPolicyStore(recorded);
   const path = newIamPolicyGrantPath({
-    creators,
+    resources,
     policies,
     lifecycle,
     logger: silentLogger,
@@ -280,7 +285,7 @@ describe("the row for a triple is found by triple, so legacy ids converge", () =
       await racingSave(policy);
     };
     const path = newIamPolicyGrantPath({
-      creators: NO_RECORDED_CREATORS,
+      resources: NO_STORED_RESOURCES,
       policies,
       lifecycle: recordingLifecycle(recorded),
       logger: silentLogger,
@@ -1035,6 +1040,122 @@ describe("who and why: every access row reaches the store with its change record
     ]);
   });
 
+  // stigmer#1603. A delete can remove a resource's scope links before
+  // another cleanup reaches the resource's access rows: an organization's
+  // delete removes every link that names it and keeps the resources, and
+  // the owner's account goes later. The walk then finds nothing, and the
+  // resource's own stored row is what still names its organization.
+  const organizationRef = create(ApiResourceRefSchema, {
+    kind: "organization",
+    id: "acme",
+  });
+  const bobRef = create(ApiResourceRefSchema, {
+    kind: "identity_account",
+    id: BOB,
+  });
+
+  it("a revoke whose scope links a delete already removed takes the organization from the resource's stored row", async () => {
+    const { policies, path } = pathOver(
+      [],
+      undefined,
+      storedResources({ organizations: { [`agent:${SHARED}`]: "acme" } }),
+    );
+    await path.grant(scopeLink("agent", SHARED, "acme"), alice, "structural");
+    await path.grant(share(BOB, "owner"), bob, "structural");
+    await path.cleanupResource(organizationRef, alice);
+    policies.changes.length = 0;
+
+    await path.cleanupResource(bobRef, bob);
+
+    expect(policies.changes).toEqual([
+      {
+        op: "delete",
+        id: policyIdFor(share(BOB, "owner")),
+        record: {
+          actor: bobActor,
+          cause: "resource_deleted",
+          organizationId: "acme",
+        },
+      },
+    ]);
+  });
+
+  it("a run's revoke walks to its session and takes the organization from the session's stored row", async () => {
+    const RUN = "aex_audited00000000000000000";
+    const SESSION = "ses_audited00000000000000000";
+    const { policies, path } = pathOver(
+      [],
+      undefined,
+      storedResources({ organizations: { [`session:${SESSION}`]: "acme" } }),
+    );
+    const viewer = triple({ kind: "identity_account", id: BOB }, "viewer", {
+      kind: "agent_execution",
+      id: RUN,
+    });
+    await path.grant(
+      scopeLink("session", SESSION, "acme"),
+      alice,
+      "structural",
+    );
+    await path.grant(
+      triple({ kind: "session", id: SESSION }, "session", {
+        kind: "agent_execution",
+        id: RUN,
+      }),
+      alice,
+      "structural",
+    );
+    await path.grant(viewer, alice, "grant");
+    await path.cleanupResource(organizationRef, alice);
+    policies.changes.length = 0;
+
+    await path.cleanupResource(bobRef, bob);
+
+    expect(policies.changes).toEqual([
+      {
+        op: "delete",
+        id: policyIdFor(viewer),
+        record: {
+          actor: bobActor,
+          cause: "resource_deleted",
+          organizationId: "acme",
+        },
+      },
+    ]);
+  });
+
+  it("a grant on a resource with no scope link records the organization of its stored row", async () => {
+    const { policies, path } = pathOver(
+      [],
+      undefined,
+      storedResources({ organizations: { [`agent:${SHARED}`]: "acme" } }),
+    );
+
+    await path.grant(share(BOB, "viewer"), alice, "grant");
+
+    expect(policies.changes).toEqual([
+      {
+        op: "save",
+        id: policyIdFor(share(BOB, "viewer")),
+        record: { actor: aliceActor, cause: "grant", organizationId: "acme" },
+      },
+    ]);
+  });
+
+  it("a resource this server stores no row of still records no organization once its links are gone", async () => {
+    const { policies, path } = pathOver([], undefined);
+    await path.grant(scopeLink("agent", SHARED, "acme"), alice, "structural");
+    await path.grant(share(BOB, "owner"), bob, "structural");
+    await path.cleanupResource(organizationRef, alice);
+    policies.changes.length = 0;
+
+    await path.cleanupResource(bobRef, bob);
+
+    expect(
+      policies.changes.map((change) => change.record?.organizationId),
+    ).toEqual([""]);
+  });
+
   it("the grant and revoke log lines carry who, why and where", async () => {
     const lines: Array<{ message: string; fields: Record<string, unknown> }> =
       [];
@@ -1042,7 +1163,7 @@ describe("who and why: every access row reaches the store with its change record
       lines.push({ message, fields: fields ?? {} });
     };
     const path = newIamPolicyGrantPath({
-      creators: NO_RECORDED_CREATORS,
+      resources: NO_STORED_RESOURCES,
       policies: fakeIamPolicyStore(),
       lifecycle: undefined,
       logger: { ...silentLogger, info: capture },
