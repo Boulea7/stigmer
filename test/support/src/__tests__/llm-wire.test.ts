@@ -1,13 +1,13 @@
 // Unit arms for the wire reader the request-shape suite uses to find where a
 // turn's own payload rides: the text of a captured request's last user message.
-// Domain: conformance harness (execution engine).
+// Domain: test support (model fakes).
 //
 // Pinned: a string content is read as it is; a block content joins its text
 // blocks and skips an image; an earlier user message (a previous turn's) is
 // never read when a later one exists; and a body with no user message, or no
 // `messages` at all, is refused by name rather than read as empty.
 import { describe, expect, it } from "vitest";
-import { readLastUserText } from "../llm-wire";
+import { readLastUserText } from "../llm-wire.ts";
 
 describe("readLastUserText", () => {
   it("reads a string content as it is", () => {

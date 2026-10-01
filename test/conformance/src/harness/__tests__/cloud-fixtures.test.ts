@@ -2,12 +2,21 @@
 // and the control API round-trip through the typed client. Pure loopback —
 // no target, no launcher.
 // Domain: conformance harness (cloud-capability fixtures, E1).
+import { execFileSync } from "node:child_process";
 import { createHmac } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { startCloudFixtures, type CloudFixtures } from "../cloud-fixtures";
+import {
+  cloudFixturesExportLines,
+  FAKE_LLM_DEFAULT_REPLY_EXPORT,
+  shellQuote,
+  startCloudFixtures,
+  type CloudFixtureAddresses,
+  type CloudFixtures,
+} from "../cloud-fixtures";
+import { CLOUD_ENV } from "../cloud-env";
 import { FAKE_CARD, signStripePayload, stripeEvent, STRIPE_JAVA_API_VERSION } from "../fake-stripe";
-import { DEFAULT_REPLY_CAPTURE_LIMIT, DEFAULT_REPLY_TEXT } from "../fake-llm-upstream";
-import { anthropicText, openAiText } from "../llm-wire";
+import { DEFAULT_REPLY_CAPTURE_LIMIT, DEFAULT_REPLY_TEXT } from "@stigmer/test-support/fake-llm-upstream";
+import { anthropicText, openAiText } from "@stigmer/test-support/llm-wire";
 import { CloudFixturesClient } from "../../support/cloud-fixtures-client";
 
 let fixtures: CloudFixtures;
@@ -227,6 +236,42 @@ describe("control API", () => {
     expect(response.status).toBe(500);
     const unknown = await fetch(`${fixtures.addresses.controlUrl}/nope`);
     expect(unknown.status).toBe(404);
+  });
+});
+
+describe("the lines fixtures:serve exports", () => {
+  const addresses: CloudFixtureAddresses = {
+    llmUpstreamUrl: "http://127.0.0.1:1",
+    stripeApiUrl: "http://127.0.0.1:2",
+    discordWebhookUrl: "http://127.0.0.1:3",
+    stripeWebhookSecret: "whsec_test",
+    controlUrl: "http://127.0.0.1:4",
+  };
+
+  /** What a POSIX shell holds in `name` after evaluating the lines. */
+  const shellValue = (lines: string[], name: string): string =>
+    execFileSync("sh", ["-c", `${lines.join("\n")}\nprintf '%s' "$${name}"`], { encoding: "utf8" });
+
+  it("exports the conformance shell's values, and no reply line outside default-reply mode", () => {
+    const lines = cloudFixturesExportLines(addresses);
+    expect(lines).toEqual([
+      `export ${CLOUD_ENV.stripeWebhookSecret}=whsec_test`,
+      `export ${CLOUD_ENV.fixturesControlUrl}=http://127.0.0.1:4`,
+    ]);
+    expect(lines.join("\n")).not.toContain(FAKE_LLM_DEFAULT_REPLY_EXPORT);
+  });
+
+  it("exports the default reply under its contract name, quoted so a shell reads the exact text back", () => {
+    const lines = cloudFixturesExportLines(addresses, { llmDefaultReply: true });
+    expect(FAKE_LLM_DEFAULT_REPLY_EXPORT).toBe("STIGMER_CONFORMANCE_CLOUD_FAKE_LLM_DEFAULT_REPLY");
+    expect(lines.at(-1)).toMatch(/^export STIGMER_CONFORMANCE_CLOUD_FAKE_LLM_DEFAULT_REPLY='/);
+    expect(DEFAULT_REPLY_TEXT).toContain("'");
+    expect(shellValue(lines, FAKE_LLM_DEFAULT_REPLY_EXPORT)).toBe(DEFAULT_REPLY_TEXT);
+  });
+
+  it("quotes spaces, `;`, `$` and embedded quotes for a POSIX shell", () => {
+    const value = "it's a \"value\"; with $HOME and 'quotes'";
+    expect(shellValue([`export V=${shellQuote(value)}`], "V")).toBe(value);
   });
 });
 
