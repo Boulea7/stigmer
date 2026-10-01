@@ -2,6 +2,7 @@
   "name": "@stigmer/e2e",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
@@ -14,7 +15,8 @@
     "@bufbuild/protobuf": "^2.0.0",
     "@connectrpc/connect-node": "^2.0.0",
     "@stigmer/protos": "*",
-    "@stigmer/sdk": "*"
+    "@stigmer/sdk": "*",
+    "@stigmer/test-support": "*"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.3",
