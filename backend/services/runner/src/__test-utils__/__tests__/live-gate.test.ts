@@ -1,7 +1,10 @@
 /**
  * Pins the live layer's gate (`live-gate.ts`): a missing key skips outside
  * the live lane and fails inside it, a key's value never reaches a message,
- * and a case's spend lands in the step summary when one is named.
+ * a case's spend lands in the step summary when one is named (a missing or
+ * zero estimate reads as none, never as free), and `useProviderDirectly`
+ * clears every provider redirect for a run and restores the environment
+ * exactly.
  *
  * These run in the ordinary suite because the rule they pin decides whether
  * the live lane can go quietly green; the live suites themselves run only
@@ -12,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { liveSecret, recordLiveSpend } from "../live-gate.js";
+import { liveSecret, recordLiveSpend, useProviderDirectly } from "../live-gate.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -67,5 +70,31 @@ describe("recordLiveSpend", () => {
     expect(log.mock.calls.flat().join(" ")).toMatch(/cursor transcript: no estimate reported/);
     expect(log.mock.calls.flat().join(" ")).toMatch(/native turn: no estimate reported/);
     expect(log.mock.calls.flat().join(" ")).not.toMatch(/\$0\.0000/);
+  });
+});
+
+describe("useProviderDirectly", () => {
+  it("clears every provider redirect for the run and restores exactly what was there", () => {
+    const redirects = {
+      ANTHROPIC_BASE_URL: "http://gateway.internal",
+      ANTHROPIC_API_URL: "http://other-gateway.internal",
+      STIGMER_ANTHROPIC_BACKEND: "vertex",
+      STIGMER_OPENAI_BACKEND: "azure",
+      STIGMER_PROXY_ENDPOINT: "http://proxy",
+      STIGMER_TOKEN: "t-1",
+    };
+    const env: NodeJS.ProcessEnv = { ...redirects, ANTHROPIC_API_KEY: "k-1" };
+    const restore = useProviderDirectly(env);
+    expect(env).toEqual({ ANTHROPIC_API_KEY: "k-1" });
+    restore();
+    expect(env).toEqual({ ...redirects, ANTHROPIC_API_KEY: "k-1" });
+  });
+
+  it("removes on restore a redirect that was absent before and set during the run", () => {
+    const env: NodeJS.ProcessEnv = { ANTHROPIC_API_KEY: "k-1" };
+    const restore = useProviderDirectly(env);
+    env.ANTHROPIC_BASE_URL = "http://set-during-the-run";
+    restore();
+    expect(env).toEqual({ ANTHROPIC_API_KEY: "k-1" });
   });
 });

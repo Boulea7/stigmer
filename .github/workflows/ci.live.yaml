@@ -1,0 +1,223 @@
+# =============================================================================
+# Live — the release against real model providers
+# =============================================================================
+# Every other check talks to a fake model. This one runs the live class
+# (`*.live.test.ts`, the runner's `npm run test:live`) and the published CLI
+# against the real providers, on their cheapest models, so a retired model id,
+# a changed provider API or a price table that no longer knows a model is seen
+# the week it happens instead of by a user:
+#   runner-live  the runner's live suites: a native turn, a tool call and a
+#                cost-cap stop on Claude Haiku; the workflow llm_call; every
+#                registry row's id at its provider; the Cursor instruments.
+#   cli-live     the CLI npm just published, `stigmer up` and an agent run on
+#                Claude Haiku (test/install/smoke-cli-cutover.mjs --live-model).
+#
+# Runs:
+# - after `release.npm-libs` completes on a pushed `v*` release tag
+#   (workflow_run), against the tagged commit and the version it published;
+#   a prerelease tag ends the run green with nothing run;
+# - by hand (workflow_dispatch), against the dispatched ref's code and the
+#   newest published CLI (or the `version` given).
+# Never on a pull request or in the merge queue: it spends money and depends
+# on providers being up, so it blocks nothing.
+#
+# Money: the case list is fixed; each native and Cursor execution runs under
+# its own cost cap (max_cost_usd) and each workflow call under a token cap.
+# runner-live's step summary lists the estimated spend of every case that has
+# an estimate (the native turns, the llm_call cases, the Cursor transcript).
+# The SDK-direct Cursor instruments and the CLI's one turn have no product cap
+# and no estimate; each is one short turn, and the summary names them.
+#
+# Keys: ANTHROPIC_API_KEY and CURSOR_API_KEY from the `provider-integration`
+# environment, which deploys only to `main` (both triggers run on `main`; the
+# tag is only the commit checked out). They reach one step each through
+# `env:` and are never printed. STIGMER_LIVE=1 makes a missing key fail the
+# run instead of skipping it (backend/services/runner/src/__test-utils__/live-gate.ts).
+#
+# Red: an unattended (workflow_run) failure files or comments on one
+# `live-failure` issue; a dispatch is watched by whoever dispatched it. The
+# release train reads this workflow's runs on `main` before it ships again.
+# =============================================================================
+
+name: ci.live
+
+# workflow_run is safe here: the job condition below admits only a
+# successful tag push, and the release job refuses any commit main does not
+# already carry, so the code run with the keys is code that passed main's
+# review. The tagged commit is checked out on purpose (the live check tests
+# the code that was released), with persist-credentials off, and nothing from
+# the triggering run (artifacts, outputs) is read.
+on: # zizmor: ignore[dangerous-triggers]
+  workflow_run:
+    workflows:
+      - "release.npm-libs"
+    types: [completed]
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The published CLI version for cli-live (X.Y.Z); empty means the newest release"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: live-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Resolve the release
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    outputs:
+      run: ${{ steps.resolve.outputs.run }}
+      ref: ${{ steps.resolve.outputs.ref }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      # main's copy of the decision script (the default checkout here is main).
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # The rule lives in scripts/live-release.mjs, with its tests: run only a
+      # commit main already carries, skip a prerelease, name the CLI version.
+      - name: The commit to test and the CLI version to install
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_VERSION: ${{ inputs.version }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          if [ -n "$RUN_TAG" ]; then
+            tag="$RUN_TAG"
+            ref="$RUN_SHA"
+          else
+            ref="$DISPATCH_SHA"
+            if [ -n "$INPUT_VERSION" ]; then
+              tag="v${INPUT_VERSION#v}"
+            else
+              tag=$(gh release view --repo "$REPO" --json tagName --jq .tagName)
+            fi
+          fi
+          compare=$(gh api "repos/$REPO/compare/main...$ref" --jq .status)
+          code=0
+          decision=$(node scripts/live-release.mjs --tag "$tag" --compare "$compare") || code=$?
+          if [ "$code" = 3 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipped: $tag is a prerelease" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$code" != 0 ]; then
+            exit 1
+          fi
+          {
+            echo "run=true"
+            echo "ref=$ref"
+            echo "$decision"
+          } >> "$GITHUB_OUTPUT"
+          echo "Testing $ref against the published CLI ${decision#version=}" >> "$GITHUB_STEP_SUMMARY"
+
+  runner-live:
+    name: Runner live suites
+    needs: release
+    if: needs.release.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    environment: provider-integration
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.release.outputs.ref }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install npm workspace dependencies
+        run: npm ci
+
+      # The runner file:-links its workspace libs and imports their built dists.
+      - name: Build runner-linked workspace libs
+        run: npm run build:runner-deps
+
+      - name: Install unified runner dependencies
+        working-directory: backend/services/runner
+        run: npm ci
+
+      - name: Run the live suites against the real providers
+        working-directory: backend/services/runner
+        env:
+          STIGMER_LIVE: "1"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          {
+            echo "### Runner live suites: estimated spend per case"
+            echo "- the five SDK-direct Cursor instruments: one short turn each, no product cap, no estimate"
+          } >> "$GITHUB_STEP_SUMMARY"
+          npm run test:live
+
+  cli-live:
+    name: Published CLI on a real model
+    needs: release
+    if: needs.release.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    environment: provider-integration
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.release.outputs.ref }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+
+      # The install scripts need no install (test/install runs on bare node).
+      - name: stigmer up from the published CLI, an agent on the real provider
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "### Published CLI ${VERSION}: one short turn on claude-haiku-4.5, no product cost cap, no estimate" >> "$GITHUB_STEP_SUMMARY"
+          node test/install/smoke-cli-cutover.mjs --published --version="$VERSION" --live-model
+
+  # An unattended run's red announces itself (#477); a dispatch is watched by
+  # whoever dispatched it. A skipped release job (the release itself failed,
+  # or the run was not a tag push) is not failure() and files nothing.
+  notify-failure:
+    name: File Live Failure Issue
+    needs: [release, runner-live, cli-live]
+    if: failure() && github.event_name != 'workflow_dispatch'
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-failure.yaml
+    with:
+      label: live-failure
+      title: "ci.live: the release's check against real model providers is failing"
+      body-context: >-
+        This workflow runs the runner's live suites and the published CLI
+        against the real model providers after each release. A failure means a
+        provider path a user takes is broken (a retired model id, a changed
+        provider API, a price table that no longer knows a model), a provider
+        was down, or a key expired; the job log names which. The release train
+        reads this before it ships again; re-dispatch the workflow after the
+        fix, and close this issue when it is green.
