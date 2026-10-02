@@ -56,7 +56,7 @@ jobs:
     # installer's only prerequisites are curl, tar, and a sha-256 tool — in
     # particular that it vendors its own Node runtime.
     container:
-      image: ubuntu:24.04
+      image: mirror.gcr.io/library/ubuntu:24.04
     steps:
       - name: Install curl and CA certificates
         run: apt-get update && apt-get install -y --no-install-recommends curl ca-certificates

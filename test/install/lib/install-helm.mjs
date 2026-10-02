@@ -35,6 +35,7 @@ import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertDockerHubMirror, kindMirrorArgs } from "./docker-hub-mirror.mjs";
 import { FAKE_MODEL_API_KEY } from "./fake-model.mjs";
 import { buildSourceImages } from "./install-compose.mjs";
 import { pollUntil } from "./stigmer-smoke.mjs";
@@ -104,8 +105,12 @@ export function createKindCluster({ existing = "", log }) {
     context,
     async start() {
       if (!own) return;
-      log(`kind create cluster ${name}`);
-      run("kind", ["create", "cluster", "--name", name, ...kubeconfigFlag, "--wait", "120s"], { stdio: "inherit" });
+      // The node image comes through dockerd; the chart's images through the
+      // node's own containerd, which gets dockerd's mirrors here.
+      assertDockerHubMirror();
+      const mirrorArgs = kindMirrorArgs(workDir);
+      log(`kind create cluster ${name}${mirrorArgs.length > 0 ? " (Docker Hub through dockerd's mirrors)" : ""}`);
+      run("kind", ["create", "cluster", "--name", name, ...kubeconfigFlag, ...mirrorArgs, "--wait", "120s"], { stdio: "inherit" });
     },
     kubectl: (args, options = {}) => run("kubectl", [...kubeconfigFlag, "--context", context, ...args], options),
     kubectlJson: (args) => JSON.parse(cluster.kubectl([...args, "-o", "json"])),

@@ -123,7 +123,7 @@ jobs:
         shard: [1, 2, 3]
     services:
       postgres:
-        image: postgres:16
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
         ports:

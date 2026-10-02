@@ -22,6 +22,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertDockerHubMirror } from "./docker-hub-mirror.mjs";
 import { pollUntil } from "./stigmer-smoke.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
@@ -53,6 +54,7 @@ export function allInOneImage(release, log) {
     throw new Error("deploy/all-in-one/stage is not staged — run `node scripts/stage-all-in-one.mjs` first");
   }
   const version = readFileSync(versionFile, "utf8").trim();
+  assertDockerHubMirror();
   log(`docker build ${LOCAL_IMAGE} (STIGMER_VERSION=${version})`);
   execFileSync("docker", ["build", "--build-arg", `STIGMER_VERSION=${version}`, "--tag", LOCAL_IMAGE, imageRoot], {
     stdio: "inherit",

@@ -1,0 +1,21 @@
+# Docker Hub through Google's mirror for every pull this job's dockerd makes.
+# A gate job that builds the product's images or starts its stack calls this
+# right after Node is set up, before any step that runs docker or kind, so a
+# Docker Hub outage cannot fail it before a test runs (#1705). Docker Hub stays
+# dockerd's fallback after the mirror; dockerd is reloaded, not restarted, so
+# the job's service containers keep running.
+#
+# docker-hub-mirror.mjs holds the reasons and the sequence. In the gate,
+# test/install/lib/docker-hub-mirror.mjs refuses to pull without it, and
+# scripts/ci-images.mjs refuses a workflow step that runs docker or kind
+# before it, or a service image that names Docker Hub.
+name: Docker Hub through a mirror
+description: >-
+  Give the runner's dockerd Google's public Docker Hub mirror, Hub kept as the
+  fallback, by a reload, and prove the daemon lists it.
+runs:
+  using: composite
+  steps:
+    - name: Point dockerd at the Docker Hub mirror
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/docker-hub-mirror.mjs"

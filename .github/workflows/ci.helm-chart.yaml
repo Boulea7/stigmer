@@ -104,6 +104,9 @@ jobs:
       - name: Install npm workspace dependencies
         run: npm ci
 
+      - name: Docker Hub through a mirror
+        uses: ./.github/actions/docker-hub-mirror
+
       - name: Install helm and kind (pinned)
         run: |
           set -euo pipefail

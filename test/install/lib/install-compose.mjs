@@ -32,6 +32,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { assertDockerHubMirror } from "./docker-hub-mirror.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const serverRoot = join(repoRoot, "backend", "services", "stigmer-server");
@@ -104,6 +105,7 @@ export function stagedRunnerCliVersion() {
  * are placeholders, and only the staged CLI's version is a real build input.
  */
 export function buildSourceImages({ log }) {
+  assertDockerHubMirror();
   stageServerTree(log);
   log("docker compose build (server + runner from source)");
   execFileSync("docker", ["compose", "-f", CHECKOUT_COMPOSE_FILE, "-f", DEV_OVERLAY_FILE, "build"], {
@@ -212,7 +214,9 @@ export function createComposeStack({ model, log }) {
 
   // Starting and upgrading are the same act in compose: the release's file
   // and version in place, then pull and up -d under the one project.
+  // up -d pulls Postgres and Temporal from Docker Hub whatever the target.
   const bringUp = (target, file) => {
+    assertDockerHubMirror();
     if (target.kind === "build") buildSourceImages({ log });
     configure(target, file);
     if (target.kind === "published") {
