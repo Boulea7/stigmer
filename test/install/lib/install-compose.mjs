@@ -29,10 +29,10 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { assertDockerHubMirror } from "./docker-hub-mirror.mjs";
+import { assertDockerHubMirror, pullBaseImages } from "./docker-hub-mirror.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const serverRoot = join(repoRoot, "backend", "services", "stigmer-server");
@@ -107,19 +107,31 @@ export function stagedRunnerCliVersion() {
 export function buildSourceImages({ log }) {
   assertDockerHubMirror();
   stageServerTree(log);
+  const env = {
+    ...process.env,
+    POSTGRES_PASSWORD: "unused",
+    STIGMER_ENCRYPTION_KEY: "unused",
+    STIGMER_RUNNER_TOKEN_KEY: "unused",
+    STIGMER_CLI_VERSION: stagedRunnerCliVersion(),
+  };
+  const sourceCompose = ["compose", "-f", CHECKOUT_COMPOSE_FILE, "-f", DEV_OVERLAY_FILE];
+  const config = execFileSync("docker", [...sourceCompose, "config", "--format", "json"], { cwd: repoRoot, encoding: "utf8", env });
+  pullBaseImages(composeDockerfiles(config), { log });
   log("docker compose build (server + runner from source)");
-  execFileSync("docker", ["compose", "-f", CHECKOUT_COMPOSE_FILE, "-f", DEV_OVERLAY_FILE, "build"], {
-    cwd: repoRoot,
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      POSTGRES_PASSWORD: "unused",
-      STIGMER_ENCRYPTION_KEY: "unused",
-      STIGMER_RUNNER_TOKEN_KEY: "unused",
-      STIGMER_CLI_VERSION: stagedRunnerCliVersion(),
-    },
-  });
+  execFileSync("docker", [...sourceCompose, "build"], { cwd: repoRoot, stdio: "inherit", env });
   return SOURCE_IMAGES;
+}
+
+/**
+ * The Dockerfile of every service `docker compose config --format json`
+ * builds, as absolute paths: compose resolves each build context against the
+ * project, and each `dockerfile` against its context.
+ */
+export function composeDockerfiles(configJson) {
+  const services = JSON.parse(configJson).services ?? {};
+  return Object.values(services)
+    .filter((service) => service.build !== undefined)
+    .map(({ build }) => resolve(build.context, build.dockerfile ?? "Dockerfile"));
 }
 
 /**

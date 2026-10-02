@@ -7,9 +7,13 @@
  * kind's node), anonymously and from Hub alone. When Hub's token endpoint
  * failed for a few seconds, `docker compose build` failed before any test ran
  * and a gate run went red on a change that touched none of it (#1705). With
- * the mirror set, dockerd asks mirror.gcr.io first and Docker Hub after it,
- * for `docker pull`, `docker run`, `compose up` and every BuildKit resolve
- * (`FROM` and `COPY --from`) alike, so a pull fails only when both are down.
+ * the mirror set, dockerd asks mirror.gcr.io first and Docker Hub after it for
+ * `docker pull`, `docker run` and `compose up`, so such a pull fails only when
+ * both are down. BuildKit, which resolves a build's `FROM` and `COPY --from`
+ * images, takes mirrors only when dockerd starts, not on this reload
+ * (measured on Docker 28.0.4, the runners' version), so the install layer
+ * pulls each build's base images through dockerd before it builds
+ * (test/install/lib/docker-hub-mirror.mjs).
  *
  * The trade-offs:
  *   - Google's mirror, not one of our own. dockerd takes a mirror for
@@ -24,7 +28,8 @@
  *     Postgres, which its image smoke reaches) run under this dockerd and
  *     would die with it. dockerd reloads `registry-mirrors` on SIGHUP, the
  *     signal its systemd unit's own reload sends, and reads a daemon.json
- *     created after it started.
+ *     created after it started. What the reload does not reach, BuildKit, is
+ *     reached by pulling first, not by a restart.
  *   - No retry. The daemon either lists the mirror within the deadline or the
  *     step fails, named, once.
  *

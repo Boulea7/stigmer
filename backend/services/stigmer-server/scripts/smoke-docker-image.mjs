@@ -45,7 +45,7 @@ import { cpSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { assertDockerHubMirror } from "../../../../test/install/lib/docker-hub-mirror.mjs";
+import { assertDockerHubMirror, pullBaseImages } from "../../../../test/install/lib/docker-hub-mirror.mjs";
 import {
   assertConsoleServed,
   connectJson,
@@ -106,6 +106,7 @@ function buildLocalImage() {
   cpSync(distSlim, staged, { recursive: true });
   const tag = "stigmer-server:smoke-local";
   assertDockerHubMirror();
+  pullBaseImages([join(serverRoot, "Dockerfile")], { log });
   log(`docker build ${tag}`);
   execFileSync("docker", ["build", "--tag", tag, serverRoot], {
     stdio: "inherit",

@@ -5,13 +5,15 @@
 // instead); the override maps host.docker.internal into the runner, and
 // hands it ANTHROPIC_BASE_URL only when the compose file does not pass it
 // through (a release from before that line); and `docker compose ps --format
-// json` is read in both of the shapes compose has printed. Run via
+// json` is read in both of the shapes compose has printed, and the Dockerfiles
+// a source build pulls base images for are read from `docker compose config`
+// (each context's dockerfile, Dockerfile by default). Run via
 // `npm run test:scripts`.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { COMPOSE_PUBLIC_URL, composeEnvText, composeOverrideText, serviceImages } from "./install-compose.mjs";
+import { COMPOSE_PUBLIC_URL, composeDockerfiles, composeEnvText, composeOverrideText, serviceImages } from "./install-compose.mjs";
 
 const KEYS = { postgresPassword: "pw", encryptionKey: "ek", runnerTokenKey: "rk" };
 const PUBLIC_URL = COMPOSE_PUBLIC_URL;
@@ -63,4 +65,20 @@ test("docker compose ps --format json is read as one object per line and as one 
   assert.deepEqual(serviceImages(rows.map((row) => JSON.stringify(row)).join("\n")), want);
   assert.deepEqual(serviceImages(JSON.stringify(rows)), want);
   assert.deepEqual(serviceImages(""), {});
+});
+
+test("the Dockerfiles compose builds are read from its resolved config: each context's dockerfile, Dockerfile by default", () => {
+  const config = JSON.stringify({
+    services: {
+      postgres: { image: "postgres:16" },
+      "stigmer-runner": { build: { context: "/repo", dockerfile: "backend/services/runner/Dockerfile.sandbox", target: "compose-runner" } },
+      "stigmer-server": { build: { context: "/repo/backend/services/stigmer-server", dockerfile: "Dockerfile" } },
+      other: { build: { context: "/repo/x" } },
+    },
+  });
+  assert.deepEqual(composeDockerfiles(config), [
+    "/repo/backend/services/runner/Dockerfile.sandbox",
+    "/repo/backend/services/stigmer-server/Dockerfile",
+    "/repo/x/Dockerfile",
+  ]);
 });

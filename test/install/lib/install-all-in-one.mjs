@@ -22,7 +22,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertDockerHubMirror } from "./docker-hub-mirror.mjs";
+import { assertDockerHubMirror, pullBaseImages } from "./docker-hub-mirror.mjs";
 import { pollUntil } from "./stigmer-smoke.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
@@ -55,6 +55,7 @@ export function allInOneImage(release, log) {
   }
   const version = readFileSync(versionFile, "utf8").trim();
   assertDockerHubMirror();
+  pullBaseImages([join(imageRoot, "Dockerfile")], { log });
   log(`docker build ${LOCAL_IMAGE} (STIGMER_VERSION=${version})`);
   execFileSync("docker", ["build", "--build-arg", `STIGMER_VERSION=${version}`, "--tag", LOCAL_IMAGE, imageRoot], {
     stdio: "inherit",

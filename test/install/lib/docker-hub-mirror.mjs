@@ -25,6 +25,17 @@
  *   - Names unchanged. A daemon mirror serves `postgres:16` as `postgres:16`,
  *     so what users install is what the gate runs, and nothing that reads an
  *     image's name (the rehearsal's serviceImages) sees a difference.
+ *   - Base images pulled before a build, not left to BuildKit. dockerd takes a
+ *     mirror on its SIGHUP reload for `docker pull`, `docker run` and
+ *     `compose up`, but BuildKit, which resolves a build's `FROM` and
+ *     `COPY --from` images, takes mirrors only when dockerd starts (measured on
+ *     Docker 28.0.4, the runners' version: a reloaded mirror left every build
+ *     going to Hub, and one set at start was used). Restarting dockerd would
+ *     stop a job's service containers. So before a source build, every image
+ *     its Dockerfiles build on is pulled through dockerd, and BuildKit builds
+ *     from those local copies. The list is read from the Dockerfiles, not
+ *     kept: each `FROM`, `COPY --from` and `RUN --mount ... from=` reference
+ *     that is not one of the file's own stages.
  *   - kind follows the host. kind's nodes run their own containerd, which the
  *     host daemon's mirrors never reach. When dockerd lists a mirror, the
  *     cluster is created with containerd's own hosts.toml for docker.io (kind's
@@ -33,13 +44,14 @@
  *     exactly as before.
  *
  * Plain node and the docker CLI, no dependencies, like its neighbours.
- * docker-hub-mirror.test.mjs pins the reader against a fake `docker` and the
+ * docker-hub-mirror.test.mjs pins the reader against a fake `docker`, the
+ * Dockerfile reader against fixtures and the gate's own Dockerfiles, and the
  * kind config against its exact text.
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import process from "node:process";
 
 /** The action a gate job calls before it reaches Docker. */
@@ -48,8 +60,14 @@ export const MIRROR_ACTION = "./.github/actions/docker-hub-mirror";
 /** Where containerd looks for per-registry hosts files inside a kind node. */
 const NODE_CERTS_DIR = "/etc/containerd/certs.d";
 
+/** The one image name a Dockerfile can build on that is not pulled. */
+const EMPTY_BASE = "scratch";
+
 /** `docker info` answering slower than this is a daemon that is not there. */
 const DOCKER_INFO_TIMEOUT_MS = 30_000;
+
+/** One base image's pull; the largest, golang:1.25-bookworm, is about 300 MB. */
+const PULL_TIMEOUT_MS = 10 * 60 * 1000;
 
 let cached;
 
@@ -149,4 +167,67 @@ export function kindMirrorArgs(workDir) {
   const configFile = join(workDir, "kind-config.yaml");
   writeFileSync(configFile, clusterConfig);
   return ["--config", configFile];
+}
+
+/**
+ * The images a Dockerfile builds on from a registry, in the order it names
+ * them: every `FROM`, `COPY --from=` and `RUN --mount=...,from=` reference
+ * that is not a stage the file itself defines (stage names are matched as
+ * Docker matches them, without case), and not `scratch`. A reference built
+ * from an `ARG` cannot be read from the file and is refused, named with its
+ * line, so a pull can never be skipped by a build argument.
+ */
+export function dockerfileBaseImages(text, file = "Dockerfile") {
+  const stages = new Set();
+  const images = [];
+  const add = (reference, line) => {
+    if (reference.includes("$")) {
+      throw new Error(`${file}:${line}: \`${reference}\` is built from an ARG, so the image it pulls cannot be read from the file`);
+    }
+    const lower = reference.toLowerCase();
+    if (stages.has(lower) || lower === EMPTY_BASE || images.includes(reference)) return;
+    images.push(reference);
+  };
+  text.split("\n").forEach((raw, index) => {
+    const line = index + 1;
+    const from = /^\s*FROM\s+(?:--platform=\S+\s+)?(\S+)(?:\s+AS\s+(\S+))?\s*$/i.exec(raw);
+    if (from) {
+      add(from[1], line);
+      if (from[2] !== undefined) stages.add(from[2].toLowerCase());
+      return;
+    }
+    if (/^\s*COPY\b/i.test(raw)) {
+      const copied = /\s--from=(\S+)/i.exec(raw);
+      if (copied) add(copied[1], line);
+      return;
+    }
+    if (/^\s*RUN\b/i.test(raw)) {
+      for (const mount of raw.matchAll(/--mount=(\S+)/gi)) {
+        const mounted = /(?:^|,)from=([^,\s]+)/i.exec(mount[1]);
+        if (mounted) add(mounted[1], line);
+      }
+    }
+  });
+  return images;
+}
+
+/**
+ * When dockerd lists a Docker Hub mirror, pull every image `dockerfiles`
+ * build on through it, so BuildKit, which does not take a mirror dockerd got
+ * on reload, finds each one local. With no mirror nothing is pulled, and the
+ * build resolves its images as it always did. Returns the images pulled.
+ */
+export function pullBaseImages(dockerfiles, { log }) {
+  if (dockerHubMirrors().length === 0) return [];
+  const images = [];
+  for (const file of dockerfiles) {
+    for (const image of dockerfileBaseImages(readFileSync(file, "utf8"), relative(process.cwd(), file) || file)) {
+      if (!images.includes(image)) images.push(image);
+    }
+  }
+  log(`pulling ${images.join(", ")} through dockerd's Docker Hub mirror (BuildKit does not take a reloaded one)`);
+  for (const image of images) {
+    execFileSync("docker", ["pull", "--quiet", image], { stdio: ["ignore", "ignore", "inherit"], timeout: PULL_TIMEOUT_MS });
+  }
+  return images;
 }

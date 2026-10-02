@@ -731,6 +731,7 @@ test("the action rule still finds the bodies and lanes it exists for", () => {
     [...actions].filter(([, action]) => action.bodies.length > 0).map(([name, action]) => [name, action.bodies]),
   );
   assert.deepEqual(bodies, {
+    "docker-hub-mirror": [".github/actions/docker-hub-mirror/docker-hub-mirror.mjs"],
     "playwright-chromium": ["scripts/playwright-chromium.mjs"],
     "temporal-cli": [
       "client-apps/cli/scripts/install-temporal-cli.ts",
