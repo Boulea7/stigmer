@@ -79,7 +79,9 @@ private static final long serialVersionUID = 0L;
    * - "slug": an agent of the organization the workflow runs in; checked when the
    * workflow is saved, against the workflow's own organization
    * - "org/slug": that organization's agent; checked when the workflow is saved,
-   * and another organization's agent must be shared at platform visibility
+   * and another organization's agent must be shared at platform visibility.
+   * The organization may be named by slug or id; the workflow stores its id,
+   * so renaming the organization never changes which agent the task calls
    * - a value holding "${ ... }", "${.env_vars.KEY}" or "${.secrets.KEY}": resolved
    * to "slug" or "org/slug" when the task runs, and read as the person who ran
    * the workflow
@@ -109,7 +111,9 @@ private static final long serialVersionUID = 0L;
    * - "slug": an agent of the organization the workflow runs in; checked when the
    * workflow is saved, against the workflow's own organization
    * - "org/slug": that organization's agent; checked when the workflow is saved,
-   * and another organization's agent must be shared at platform visibility
+   * and another organization's agent must be shared at platform visibility.
+   * The organization may be named by slug or id; the workflow stores its id,
+   * so renaming the organization never changes which agent the task calls
    * - a value holding "${ ... }", "${.env_vars.KEY}" or "${.secrets.KEY}": resolved
    * to "slug" or "org/slug" when the task runs, and read as the person who ran
    * the workflow
@@ -1262,7 +1266,9 @@ java.lang.String defaultValue) {
      * - "slug": an agent of the organization the workflow runs in; checked when the
      * workflow is saved, against the workflow's own organization
      * - "org/slug": that organization's agent; checked when the workflow is saved,
-     * and another organization's agent must be shared at platform visibility
+     * and another organization's agent must be shared at platform visibility.
+     * The organization may be named by slug or id; the workflow stores its id,
+     * so renaming the organization never changes which agent the task calls
      * - a value holding "${ ... }", "${.env_vars.KEY}" or "${.secrets.KEY}": resolved
      * to "slug" or "org/slug" when the task runs, and read as the person who ran
      * the workflow
@@ -1291,7 +1297,9 @@ java.lang.String defaultValue) {
      * - "slug": an agent of the organization the workflow runs in; checked when the
      * workflow is saved, against the workflow's own organization
      * - "org/slug": that organization's agent; checked when the workflow is saved,
-     * and another organization's agent must be shared at platform visibility
+     * and another organization's agent must be shared at platform visibility.
+     * The organization may be named by slug or id; the workflow stores its id,
+     * so renaming the organization never changes which agent the task calls
      * - a value holding "${ ... }", "${.env_vars.KEY}" or "${.secrets.KEY}": resolved
      * to "slug" or "org/slug" when the task runs, and read as the person who ran
      * the workflow
@@ -1321,7 +1329,9 @@ java.lang.String defaultValue) {
      * - "slug": an agent of the organization the workflow runs in; checked when the
      * workflow is saved, against the workflow's own organization
      * - "org/slug": that organization's agent; checked when the workflow is saved,
-     * and another organization's agent must be shared at platform visibility
+     * and another organization's agent must be shared at platform visibility.
+     * The organization may be named by slug or id; the workflow stores its id,
+     * so renaming the organization never changes which agent the task calls
      * - a value holding "${ ... }", "${.env_vars.KEY}" or "${.secrets.KEY}": resolved
      * to "slug" or "org/slug" when the task runs, and read as the person who ran
      * the workflow
@@ -1347,7 +1357,9 @@ java.lang.String defaultValue) {
      * - "slug": an agent of the organization the workflow runs in; checked when the
      * workflow is saved, against the workflow's own organization
      * - "org/slug": that organization's agent; checked when the workflow is saved,
-     * and another organization's agent must be shared at platform visibility
+     * and another organization's agent must be shared at platform visibility.
+     * The organization may be named by slug or id; the workflow stores its id,
+     * so renaming the organization never changes which agent the task calls
      * - a value holding "${ ... }", "${.env_vars.KEY}" or "${.secrets.KEY}": resolved
      * to "slug" or "org/slug" when the task runs, and read as the person who ran
      * the workflow
@@ -1370,7 +1382,9 @@ java.lang.String defaultValue) {
      * - "slug": an agent of the organization the workflow runs in; checked when the
      * workflow is saved, against the workflow's own organization
      * - "org/slug": that organization's agent; checked when the workflow is saved,
-     * and another organization's agent must be shared at platform visibility
+     * and another organization's agent must be shared at platform visibility.
+     * The organization may be named by slug or id; the workflow stores its id,
+     * so renaming the organization never changes which agent the task calls
      * - a value holding "${ ... }", "${.env_vars.KEY}" or "${.secrets.KEY}": resolved
      * to "slug" or "org/slug" when the task runs, and read as the person who ran
      * the workflow
