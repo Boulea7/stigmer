@@ -44,8 +44,10 @@ public final class ExecutionContextInput {
             }
         }
         ApiResourceMetadata.Builder metaBuilder = ApiResourceMetadata.newBuilder()
-            .setName(this.name)
-            .setOrg(this.org);
+            .setName(this.name);
+        if (this.org != null) {
+            metaBuilder.setOrg(this.org);
+        }
         if (this.id != null) {
             metaBuilder.setId(this.id);
         }

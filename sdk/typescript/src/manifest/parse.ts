@@ -28,6 +28,13 @@ export interface ParseManifestOptions {
    * `stigmer apply`).
    */
   readonly org?: string;
+  /**
+   * Every other value the target organization goes by (its slug when `org`
+   * is its id, or its id when `org` is its slug). Parsing asks no server, so
+   * these are what let a document naming the target in another form apply
+   * quietly, and one naming a different organization in either form warn.
+   */
+  readonly orgNames?: readonly string[];
 }
 
 /** One resource document parsed from a manifest. */
@@ -103,7 +110,7 @@ export function parseManifest(
       );
     }
 
-    documents.push(parseDocument(value as Record<string, unknown>, where, options.org));
+    documents.push(parseDocument(value as Record<string, unknown>, where, options.org, options.orgNames));
   }
 
   if (documents.length === 0) {
@@ -122,6 +129,7 @@ function parseDocument(
   value: Record<string, unknown>,
   where: string,
   org: string | undefined,
+  orgNames: readonly string[] = [],
 ): ManifestDocument {
   const kind = value.kind;
   if (typeof kind !== "string" || kind === "") {
@@ -153,7 +161,7 @@ function parseDocument(
     );
   }
 
-  const warning = injectOrg(message, org ?? "");
+  const warning = injectOrg(message, org ?? "", orgNames);
 
   const metadata = metadataOf(message);
   const name = metadata?.name ?? "";
@@ -181,9 +189,11 @@ export function metadataOf(message: Message): ApiResourceMetadata | undefined {
 // Inject the target org into metadata.org when the document omitted it. When
 // the document specifies a *different* org, the document's value is honored
 // and a warning is returned (matching `stigmer apply`). An organization is
-// named by its id or its slug, and parsing asks no server, so only two
-// values of the same form (two ids, or two slugs) are known to differ.
-function injectOrg(message: Message, org: string): string | undefined {
+// named by its id or its slug, and parsing asks no server: the target is
+// known by `org` and `orgNames`, and a document's org is known to differ
+// only when it is none of those and one of them has its form (two ids, or
+// two slugs).
+function injectOrg(message: Message, org: string, orgNames: readonly string[]): string | undefined {
   if (org === "") return undefined;
   const holder = message as unknown as { metadata?: ApiResourceMetadata };
   if (holder.metadata === undefined) {
@@ -194,13 +204,16 @@ function injectOrg(message: Message, org: string): string | undefined {
     holder.metadata.org = org;
     return undefined;
   }
+  const documentOrg = holder.metadata.org;
+  const target = [org, ...orgNames];
   if (
-    holder.metadata.org !== org &&
-    isOrganizationId(holder.metadata.org) === isOrganizationId(org)
+    !target.includes(documentOrg) &&
+    target.some((name) => isOrganizationId(name) === isOrganizationId(documentOrg))
   ) {
+    const targetLabel = target.find((name) => !isOrganizationId(name)) ?? org;
     return (
-      `The document's org "${holder.metadata.org}" differs from the ` +
-      `target org "${org}"; applying to "${holder.metadata.org}".`
+      `The document's org "${documentOrg}" differs from the ` +
+      `target org "${targetLabel}"; applying to "${documentOrg}".`
     );
   }
   return undefined;

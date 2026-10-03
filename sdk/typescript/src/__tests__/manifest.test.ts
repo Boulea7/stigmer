@@ -129,6 +129,20 @@ describe("parseManifest", () => {
     expect(docs[0].warning).toContain('"acme"');
   });
 
+  it("knows the target by every name it is given: one naming it either way applies quietly, another warns in either form", () => {
+    const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+    const GLOBEX_ID = "org_01jbbbbbbbbbbbbbbbbbbbbbbb";
+    const naming = (org: string) => AGENT_YAML.replace("org: rakeshreddi098", `org: ${org}`);
+    const target = { org: ACME_ID, orgNames: ["acme"] };
+
+    expect(parseManifest(naming("acme"), target)[0].warning).toBeUndefined();
+    expect(parseManifest(naming(ACME_ID), target)[0].warning).toBeUndefined();
+    expect(parseManifest(naming("globex"), target)[0].warning).toContain('target org "acme"');
+    expect(parseManifest(naming(GLOBEX_ID), target)[0].warning).toContain(`"${GLOBEX_ID}"`);
+    // Known only by its id, the target cannot be compared with a slug.
+    expect(parseManifest(naming("globex"), { org: ACME_ID })[0].warning).toBeUndefined();
+  });
+
   it("rejects unknown fields loudly (strict schema contract)", () => {
     const yaml = AGENT_YAML.replace("spec:", "spec:\n  instrctions: typo");
     expect(() => parseManifest(yaml)).toThrow(/Invalid Agent/);

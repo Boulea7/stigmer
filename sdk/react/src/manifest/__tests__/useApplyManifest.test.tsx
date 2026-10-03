@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { StigmerContext } from "../../context";
+import { FetchCacheContext } from "../../internal/FetchCacheProvider";
+import { OrgProvider } from "../../organization/OrgProvider";
 import { useApplyManifest } from "../useApplyManifest";
 
 // The hook runs the real manifest engine (parseManifest from @stigmer/sdk);
@@ -233,5 +235,60 @@ describe("useApplyManifest", () => {
     expect(result.current.content).toBe("");
     expect(result.current.entries).toBeNull();
     expect(result.current.validationError).toBeNull();
+  });
+});
+
+describe("useApplyManifest's org-mismatch warning, inside the person's organizations", () => {
+  const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function withOrganizations() {
+    const client = {
+      ...(createMockStigmer() as object),
+      organization: {
+        findMyOrganizations: vi.fn().mockResolvedValue({
+          entries: [{ metadata: { id: ACME_ID, slug: "acme", name: "Acme" } }],
+        }),
+      },
+    };
+    return function Wrapper({ children }: { children: ReactNode }) {
+      return (
+        <StigmerContext.Provider value={client as never}>
+          <FetchCacheContext.Provider value={null}>
+            <OrgProvider>{children}</OrgProvider>
+          </FetchCacheContext.Provider>
+        </StigmerContext.Provider>
+      );
+    };
+  }
+
+  async function warningFor(documentOrg: string): Promise<string | undefined> {
+    const { result } = renderHook(() => useApplyManifest(ACME_ID), { wrapper: withOrganizations() });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    act(() => {
+      result.current.setContent(AGENT_YAML.replace("  name: clinic-patient-assistant\n", `  name: clinic-patient-assistant\n  org: ${documentOrg}\n`));
+    });
+    await act(settleValidation);
+    expect(result.current.entries).toHaveLength(1);
+    return result.current.entries![0].document.warning;
+  }
+
+  it("stays quiet for a document naming the target by its slug while the target is its id", async () => {
+    expect(await warningFor("acme")).toBeUndefined();
+  });
+
+  it("warns for a document naming another organization by slug, and names the target by its slug", async () => {
+    const warning = await warningFor("globex");
+    expect(warning).toContain('"globex"');
+    expect(warning).toContain('target org "acme"');
   });
 });

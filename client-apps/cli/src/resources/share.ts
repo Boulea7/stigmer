@@ -164,12 +164,14 @@ export async function shareAgent(
     );
   }
 
+  const outcomeOrg = share?.metadata?.org || shareOrg;
   return describeOutcome(
     agent,
     share,
     options,
     targetAudience,
     alreadyInState && options.resetLink !== true,
+    await organizationLabel(client, outcomeOrg),
   );
 }
 
@@ -254,13 +256,15 @@ function preservingShareInput(
 // slug) — falling back to the resolved agent's on disable-when-never-shared.
 // The link token comes from the share's status (post-rotation when
 // --reset-link ran) and rides the printed URL and snippet — public audience
-// only (org access is gated by membership).
+// only (org access is gated by membership). The link carries the
+// organization's id; the words a person reads name it by `orgLabel`, its slug.
 function describeOutcome(
   agent: Agent,
   share: AgentShare | null,
   options: ShareAgentOptions,
   audience: ShareAudience,
   alreadyInState: boolean,
+  orgLabel: string,
 ): CommandResult {
   const org = share?.metadata?.org || (agent.metadata?.org ?? "");
   const slug = share?.metadata?.slug || (agent.metadata?.slug ?? "");
@@ -272,7 +276,7 @@ function describeOutcome(
       alreadyInState ? `Sharing is already off for '${name}'` : `Sharing disabled for '${name}'`,
     );
     result.hint("The share link no longer works. Re-enable with:");
-    result.hint(`  stigmer share agent ${org}/${slug}`);
+    result.hint(`  stigmer share agent ${orgLabel}/${slug}`);
     return result;
   }
 
@@ -292,15 +296,15 @@ function describeOutcome(
   if (audience === "org") {
     // Embeds serve anonymous guests, which org-members-only shares refuse
     // by design — no snippet to print.
-    result.hint(`Only signed-in members of ${org} can chat. Access ends when they leave the organization.`);
-    result.hint(`Members chat on ${org}'s credits.`);
+    result.hint(`Only signed-in members of ${orgLabel} can chat. Access ends when they leave the organization.`);
+    result.hint(`Members chat on ${orgLabel}'s credits.`);
   } else {
     const snippetSection = result.addSection("Embed on your site");
     for (const line of buildEmbedSnippet(options.appOrigin, org, slug, publicLinkToken).split("\n")) {
       snippetSection.item(line);
     }
 
-    result.hint(`Visitors chat on ${org}'s credits.`);
+    result.hint(`Visitors chat on ${orgLabel}'s credits.`);
     result.hint("Public links can be forwarded and indexed by search engines.");
     if (options.resetLink === true) {
       result.hint("Re-share the new link with the people who should keep access.");

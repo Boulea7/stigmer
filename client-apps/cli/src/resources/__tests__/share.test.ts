@@ -350,6 +350,30 @@ describe("shareAgent output", () => {
     expect(result.hints.some((h) => h.includes("search engines"))).toBe(true);
   });
 
+  it("names the organization by its slug in what a person reads, while the link carries its id", async () => {
+    const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+    const agent = makeAgent();
+    agent.metadata!.org = ACME_ID;
+    const share = makeShare({ enabled: false });
+    share.metadata.org = ACME_ID;
+    const { client } = fakeClient(agent, share);
+    (client as unknown as { organization: unknown }).organization = {
+      async get(value: string) {
+        if (value !== ACME_ID && value !== "acme") throw new Error("not found");
+        return { metadata: { id: ACME_ID, slug: "acme" } };
+      },
+    };
+
+    const enabled = await shareAgent(client, "acme/support-agent", "acme", { enabled: true, ...CLOUD });
+    expect(enabled.hints.some((h) => h.includes("acme's credits"))).toBe(true);
+    expect(enabled.hints.some((h) => h.includes(ACME_ID))).toBe(false);
+    const link = enabled.sections.find((s) => s.title === "Public chat link");
+    expect(link?.items).toEqual([`https://app.stigmer.ai/chat/${ACME_ID}/support-agent`]);
+
+    const disabled = await shareAgent(client, "acme/support-agent", "acme", { enabled: false, ...CLOUD });
+    expect(disabled.hints).toContain("  stigmer share agent acme/support-agent");
+  });
+
   it("warns that a local link won't serve visitors (guest chat is Cloud-only)", async () => {
     const { client } = fakeClient(makeAgent(), makeShare({ enabled: false }));
 

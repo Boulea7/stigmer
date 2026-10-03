@@ -160,10 +160,15 @@ export function ensureAuthenticated(config: Config): void {
   ]);
 }
 
-/** How output names the context organization: its slug and id when `set` stored them, else the value as configured. */
+/** How output names the context organization: the slug `set` stored with its id, else the value as configured. */
 export function contextOrganizationLabel(config: Config): string {
   const org = resolveContextOrganization(config);
   const slug = config.context?.org_slug ?? "";
-  if (org === "" || slug === "" || slug === org) return org;
-  return `${slug} (${org})`;
+  return org === "" || slug === "" ? org : slug;
+}
+
+/** The context organization's id, shown beside its label; "" when the label already is the configured value. */
+export function contextOrganizationId(config: Config): string {
+  const org = resolveContextOrganization(config);
+  return contextOrganizationLabel(config) === org ? "" : org;
 }

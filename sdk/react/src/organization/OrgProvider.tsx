@@ -41,10 +41,15 @@ const OrgContext = createContext<OrgContextValue | null>(null);
 // The active org is remembered by its id: an id never changes, while a
 // slug can be renamed and would then restore nothing.
 const STORAGE_KEY = "stigmer:activeOrg";
+// Where earlier releases remembered the active org, by slug. Read once, when
+// no id is remembered yet, so an upgrade keeps the person's choice; the first
+// id persisted removes it.
+const LEGACY_SLUG_STORAGE_KEY = "stigmer:activeOrgSlug";
 
-function readPersistedOrgId(): string | null {
+/** The remembered org: its id, or the slug an earlier release remembered. */
+function readPersistedOrgRef(): string | null {
   try {
-    return localStorage.getItem(STORAGE_KEY);
+    return localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_SLUG_STORAGE_KEY);
   } catch {
     return null;
   }
@@ -53,6 +58,7 @@ function readPersistedOrgId(): string | null {
 function persistOrgId(id: string): void {
   try {
     localStorage.setItem(STORAGE_KEY, id);
+    localStorage.removeItem(LEGACY_SLUG_STORAGE_KEY);
   } catch {
     // SSR or private browsing — silently ignore.
   }
@@ -130,7 +136,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const preferred = target ?? readPersistedOrgId();
+        const preferred = target ?? readPersistedOrgRef();
         const restored = preferred
           ? findOrgByRef(entries, preferred)
           : undefined;

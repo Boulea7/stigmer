@@ -19,7 +19,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
-import type { ConnectRouter } from "@connectrpc/connect";
+import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { OrganizationsSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/io_pb";
@@ -42,6 +42,14 @@ let originalHome: string | undefined;
 beforeAll(async () => {
   const routes = (router: ConnectRouter) => {
     router.service(OrganizationQueryController, {
+      // The server resolves a slug acme was renamed from, as the serving
+      // chain's resolver does.
+      get: ({ value }) => {
+        if (value !== "acme-old" && value !== "acme" && value !== ACME_ID) {
+          throw new ConnectError("not found", Code.NotFound);
+        }
+        return create(OrganizationSchema, { metadata: { id: ACME_ID, slug: "acme" } });
+      },
       findMyOrganizations: () => {
         lookups += 1;
         return create(OrganizationsSchema, {
@@ -145,6 +153,13 @@ describe("config context set --org", () => {
     expect(load().context?.org_slug).toBe("acme");
   });
 
+  it("accepts a slug the organization was renamed from, while the server still resolves it, and stores the current one", async () => {
+    const outcome = await run("--org", "acme-old");
+    expect(outcome.exitCode).toBe(ExitCode.Success);
+    expect(resolveOrganization(load())).toBe(ACME_ID);
+    expect(load().context?.org_slug).toBe("acme");
+  });
+
   it("refuses a slug the backend does not list as the caller's and leaves the config untouched", async () => {
     const before = readFileSync(configFile(), "utf8");
     const outcome = await run("--org", "acmee");
@@ -176,7 +191,8 @@ describe("config context show", () => {
     expect(outcome.exitCode).toBe(ExitCode.Success);
     const fields = JSON.parse(outcome.stdout).sections[0].fields as { key: string; value: string }[];
     expect(fields).toEqual([
-      { key: "Organization", value: `acme (${ACME_ID})` },
+      { key: "Organization", value: "acme" },
+      { key: "Organization ID", value: ACME_ID },
       { key: "Backend", value: "team" },
     ]);
   });

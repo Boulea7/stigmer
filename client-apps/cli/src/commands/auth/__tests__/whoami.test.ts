@@ -50,6 +50,19 @@ describe("whoamiResult", () => {
     expect(result.hints).toEqual([]);
   });
 
+  it("names the organization by slug, with its id as a field of its own", () => {
+    const result = whoamiResult(ACCOUNT, {
+      created: false,
+      org: "acme",
+      orgId: "org_01jaaaaaaaaaaaaaaaaaaaaaaa",
+      singleOrg: false,
+    });
+    expect(fields(result)).toMatchObject({
+      Organization: "acme",
+      "Organization ID": "org_01jaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+  });
+
   it("says so when this call created the account — the first sign-in is visible, never silent", () => {
     const result = whoamiResult(ACCOUNT, { created: true, org: "acme", singleOrg: false });
     expect(result.status).toBe("success");

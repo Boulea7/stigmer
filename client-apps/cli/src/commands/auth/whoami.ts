@@ -13,6 +13,7 @@ import type { IdentityAccount } from "@stigmer/protos/ai/stigmer/iam/identityacc
 import { ensureMyIdentityAccount } from "@stigmer/sdk";
 import {
   ensureAuthenticated,
+  contextOrganizationId,
   contextOrganizationLabel,
 } from "../../config/index.js";
 import { CommandResult } from "../../output/index.js";
@@ -22,8 +23,10 @@ import { omitsOrganization } from "../../client/single-org.js";
 export interface WhoamiContext {
   /** `true` when this call created the account (a first sign-in). */
   readonly created: boolean;
-  /** The organization the CLI context resolves to; "" when none is set. */
+  /** The organization the CLI context resolves to, by slug when known; "" when none is set. */
   readonly org: string;
+  /** Its id, when `org` is its slug; "" otherwise. */
+  readonly orgId?: string;
   /** The server holds one organization and fills it, so the CLI never names one. */
   readonly singleOrg: boolean;
 }
@@ -68,6 +71,7 @@ export function whoamiResult(
   if (!context.singleOrg) {
     if (context.org !== "") {
       section.field("Organization", context.org);
+      if (context.orgId) section.field("Organization ID", context.orgId);
     } else {
       result.hint(
         "No organization set. Use: stigmer config context set --org <slug>",
@@ -89,6 +93,7 @@ export async function runWhoami(): Promise<CommandResult> {
   return whoamiResult(account, {
     created,
     org: contextOrganizationLabel(client.config),
+    orgId: contextOrganizationId(client.config),
     singleOrg: await omitsOrganization(client.stigmer),
   });
 }

@@ -109,6 +109,26 @@ describe("OrgProvider persistence by id", () => {
     expect(localStorage.getItem("stigmer:activeOrg")).toBe(ACME_ID);
   });
 
+  it("keeps the choice an earlier release remembered by slug, then remembers it by id alone", async () => {
+    localStorage.setItem("stigmer:activeOrgSlug", "globex");
+    const { result } = renderOrg(
+      createMockStigmer([[org(ACME_ID, "acme"), org(GLOBEX_ID, "globex")]]),
+    );
+    await waitFor(() => expect(result.current.id).toBe(GLOBEX_ID));
+    expect(localStorage.getItem("stigmer:activeOrg")).toBe(GLOBEX_ID);
+    expect(localStorage.getItem("stigmer:activeOrgSlug")).toBeNull();
+  });
+
+  it("prefers the remembered id over a slug an earlier release left behind", async () => {
+    localStorage.setItem("stigmer:activeOrg", ACME_ID);
+    localStorage.setItem("stigmer:activeOrgSlug", "globex");
+    const { result } = renderOrg(
+      createMockStigmer([[org(ACME_ID, "acme"), org(GLOBEX_ID, "globex")]]),
+    );
+    await waitFor(() => expect(result.current.id).toBe(ACME_ID));
+    expect(localStorage.getItem("stigmer:activeOrgSlug")).toBeNull();
+  });
+
   it("treats an older org whose id equals its slug like any other", async () => {
     localStorage.setItem("stigmer:activeOrg", "legacy");
     const { result } = renderOrg(

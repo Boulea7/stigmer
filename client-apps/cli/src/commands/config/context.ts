@@ -13,7 +13,15 @@
 // hatch.
 
 import type { Command } from "commander";
-import { type Config, activeBackendName, contextOrganizationLabel, ensureAuthenticated, load, save } from "../../config/index.js";
+import {
+  type Config,
+  activeBackendName,
+  contextOrganizationId,
+  contextOrganizationLabel,
+  ensureAuthenticated,
+  load,
+  save,
+} from "../../config/index.js";
 import { CliExitError, ExitCode, UsageError } from "../../errors/index.js";
 import { CommandResult, type OutputFlags, renderResult } from "../../output/index.js";
 import { addResultFlags, resultFormat } from "../shared.js";
@@ -37,8 +45,11 @@ export function addContextCommands(context: Command): void {
 
 function buildShow(config: Config): CommandResult {
   const organization = contextOrganizationLabel(config) || "(not set)";
+  const organizationId = contextOrganizationId(config);
   const result = CommandResult.success("CLI context");
-  result.addSection("").field("Organization", organization).field("Backend", activeBackendName(config));
+  const section = result.addSection("").field("Organization", organization);
+  if (organizationId !== "") section.field("Organization ID", organizationId);
+  section.field("Backend", activeBackendName(config));
   return result;
 }
 
@@ -71,7 +82,18 @@ async function assertMembership(config: Config, org: string): Promise<{ id: stri
   const client = connectBackend(config);
   ensureAuthenticated(client.config);
   const mine = await client.stigmer.organization.findMyOrganizations();
-  const match = mine.entries.find((entry) => entry.metadata?.slug === org || entry.metadata?.id === org);
+  // A slug an organization was renamed from still leads to it for a while:
+  // the server answers which organization it names, matched here by id.
+  const named = async (): Promise<string | undefined> => {
+    try {
+      return (await client.stigmer.organization.get(org)).metadata?.id;
+    } catch {
+      return undefined;
+    }
+  };
+  const match =
+    mine.entries.find((entry) => entry.metadata?.slug === org || entry.metadata?.id === org) ??
+    (await named().then((id) => mine.entries.find((entry) => id !== undefined && entry.metadata?.id === id)));
   if (match?.metadata !== undefined && match.metadata.id !== "") {
     return { id: match.metadata.id, slug: match.metadata.slug };
   }
