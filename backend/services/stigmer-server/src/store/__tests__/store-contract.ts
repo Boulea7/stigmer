@@ -1593,6 +1593,40 @@ export function describeStoreContract(
       expect(await names().resolve(key("acme-corp"), T2)).toBeUndefined();
     });
 
+    it("revertRename restores a name the rename took back, as it stood, instead of letting it go", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 });
+      const back = { ...ORG, id: "org_a", from: "acme-corp", to: "acme", fromExpiresAt: T3, now: T2 };
+      const moved = await names().rename(back);
+      expect(moved.claimed).toBe(true);
+      const takenBack = moved.claimed ? moved.takenBack : undefined;
+      expect(takenBack).toMatchObject({ name: "acme", id: "org_a", state: "previous", expiresAt: T3 });
+
+      await names().revertRename(back, takenBack);
+      await names().revertRename(back, takenBack);
+      expect(await names().resolve(key("acme-corp"), T2)).toMatchObject({ state: "current", expiresAt: "" });
+      expect(await names().resolve(key("acme"), T2)).toMatchObject({ id: "org_a", state: "previous", expiresAt: T3 });
+    });
+
+    it("a move back never lets go of a name equal to its id", async () => {
+      await names().claim(key("older"), "older", T0);
+      await names().rename({ ...ORG, id: "older", from: "older", to: "newer", fromExpiresAt: T2, now: T1 });
+      const back = { ...ORG, id: "older", from: "newer", to: "older", fromExpiresAt: T2, now: T1 };
+      const moved = await names().rename(back);
+      await names().revertRename(back, moved.claimed ? moved.takenBack : undefined);
+
+      expect(await names().resolve(key("older"), "2999-01-01T00:00:00.000Z")).toMatchObject({
+        id: "older", state: "previous", expiresAt: "",
+      });
+      expect((await names().claim(key("older"), "org_b", "2999-01-01T00:00:00.000Z")).claimed).toBe(false);
+    });
+
+    it("a rename onto a name taken fresh carries nothing taken back", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      const moved = await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 });
+      expect(moved.claimed && moved.takenBack).toBeUndefined();
+    });
+
     it("release lets go of every name one resource holds, and only its", async () => {
       await names().claim(key("acme"), "org_a", T0);
       await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 });

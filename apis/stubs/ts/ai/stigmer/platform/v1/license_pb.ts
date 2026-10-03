@@ -127,9 +127,9 @@ export type LicenseCustomer = Message<"ai.stigmer.platform.v1.LicenseCustomer"> 
   contactEmail: string;
 
   /**
-   * The cloud organization this customer also holds, as its slug (the same
-   * value a resource's metadata.org carries). Empty when the customer has
-   * none.
+   * The cloud organization this customer also holds. A request may name it
+   * by slug or id; the server stores its id, the value a resource's
+   * metadata.org carries. Empty when the customer has none.
    *
    * @generated from field: string org = 4;
    */

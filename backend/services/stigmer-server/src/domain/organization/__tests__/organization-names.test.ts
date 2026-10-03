@@ -645,6 +645,38 @@ describe("a rename whose row write fails", () => {
     ).rejects.toThrow();
     expect(errors).toHaveLength(1);
   });
+
+  it("hands the move back the name it took back, so the store restores it rather than letting it go", async () => {
+    const takenBack: ResourceNameEntry = {
+      ...organizationNameKey("acme-corp"),
+      id: "org_01jaaaaaaaaaaaaaaaaaaaaaaa",
+      state: "previous",
+      claimedAt: "2026-09-01T00:00:00.000Z",
+      expiresAt: "2026-10-01T00:00:00.000Z",
+    };
+    const reverts: Array<ResourceNameEntry | undefined> = [];
+    const store = {
+      resourceNames: {
+        rename: async (move: ResourceNameRename) => ({
+          claimed: true,
+          entry: { ...takenBack, state: "current", claimedAt: move.now, expiresAt: "" },
+          takenBack,
+        }),
+        revertRename: async (_move: ResourceNameRename, restored?: ResourceNameEntry) => {
+          reverts.push(restored);
+        },
+      },
+      saveResource: async () => {
+        throw new Error("disk full");
+      },
+    } as unknown as Store;
+    const logger = { error: () => {}, warn: () => {}, info: () => {}, debug: () => {} } as unknown as Logger;
+
+    const ctx = renameRequest();
+    await newRenameOrganizationSlugStep(store).execute(ctx);
+    await expect(newPersistRenamedOrganizationStep(store, logger).execute(ctx)).rejects.toThrow();
+    expect(reverts).toEqual([takenBack]);
+  });
 });
 
 /** The ConnectError a step fails with. */

@@ -50,7 +50,7 @@
       "type": {
         "kind": "string"
       },
-      "description": "The cloud organization this customer also holds, as its slug (the same\n value a resource's metadata.org carries). Empty when the customer has\n none.",
+      "description": "The cloud organization this customer also holds. A request may name it\n by slug or id; the server stores its id, the value a resource's\n metadata.org carries. Empty when the customer has none.",
       "required": false
     }
   ]

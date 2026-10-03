@@ -211,9 +211,9 @@ private static final long serialVersionUID = 0L;
   private volatile java.lang.Object org_ = "";
   /**
    * <pre>
-   * The cloud organization this customer also holds, as its slug (the same
-   * value a resource's metadata.org carries). Empty when the customer has
-   * none.
+   * The cloud organization this customer also holds. A request may name it
+   * by slug or id; the server stores its id, the value a resource's
+   * metadata.org carries. Empty when the customer has none.
    * </pre>
    *
    * <code>string org = 4 [json_name = "org"];</code>
@@ -234,9 +234,9 @@ private static final long serialVersionUID = 0L;
   }
   /**
    * <pre>
-   * The cloud organization this customer also holds, as its slug (the same
-   * value a resource's metadata.org carries). Empty when the customer has
-   * none.
+   * The cloud organization this customer also holds. A request may name it
+   * by slug or id; the server stores its id, the value a resource's
+   * metadata.org carries. Empty when the customer has none.
    * </pre>
    *
    * <code>string org = 4 [json_name = "org"];</code>
@@ -921,9 +921,9 @@ private static final long serialVersionUID = 0L;
     private java.lang.Object org_ = "";
     /**
      * <pre>
-     * The cloud organization this customer also holds, as its slug (the same
-     * value a resource's metadata.org carries). Empty when the customer has
-     * none.
+     * The cloud organization this customer also holds. A request may name it
+     * by slug or id; the server stores its id, the value a resource's
+     * metadata.org carries. Empty when the customer has none.
      * </pre>
      *
      * <code>string org = 4 [json_name = "org"];</code>
@@ -943,9 +943,9 @@ private static final long serialVersionUID = 0L;
     }
     /**
      * <pre>
-     * The cloud organization this customer also holds, as its slug (the same
-     * value a resource's metadata.org carries). Empty when the customer has
-     * none.
+     * The cloud organization this customer also holds. A request may name it
+     * by slug or id; the server stores its id, the value a resource's
+     * metadata.org carries. Empty when the customer has none.
      * </pre>
      *
      * <code>string org = 4 [json_name = "org"];</code>
@@ -966,9 +966,9 @@ private static final long serialVersionUID = 0L;
     }
     /**
      * <pre>
-     * The cloud organization this customer also holds, as its slug (the same
-     * value a resource's metadata.org carries). Empty when the customer has
-     * none.
+     * The cloud organization this customer also holds. A request may name it
+     * by slug or id; the server stores its id, the value a resource's
+     * metadata.org carries. Empty when the customer has none.
      * </pre>
      *
      * <code>string org = 4 [json_name = "org"];</code>
@@ -985,9 +985,9 @@ private static final long serialVersionUID = 0L;
     }
     /**
      * <pre>
-     * The cloud organization this customer also holds, as its slug (the same
-     * value a resource's metadata.org carries). Empty when the customer has
-     * none.
+     * The cloud organization this customer also holds. A request may name it
+     * by slug or id; the server stores its id, the value a resource's
+     * metadata.org carries. Empty when the customer has none.
      * </pre>
      *
      * <code>string org = 4 [json_name = "org"];</code>
@@ -1001,9 +1001,9 @@ private static final long serialVersionUID = 0L;
     }
     /**
      * <pre>
-     * The cloud organization this customer also holds, as its slug (the same
-     * value a resource's metadata.org carries). Empty when the customer has
-     * none.
+     * The cloud organization this customer also holds. A request may name it
+     * by slug or id; the server stores its id, the value a resource's
+     * metadata.org carries. Empty when the customer has none.
      * </pre>
      *
      * <code>string org = 4 [json_name = "org"];</code>

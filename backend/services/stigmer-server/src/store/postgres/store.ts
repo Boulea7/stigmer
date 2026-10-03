@@ -56,6 +56,7 @@ import type {
   ResourceNameEntry,
   ResourceNameKey,
   ResourceNameRename,
+  ResourceNameRenamed,
   ResourceNameStore,
   PendingOAuthState,
   PendingOAuthStateStore,
@@ -1581,11 +1582,17 @@ class PostgresResourceNameStore implements ResourceNameStore {
     });
   }
 
-  async rename(rename: ResourceNameRename): Promise<ResourceNameClaim> {
+  async rename(rename: ResourceNameRename): Promise<ResourceNameRenamed> {
     assertRenameMoves(rename);
     const to = { kind: rename.kind, org: rename.org, name: rename.to };
     return this.transaction(async (client) => {
       await removeExpired(client, to, rename.now);
+      const before = await client.query<ResourceNameRow>(
+        `SELECT ${RESOURCE_NAME_COLUMNS} FROM resource_names
+         WHERE kind = $1 AND org = $2 AND name = $3 AND id = $4`,
+        [to.kind, to.org, to.name, rename.id],
+      );
+      const takenBack = before.rows[0];
       const taken = await client.query<ResourceNameRow>(
         `INSERT INTO resource_names (kind, org, name, id, state, claimed_at)
          VALUES ($1, $2, $3, $4, 'current', $5)
@@ -1617,17 +1624,38 @@ class PostgresResourceNameStore implements ResourceNameStore {
           rename.fromExpiresAt,
         ],
       );
-      return { claimed: true, entry: resourceNameEntryOf(row) };
+      return takenBack === undefined
+        ? { claimed: true, entry: resourceNameEntryOf(row) }
+        : { claimed: true, entry: resourceNameEntryOf(row), takenBack: resourceNameEntryOf(takenBack) };
     });
   }
 
-  async revertRename(rename: ResourceNameRename): Promise<void> {
+  async revertRename(
+    rename: ResourceNameRename,
+    takenBack?: ResourceNameEntry,
+  ): Promise<void> {
     await this.transaction(async (client) => {
-      await client.query(
-        `DELETE FROM resource_names
-         WHERE kind = $1 AND org = $2 AND name = $3 AND id = $4`,
-        [rename.kind, rename.org, rename.to, rename.id],
-      );
+      if (takenBack === undefined) {
+        await client.query(
+          `DELETE FROM resource_names
+           WHERE kind = $1 AND org = $2 AND name = $3 AND id = $4`,
+          [rename.kind, rename.org, rename.to, rename.id],
+        );
+      } else {
+        await client.query(
+          `UPDATE resource_names SET state = $5, claimed_at = $6, expires_at = $7
+           WHERE kind = $1 AND org = $2 AND name = $3 AND id = $4`,
+          [
+            rename.kind,
+            rename.org,
+            rename.to,
+            rename.id,
+            takenBack.state,
+            takenBack.claimedAt,
+            takenBack.expiresAt,
+          ],
+        );
+      }
       await client.query(
         `UPDATE resource_names SET state = 'current', expires_at = ''
          WHERE kind = $1 AND org = $2 AND name = $3 AND id = $4`,

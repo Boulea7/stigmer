@@ -21,7 +21,7 @@
  */
 import type { Logger } from "../../boot/logger.js";
 import { ResourceNotFoundError } from "../../store/interface.js";
-import type { ResourceNameRename, Store } from "../../store/interface.js";
+import type { ResourceNameEntry, ResourceNameRename, Store } from "../../store/interface.js";
 import { internalError, notFoundError } from "../../pipeline/errors.js";
 import type { PipelineStep } from "../../pipeline/pipeline.js";
 import type { RequestContext } from "../../pipeline/request-context.js";
@@ -47,6 +47,12 @@ export const RENAMED_ORGANIZATION_KEY = "renamedOrganization";
 
 /** Where RenameOrganizationSlug leaves the move it made, for the write that follows. */
 const NAME_MOVE_KEY = "organizationNameMove";
+
+/** The move RenameOrganizationSlug made, and the earlier state of a name it took back. */
+interface NameMove {
+  readonly move: ResourceNameRename;
+  readonly takenBack?: ResourceNameEntry;
+}
 
 /** Loads the organization by resource_id; a missing one answers NotFound, a store fault Internal. */
 export function newLoadOrganizationForRenameStep(
@@ -125,7 +131,8 @@ export function newRenameOrganizationSlugStep(
       if (!moved.claimed) {
         throw refusalForHeldName(moved.entry);
       }
-      ctx.set(NAME_MOVE_KEY, move);
+      const recorded: NameMove = moved.takenBack === undefined ? { move } : { move, takenBack: moved.takenBack };
+      ctx.set(NAME_MOVE_KEY, recorded);
       metadata.slug = ctx.input.slug;
       setAuditFieldsForUpdate(
         OrganizationSchema,
@@ -152,10 +159,11 @@ export function newPersistRenamedOrganizationStep(
   return {
     name: "PersistRenamedOrganization",
     async execute(ctx: RequestContext<RenameDesc>): Promise<void> {
-      const move = ctx.get(NAME_MOVE_KEY) as ResourceNameRename | undefined;
-      if (move === undefined) {
+      const recorded = ctx.get(NAME_MOVE_KEY) as NameMove | undefined;
+      if (recorded === undefined) {
         return; // the slug was already the organization's
       }
+      const { move, takenBack } = recorded;
       const organization = ctx.get(RENAMED_ORGANIZATION_KEY) as Organization;
       try {
         await store.saveResource(
@@ -166,7 +174,7 @@ export function newPersistRenamedOrganizationStep(
         );
       } catch (error) {
         try {
-          await store.resourceNames.revertRename(move);
+          await store.resourceNames.revertRename(move, takenBack);
         } catch (revertError) {
           logger.error(
             "organization rename failed and its names could not be moved back; both slugs lead to the organization until a retry",

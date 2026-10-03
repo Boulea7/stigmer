@@ -51,6 +51,7 @@ import type {
   ResourceNameEntry,
   ResourceNameKey,
   ResourceNameRename,
+  ResourceNameRenamed,
   ResourceNameStore,
   PendingOAuthState,
   PendingOAuthStateStore,
@@ -1686,11 +1687,17 @@ class SqliteResourceNameStore implements ResourceNameStore {
     });
   }
 
-  async rename(rename: ResourceNameRename): Promise<ResourceNameClaim> {
+  async rename(rename: ResourceNameRename): Promise<ResourceNameRenamed> {
     assertRenameMoves(rename);
     const to = { kind: rename.kind, org: rename.org, name: rename.to };
     return this.transaction((db) => {
       removeExpiredName(db, to, rename.now);
+      const takenBack = db
+        .prepare(
+          `SELECT ${RESOURCE_NAME_COLUMNS} FROM resource_names
+           WHERE kind = ? AND org = ? AND name = ? AND id = ?`,
+        )
+        .get(to.kind, to.org, to.name, rename.id) as ResourceNameRow | undefined;
       const row = db
         .prepare(
           `INSERT INTO resource_names (kind, org, name, id, state, claimed_at)
@@ -1723,16 +1730,36 @@ class SqliteResourceNameStore implements ResourceNameStore {
         rename.id,
         rename.to,
       );
-      return { claimed: true, entry: resourceNameEntryOf(row) };
+      return takenBack === undefined
+        ? { claimed: true, entry: resourceNameEntryOf(row) }
+        : { claimed: true, entry: resourceNameEntryOf(row), takenBack: resourceNameEntryOf(takenBack) };
     });
   }
 
-  async revertRename(rename: ResourceNameRename): Promise<void> {
+  async revertRename(
+    rename: ResourceNameRename,
+    takenBack?: ResourceNameEntry,
+  ): Promise<void> {
     this.transaction((db) => {
-      db.prepare(
-        `DELETE FROM resource_names
-         WHERE kind = ? AND org = ? AND name = ? AND id = ?`,
-      ).run(rename.kind, rename.org, rename.to, rename.id);
+      if (takenBack === undefined) {
+        db.prepare(
+          `DELETE FROM resource_names
+           WHERE kind = ? AND org = ? AND name = ? AND id = ?`,
+        ).run(rename.kind, rename.org, rename.to, rename.id);
+      } else {
+        db.prepare(
+          `UPDATE resource_names SET state = ?, claimed_at = ?, expires_at = ?
+           WHERE kind = ? AND org = ? AND name = ? AND id = ?`,
+        ).run(
+          takenBack.state,
+          takenBack.claimedAt,
+          takenBack.expiresAt,
+          rename.kind,
+          rename.org,
+          rename.to,
+          rename.id,
+        );
+      }
       db.prepare(
         `UPDATE resource_names SET state = 'current', expires_at = ''
          WHERE kind = ? AND org = ? AND name = ? AND id = ?`,

@@ -367,6 +367,19 @@ export type ResourceNameClaim =
   | { readonly claimed: true; readonly entry: ResourceNameEntry }
   | { readonly claimed: false; readonly entry: ResourceNameEntry };
 
+/**
+ * A rename's outcome, as a claim's. A won rename that took back one of the
+ * resource's own previous names carries that name as it stood before
+ * (`takenBack`), so a move back can restore it rather than let it go.
+ */
+export type ResourceNameRenamed =
+  | {
+      readonly claimed: true;
+      readonly entry: ResourceNameEntry;
+      readonly takenBack?: ResourceNameEntry;
+    }
+  | { readonly claimed: false; readonly entry: ResourceNameEntry };
+
 /** One rename: `id`'s current name `from` becomes `to`. */
 export interface ResourceNameRename {
   readonly kind: string;
@@ -416,9 +429,13 @@ export interface ResourceNameStore {
    * exactly one current name however renames interleave. Lost, with
    * nothing changed, when another resource holds `to`.
    */
-  rename(rename: ResourceNameRename): Promise<ResourceNameClaim>;
-  /** Undoes a rename whose resource write failed: `to` is let go and `from` is current again. Idempotent. */
-  revertRename(rename: ResourceNameRename): Promise<void>;
+  rename(rename: ResourceNameRename): Promise<ResourceNameRenamed>;
+  /**
+   * Undoes a rename whose resource write failed: `from` is current again,
+   * and `to` is let go, or, when the rename took it back (`takenBack`, from
+   * the rename's outcome), restored to that earlier state. Idempotent.
+   */
+  revertRename(rename: ResourceNameRename, takenBack?: ResourceNameEntry): Promise<void>;
   /** Lets go of every name `id` holds in the kind and scope (its delete, or a create whose row never landed). Idempotent. */
   release(kind: string, org: string, id: string): Promise<void>;
 }
