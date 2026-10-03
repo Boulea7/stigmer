@@ -68,6 +68,14 @@ const knownApiKey = create(ApiKeySchema, {
   spec: { fingerprint: "abcd", neverExpires: true },
 });
 
+// An organization the server holds under a newer slug and no membership
+// lists, so a get by its earlier slug or its id falls back to the server.
+const renamedOrg = create(OrganizationSchema, {
+  apiVersion: "tenancy.stigmer.ai/v1",
+  kind: "Organization",
+  metadata: { name: "Globex", slug: "globex", id: "org_01jbbbbbbbbbbbbbbbbbbbbbbb" },
+});
+
 // Second org/API-key entries so the list tests can pin the
 // dispatcher-applied --limit slice — both RPCs are unpaginated (Empty
 // request), the exact shape that shipped ignoring the flag when handlers
@@ -242,6 +250,13 @@ beforeAll(async () => {
     });
     router.service(OrganizationQueryController, {
       findMyOrganizations: () => ({ entries: [knownOrg, secondOrg] }),
+      // The server resolves an earlier slug and an id to the organization.
+      get: (req) => {
+        if (req.value !== "globex-old" && req.value !== renamedOrg.metadata?.id) {
+          throw new ConnectError("organization not found", Code.NotFound);
+        }
+        return renamedOrg;
+      },
     });
     router.service(ApiKeyQueryController, {
       findAll: () => ({ entries: [knownApiKey, secondApiKey] }),
@@ -363,6 +378,29 @@ describe("get integration", () => {
     expect(JSON.parse(renderResource(OrganizationSchema, message, "json"))).toMatchObject({
       metadata: { slug: "acme" },
     });
+  });
+
+  it("falls back to the server for an organization's earlier slug or id, which no membership's slug matches", async () => {
+    for (const token of ["globex-old", "org_01jbbbbbbbbbbbbbbbbbbbbbbb"]) {
+      const { message } = await fetchResource(client, ApiResourceKind.organization, {
+        kind: "ref",
+        org: "acme",
+        slug: token,
+      });
+      expect(JSON.parse(renderResource(OrganizationSchema, message, "json"))).toMatchObject({
+        metadata: { slug: "globex", id: "org_01jbbbbbbbbbbbbbbbbbbbbbbb" },
+      });
+    }
+  });
+
+  it("answers NotFound for an organization neither the memberships nor the server know", async () => {
+    const err = await fetchResource(client, ApiResourceKind.organization, {
+      kind: "ref",
+      org: "acme",
+      slug: "nobody",
+    }).catch((e) => e);
+    expect(classify(err)?.exitCode).toBe(ExitCode.NotFound);
+    expect(String(err)).toMatch(/organization "nobody" not found/);
   });
 
   it("fetches an environment by org/slug and renders backend protojson", async () => {

@@ -6,15 +6,19 @@
 // organization manifest carries its id and a different slug, through rename.
 // And the org-mismatch warning: an organization is named by id or slug, so
 // two different strings are asked about before they are called different.
+// And the Organization handler's rename binding, which the follow-up drives.
 
 import { create, type Message } from "@bufbuild/protobuf";
 import { AgentSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { ApiResourceVisibility } from "@stigmer/protos/ai/stigmer/commons/apiresource/enum_pb";
+import { RenameInputSchema } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
 import type { RenameInput, UpdateVisibilityInput } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
 import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
+import { OrganizationCommandController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/command_pb";
 import { describe, expect, it } from "vitest";
 import { applyMessage } from "../apply.js";
+import { APPLY_HANDLERS } from "../handlers.js";
 import type { ApplyHandler, ControllerFn } from "../handlers.js";
 
 // The controller accessor is only ever forwarded to handler methods, which
@@ -222,5 +226,41 @@ describe("applyMessage org-mismatch warning", () => {
       true,
     );
     expect(outcome.warning).toMatch(/resource org 'acme' differs from target org 'globex'; using 'acme'/);
+  });
+
+  it("warns when the caller cannot see the target, since no lookup can prove the two the same", async () => {
+    const { handler } = handlerWith({ applyReturns: agent(ApiResourceVisibility.visibility_org) });
+    const outcome = await applyMessage(
+      organizationsNaming({ acme: ACME_ID }),
+      handler,
+      agent(ApiResourceVisibility.api_resource_visibility_unspecified),
+      "hidden",
+      true,
+    );
+    expect(outcome.warning).toMatch(/resource org 'acme' differs from target org 'hidden'; using 'acme'/);
+  });
+});
+
+describe("the Organization apply handler", () => {
+  it("sends a slug change through the Organization service's rename, the only door for it", async () => {
+    const handler = APPLY_HANDLERS.get(ApiResourceKind.organization);
+    const services: unknown[] = [];
+    const renames: RenameInput[] = [];
+    const recording = ((service: unknown) => {
+      services.push(service);
+      return {
+        rename: (input: RenameInput) => {
+          renames.push(input);
+          return Promise.resolve(organization(input.slug));
+        },
+      };
+    }) as unknown as ControllerFn;
+    const input = create(RenameInputSchema, { resourceId: ACME_ID, slug: "acme-corp" });
+
+    const renamed = await handler?.rename?.(recording, input);
+
+    expect(services).toEqual([OrganizationCommandController]);
+    expect(renames).toEqual([input]);
+    expect((renamed as { metadata?: { slug?: string } } | undefined)?.metadata?.slug).toBe("acme-corp");
   });
 });

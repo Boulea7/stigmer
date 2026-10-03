@@ -20,7 +20,10 @@
  * And, over store doubles, the two failure paths: the release a failed
  * create runs (it frees the claim only when the organization was never
  * stored, and every fault leaves the name claimed), and the move back a
- * rename whose row write fails runs.
+ * rename whose row write fails runs. Also over doubles, the arms a composed
+ * server does not reach in order: when a name's holder counts as gone, the
+ * claim and release steps' server faults, and the organization loaders'
+ * answers for an id or slug no row holds and for a store fault.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -73,7 +76,9 @@ import {
   ABANDONED_NAME_AFTER_MS,
   ORGANIZATION_SLUG_RESERVED,
   RENAMED_SLUG_HOLD_MS,
+  nameHolderIsGone,
   newClaimOrganizationSlugStep,
+  newRetireOrganizationSlugStep,
   organizationNameKey,
   releaseSlugClaimAfterFailure,
 } from "../names.js";
@@ -82,6 +87,15 @@ import {
   newPersistRenamedOrganizationStep,
   newRenameOrganizationSlugStep,
 } from "../rename.js";
+import {
+  newLoadExistingOrganizationStep,
+  newLoadOrganizationForApplyStep,
+} from "../steps.js";
+import { EXISTING_RESOURCE_KEY } from "../../../pipeline/steps/load-existing.js";
+import {
+  EXISTS_IN_DATABASE_KEY,
+  SHOULD_CREATE_KEY,
+} from "../../../pipeline/steps/load-for-apply.js";
 
 const OPERATOR_EMAIL = "operator@example.com";
 const DUPLICATE_COPY = (slug: string) =>
@@ -584,5 +598,205 @@ describe("a rename whose row write fails", () => {
       newPersistRenamedOrganizationStep(store, logger).execute(again),
     ).rejects.toThrow();
     expect(errors).toHaveLength(1);
+  });
+});
+
+/** The ConnectError a step fails with. */
+async function stepRefusal(run: () => Promise<void> | void): Promise<ConnectError> {
+  try {
+    await run();
+  } catch (error) {
+    if (error instanceof ConnectError) {
+      return error;
+    }
+    throw error;
+  }
+  throw new Error("expected the step to fail");
+}
+
+const HELD_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+
+/** A store double whose organization row read answers `read`. */
+function rowStore(read: () => Promise<unknown>): Store & {
+  getResource: ReturnType<typeof vi.fn>;
+} {
+  return { getResource: vi.fn(read) } as unknown as Store & {
+    getResource: ReturnType<typeof vi.fn>;
+  };
+}
+
+const rowMissing = async () => {
+  throw new ResourceNotFoundError("organization");
+};
+const storeFault = async () => {
+  throw new Error("database locked");
+};
+
+describe("nameHolderIsGone", () => {
+  const now = new Date("2026-10-01T12:00:00.000Z");
+  const claimedAgo = (ms: number): ResourceNameEntry => ({
+    ...organizationNameKey("acme"),
+    id: HELD_ID,
+    state: "current",
+    claimedAt: new Date(now.getTime() - ms).toISOString(),
+    expiresAt: "",
+  });
+  const old = claimedAgo(ABANDONED_NAME_AFTER_MS + 1000);
+
+  it("never counts a young name gone, and reads no row for it: its create may be in flight", async () => {
+    const store = rowStore(rowMissing);
+    expect(await nameHolderIsGone(store, claimedAgo(1000), now)).toBe(false);
+    expect(store.getResource).not.toHaveBeenCalled();
+  });
+
+  it("counts an old name gone only when no organization row holds its id", async () => {
+    expect(await nameHolderIsGone(rowStore(rowMissing), old, now)).toBe(true);
+    expect(
+      await nameHolderIsGone(rowStore(async () => create(OrganizationSchema)), old, now),
+    ).toBe(false);
+  });
+
+  it("rejects with a store fault rather than guessing, so a name is never freed on a failed read", async () => {
+    await expect(nameHolderIsGone(rowStore(storeFault), old, now)).rejects.toThrow(
+      "database locked",
+    );
+  });
+});
+
+describe("ClaimOrganizationSlug's server faults", () => {
+  it("refuses a new state with no id as a server fault, claiming nothing", async () => {
+    const claim = vi.fn();
+    const ctx = new RequestContext(
+      OrganizationSchema,
+      create(OrganizationSchema, { metadata: { slug: "acme" } }),
+      testCallerIdentity(),
+    );
+    const fault = await stepRefusal(() =>
+      newClaimOrganizationSlugStep({ resourceNames: { claim } } as unknown as Store).execute(ctx),
+    );
+    expect(fault.code).toBe(Code.Internal);
+    expect(fault.rawMessage).toBe("failed to claim the organization slug");
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it("answers Internal when the name table faults", async () => {
+    const ctx = new RequestContext(
+      OrganizationSchema,
+      create(OrganizationSchema, { metadata: { slug: "acme", id: HELD_ID } }),
+      testCallerIdentity(),
+    );
+    const store = { resourceNames: { claim: storeFault } } as unknown as Store;
+    const fault = await stepRefusal(() => newClaimOrganizationSlugStep(store).execute(ctx));
+    expect(fault.code).toBe(Code.Internal);
+    expect(fault.rawMessage).toBe("failed to claim the organization slug");
+  });
+});
+
+describe("RetireOrganizationSlug", () => {
+  function deleteRequest(loaded?: Organization) {
+    const ctx = new RequestContext(
+      OrganizationSchema,
+      create(OrganizationSchema),
+      testCallerIdentity(),
+    );
+    if (loaded !== undefined) {
+      ctx.set(EXISTING_RESOURCE_KEY, loaded);
+    }
+    return ctx;
+  }
+  const silent = {
+    error: () => {},
+    warn: () => {},
+    info: () => {},
+    debug: () => {},
+  } as unknown as Logger;
+
+  it("releases every name the loaded organization held", async () => {
+    const release = vi.fn(async () => {});
+    const store = { resourceNames: { release } } as unknown as Store;
+    await newRetireOrganizationSlugStep(store, silent).execute(
+      deleteRequest(create(OrganizationSchema, { metadata: { id: HELD_ID } })),
+    );
+    expect(release).toHaveBeenCalledWith("organization", "", HELD_ID);
+  });
+
+  it("refuses to run without the loaded row as a server fault, releasing nothing", async () => {
+    const release = vi.fn();
+    const store = { resourceNames: { release } } as unknown as Store;
+    const fault = await stepRefusal(() =>
+      newRetireOrganizationSlugStep(store, silent).execute(deleteRequest()),
+    );
+    expect(fault.code).toBe(Code.Internal);
+    expect(fault.rawMessage).toBe("failed to release the organization slug");
+    expect(release).not.toHaveBeenCalled();
+  });
+});
+
+describe("the organization loaders", () => {
+  function requestNaming(metadata?: { id?: string; slug?: string }) {
+    return new RequestContext(
+      OrganizationSchema,
+      create(OrganizationSchema, metadata === undefined ? {} : { metadata }),
+      testCallerIdentity(),
+    );
+  }
+  /** A store double: the row read, and a name table where nothing holds any slug. */
+  function loaderStore(read: () => Promise<unknown>): Store {
+    return {
+      getResource: read,
+      resourceNames: { resolve: async () => undefined },
+    } as unknown as Store;
+  }
+
+  it("apply creates when the manifest's id names no row", async () => {
+    const ctx = requestNaming({ id: HELD_ID, slug: "acme" });
+    await newLoadOrganizationForApplyStep(loaderStore(rowMissing)).execute(ctx);
+    expect(ctx.get(SHOULD_CREATE_KEY)).toBe(true);
+    expect(ctx.get(EXISTS_IN_DATABASE_KEY)).toBe(false);
+    expect(ctx.get(EXISTING_RESOURCE_KEY)).toBeUndefined();
+  });
+
+  it("apply and update fail with a store fault instead of creating a second organization", async () => {
+    await expect(
+      newLoadOrganizationForApplyStep(loaderStore(storeFault)).execute(
+        requestNaming({ id: HELD_ID, slug: "acme" }),
+      ),
+    ).rejects.toThrow("database locked");
+    await expect(
+      newLoadExistingOrganizationStep(loaderStore(storeFault)).execute(
+        requestNaming({ id: HELD_ID }),
+      ),
+    ).rejects.toThrow("database locked");
+  });
+
+  it("update answers NotFound for an id or slug nothing holds, naming what was asked", async () => {
+    const byId = await stepRefusal(() =>
+      newLoadExistingOrganizationStep(loaderStore(rowMissing)).execute(
+        requestNaming({ id: HELD_ID, slug: "acme" }),
+      ),
+    );
+    expect(byId.code).toBe(Code.NotFound);
+    expect(byId.rawMessage).toBe(`Organization not found: ${HELD_ID}`);
+
+    const bySlug = await stepRefusal(() =>
+      newLoadExistingOrganizationStep(loaderStore(rowMissing)).execute(
+        requestNaming({ slug: "nobody" }),
+      ),
+    );
+    expect(bySlug.code).toBe(Code.NotFound);
+    expect(bySlug.rawMessage).toBe("Organization not found: nobody");
+  });
+
+  it("update refuses a request naming neither id nor slug, and a missing metadata is a server fault", async () => {
+    const unnamed = await stepRefusal(() =>
+      newLoadExistingOrganizationStep(loaderStore(rowMissing)).execute(requestNaming({})),
+    );
+    expect(unnamed.code).toBe(Code.InvalidArgument);
+    expect(unnamed.rawMessage).toBe("resource id or slug is required for update");
+
+    const noMetadata = await stepRefusal(() =>
+      newLoadExistingOrganizationStep(loaderStore(rowMissing)).execute(requestNaming()),
+    );
+    expect(noMetadata.code).toBe(Code.Internal);
   });
 });

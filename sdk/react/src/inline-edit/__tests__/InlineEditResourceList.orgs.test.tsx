@@ -92,4 +92,24 @@ describe("InlineEditResourceList org comparison", () => {
       { org: ACME_ID, slug: "summarize", label: "summarize" },
     ]);
   });
+
+  it("adds a reference typed without an org, from the add button, in the default org by id", async () => {
+    const onSave = vi.fn(async (_refs: ResourceRefRow[]) => true);
+    renderEditing([], onSave);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add skill" }));
+    fireEvent.change(screen.getByPlaceholderText("org"), { target: { value: "" } });
+    const slugInput = screen.getByPlaceholderText("slug");
+    fireEvent.change(slugInput, { target: { value: "summarize" } });
+    // The add button is the icon button that follows the slug field.
+    const addButton = slugInput.nextElementSibling as HTMLButtonElement;
+    expect(addButton.tagName).toBe("BUTTON");
+    fireEvent.click(addButton);
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0]![0]).toEqual([
+      { org: ACME_ID, slug: "summarize", label: "summarize" },
+    ]);
+  });
 });

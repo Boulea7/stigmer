@@ -1577,6 +1577,42 @@ export function describeStoreContract(
       expect(await names().resolve(key("globex"), T1)).toMatchObject({ id: "org_b" });
       expect((await names().claim(key("acme"), "org_c", T1)).claimed).toBe(true);
     });
+
+    // The two cases below make the engine refuse a write by binding NULL to
+    // a NOT NULL column (the types forbid it, so the value is cast): the one
+    // refusal both engines raise on demand. Each proves the write's earlier
+    // statements are rolled back with it.
+
+    it("a claim the engine refuses fails, claims nothing, and keeps the expired name it would have cleared", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T2, now: T1 });
+
+      // At T3 the claim first clears acme's expired previous name, then its
+      // insert is refused.
+      await expect(names().claim(key("acme"), null as unknown as string, T3)).rejects.toThrow();
+
+      expect(await names().resolve(key("acme"), T3)).toBeUndefined();
+      expect(
+        await names().resolve(key("acme"), T1),
+        "the clearing rolled back with the refused insert",
+      ).toMatchObject({ id: "org_a", state: "previous", expiresAt: T2 });
+      expect((await names().claim(key("acme"), "org_b", T3)).claimed).toBe(true);
+    });
+
+    it("a rename whose second write the engine refuses moves nothing", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await expect(
+        names().rename({
+          ...ORG, id: "org_a", from: "acme", to: "acme-corp",
+          fromExpiresAt: null as unknown as string, now: T1,
+        }),
+      ).rejects.toThrow();
+
+      expect(await names().resolve(key("acme-corp"), T1), "the new name stays free").toBeUndefined();
+      expect(await names().resolve(key("acme"), T1)).toMatchObject({
+        id: "org_a", state: "current", expiresAt: "",
+      });
+    });
   });
 
   describe("oauth grants", () => {

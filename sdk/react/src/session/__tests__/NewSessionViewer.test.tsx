@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import type { McpServerUsageInput, ResourceRef } from "@stigmer/sdk";
+import { ACME_ID, GLOBEX_ID, orgWrapper } from "../../organization/__tests__/org-fixture";
 
 // ---------------------------------------------------------------------------
 // Launcher panel behavior: the session panel chip is PERSISTENT chrome (always
@@ -43,9 +45,9 @@ const stubEmptyFlow = {
   setAgentRef: vi.fn(),
   resolution: null,
   setResolution: vi.fn(),
-  mcpServerUsages: [],
+  mcpServerUsages: [] as McpServerUsageInput[],
   setMcpServerUsages: vi.fn(),
-  skillRefs: [],
+  skillRefs: [] as ResourceRef[],
   setSkillRefs: vi.fn(),
   workspace: emptyWorkspace,
   sessionVariables: { entries: [], isEmpty: true, clear: vi.fn() },
@@ -176,5 +178,46 @@ describe("NewSessionViewer — composer stays centered", () => {
     // composer. Centering must now hold irrespective of attached context.
     expect(composerWrapper()?.className).toContain("stg:my-auto");
     expect(composerWrapper()?.className).not.toContain("stg:my-6");
+  });
+});
+
+describe("NewSessionViewer — removing an attached reference compares orgs by id", () => {
+  // The same server attached twice, once naming its org by slug (a host's
+  // seed) and once by id (a picked one), and a namesake in another org.
+  const mcpServerUsages: McpServerUsageInput[] = [
+    { mcpServerRef: { org: "acme", slug: "github" } },
+    { mcpServerRef: { org: ACME_ID, slug: "github" } },
+    { mcpServerRef: { org: GLOBEX_ID, slug: "github" } },
+  ];
+  const skillRefs: ResourceRef[] = [
+    { org: ACME_ID, slug: "triage" },
+    { org: "acme", slug: "triage" },
+    { org: "globex", slug: "triage" },
+  ];
+
+  async function renderWithRefs() {
+    mockFlow = { ...stubEmptyFlow, mcpServerUsages, skillRefs };
+    render(<NewSessionViewer org={ACME_ID} onSessionCreated={vi.fn()} />, {
+      wrapper: orgWrapper({}, undefined, true),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Show panel" }));
+  }
+
+  it("drops every attachment of the removed MCP server, and only in its org", async () => {
+    await renderWithRefs();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Remove MCP server github" }))[0]);
+
+    expect(stubEmptyFlow.setMcpServerUsages).toHaveBeenCalledExactlyOnceWith([
+      { mcpServerRef: { org: GLOBEX_ID, slug: "github" } },
+    ]);
+  });
+
+  it("drops every attachment of the removed skill, and only in its org", async () => {
+    await renderWithRefs();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Remove skill triage" }))[0]);
+
+    expect(stubEmptyFlow.setSkillRefs).toHaveBeenCalledExactlyOnceWith([{ org: "globex", slug: "triage" }]);
   });
 });

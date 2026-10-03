@@ -1,8 +1,9 @@
 // Pins what the resource layer prints and asks on a server that holds one
-// organization: the field view leaves the Org line out (machine output keeps
-// it), an empty version history names no organization, and a schedule named by
-// bare slug with no organization resolves on such a server and is refused,
-// naming the ways to set one, on a server that holds several.
+// organization: the field view and the delete warning leave the Org line out
+// (machine output keeps it), an empty version history names no organization,
+// and a schedule named by bare slug with no organization resolves on such a
+// server and is refused, naming the ways to set one, on a server that holds
+// several.
 
 import { create } from "@bufbuild/protobuf";
 import { describe, expect, it, vi } from "vitest";
@@ -10,6 +11,7 @@ import { AgentSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb"
 import { ScheduleSchema } from "@stigmer/protos/ai/stigmer/agentic/schedule/v1/api_pb";
 import type { Stigmer } from "@stigmer/sdk";
 import { UsageError } from "../../errors/usage-error.js";
+import { planDelete } from "../delete.js";
 import { renderResource } from "../render.js";
 import { resumeSchedule } from "../schedule.js";
 import { renderWorkflowVersionHistory } from "../version.js";
@@ -33,6 +35,32 @@ describe("renderResource's field view", () => {
     expect(JSON.parse(renderResource(AgentSchema, AGENT, "json"))).toMatchObject({
       metadata: { org: "stigmer" },
     });
+  });
+});
+
+describe("the delete warning", () => {
+  function serverHolding(singleOrg: boolean) {
+    return {
+      platform: { getServerInfo: async () => ({ singleOrg }) },
+      agent: { get: async () => AGENT },
+      // The label lookup names the organization by its slug.
+      organization: {
+        get: async () => ({ metadata: { id: "stigmer", slug: "stigmer-co" } }),
+      },
+    } as unknown as Stigmer;
+  }
+  const keys = (stigmer: Stigmer) =>
+    planDelete(stigmer, "agent", "agt_1", "").then((plan) =>
+      plan.warning.sections[0]?.fields.map((field) => field.key),
+    );
+
+  it("leaves the Org line out on a server that holds one", async () => {
+    expect(await keys(serverHolding(true))).toEqual(["ID", "Name", "Slug"]);
+  });
+
+  it("names the organization by its slug on a server that holds several", async () => {
+    const plan = await planDelete(serverHolding(false), "agent", "agt_1", "");
+    expect(plan.warning.sections[0]?.fields).toContainEqual({ key: "Org", value: "stigmer-co" });
   });
 });
 

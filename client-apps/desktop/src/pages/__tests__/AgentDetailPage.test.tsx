@@ -35,6 +35,8 @@ interface DetailProps {
   additionalTabs: Tab[];
   viewerOrg: string;
   onSkillClick: (ref: { org: string; slug: string }) => void;
+  onMcpServerClick: (ref: { org: string; slug: string }) => void;
+  onPluginClick: (ref: { org: string; slug: string }) => void;
 }
 
 const page = vi.hoisted(() => ({
@@ -141,5 +143,23 @@ describe("desktop AgentDetailPage — organizations", () => {
     act(() => page.detail.at(-1)?.onSkillClick({ org: ACME_ID, slug: "triage" }));
 
     expect(screen.getByTestId("location").textContent).toBe("/library/skills/acme/triage");
+  });
+
+  it("opens a referenced MCP server at a URL carrying its org's slug", () => {
+    page.agent = AGENT;
+    renderAgent();
+
+    act(() => page.detail.at(-1)?.onMcpServerClick({ org: ACME_ID, slug: "github" }));
+
+    expect(screen.getByTestId("location").textContent).toBe("/library/mcp-servers/acme/github");
+  });
+
+  it("opens the installing plugin at a URL carrying its org's slug", () => {
+    page.agent = AGENT;
+    renderAgent();
+
+    act(() => page.detail.at(-1)?.onPluginClick({ org: ACME_ID, slug: "toolkit" }));
+
+    expect(screen.getByTestId("location").textContent).toBe("/library/plugins/acme/toolkit");
   });
 });

@@ -12,10 +12,26 @@
  *   - each distinct name is looked up once, and the caller's message is
  *     never mutated;
  *   - the field rule reads the contract's spelling (`org`, `*_org`,
- *     `orgs`) and the annotation, and is safe on recursive message types.
+ *     `orgs`) and the annotation, and is safe on recursive message types;
+ *   - the walk reaches every shape the rule allows, over a fixture service
+ *     built from a descriptor here, since no served method's input holds
+ *     them today: a repeated `orgs`, an `org` inside the values of a map,
+ *     and an annotation whose path holds no string (passed over, never a
+ *     failure); an annotated path through an unset message is passed over.
  */
-import { create } from "@bufbuild/protobuf";
-import type { Message } from "@bufbuild/protobuf";
+import { create, createFileRegistry, setExtension } from "@bufbuild/protobuf";
+import type {
+  DescMessage,
+  DescMethodUnary,
+  DescService,
+  Message,
+} from "@bufbuild/protobuf";
+import {
+  FieldDescriptorProto_Label,
+  FieldDescriptorProto_Type,
+  FileDescriptorProtoSchema,
+  MethodOptionsSchema,
+} from "@bufbuild/protobuf/wkt";
 import { createClient, createRouterTransport } from "@connectrpc/connect";
 import type { Interceptor } from "@connectrpc/connect";
 import { describe, expect, it } from "vitest";
@@ -30,6 +46,9 @@ import { OrganizationCommandController } from "@stigmer/protos/ai/stigmer/tenanc
 import { OrganizationQueryController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/query_pb";
 import { ApiResourceReferenceSchema } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
 import { CursorAccountSchema } from "@stigmer/protos/ai/stigmer/platform/cursoraccount/v1/cursor_account_pb";
+import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
+import { RpcAuthorizationConfigSchema } from "@stigmer/protos/ai/stigmer/commons/rpc/authorization_config_pb";
+import { config as rpcAuthorizationConfig } from "@stigmer/protos/ai/stigmer/commons/rpc/method_options_pb";
 
 import {
   annotatedOrganizationPath,
@@ -216,5 +235,172 @@ describe("the field rule, from the contract", () => {
     expect(isOrganizationId("acme")).toBe(false);
     expect(isOrganizationId("org-acme")).toBe(false);
     expect(isOrganizationId("org_ACME")).toBe(false);
+  });
+});
+
+/**
+ * A fixture service whose input holds the shapes no served method's input
+ * holds today:
+ *
+ *   message Ref { string org = 1; }
+ *   message Holder { map<string, Ref> refs = 1; repeated string orgs = 2; Ref ref = 3; }
+ *   service Fixture {
+ *     // annotated with kind organization at `ref`, a message, not a string
+ *     rpc Put(Holder) returns (Holder);
+ *   }
+ */
+function fixtureService(): { service: DescService; holder: DescMessage } {
+  const { STRING: TYPE_STRING, MESSAGE: TYPE_MESSAGE } = FieldDescriptorProto_Type;
+  const { OPTIONAL: LABEL_OPTIONAL, REPEATED: LABEL_REPEATED } = FieldDescriptorProto_Label;
+  const options = create(MethodOptionsSchema);
+  setExtension(
+    options,
+    rpcAuthorizationConfig,
+    create(RpcAuthorizationConfigSchema, {
+      resourceKind: ApiResourceKind.organization,
+      fieldPath: "ref",
+    }),
+  );
+  const registry = createFileRegistry(
+    create(FileDescriptorProtoSchema, {
+      name: "organization_names_fixture.proto",
+      package: "organizationnames.fixture.v1",
+      syntax: "proto3",
+      messageType: [
+        {
+          name: "Ref",
+          field: [{ name: "org", number: 1, type: TYPE_STRING, label: LABEL_OPTIONAL, jsonName: "org" }],
+        },
+        {
+          name: "Holder",
+          field: [
+            {
+              name: "refs",
+              number: 1,
+              type: TYPE_MESSAGE,
+              label: LABEL_REPEATED,
+              typeName: ".organizationnames.fixture.v1.Holder.RefsEntry",
+              jsonName: "refs",
+            },
+            { name: "orgs", number: 2, type: TYPE_STRING, label: LABEL_REPEATED, jsonName: "orgs" },
+            {
+              name: "ref",
+              number: 3,
+              type: TYPE_MESSAGE,
+              label: LABEL_OPTIONAL,
+              typeName: ".organizationnames.fixture.v1.Ref",
+              jsonName: "ref",
+            },
+          ],
+          nestedType: [
+            {
+              name: "RefsEntry",
+              options: { mapEntry: true },
+              field: [
+                { name: "key", number: 1, type: TYPE_STRING, label: LABEL_OPTIONAL, jsonName: "key" },
+                {
+                  name: "value",
+                  number: 2,
+                  type: TYPE_MESSAGE,
+                  label: LABEL_OPTIONAL,
+                  typeName: ".organizationnames.fixture.v1.Ref",
+                  jsonName: "value",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      service: [
+        {
+          name: "Fixture",
+          method: [
+            {
+              name: "Put",
+              inputType: ".organizationnames.fixture.v1.Holder",
+              outputType: ".organizationnames.fixture.v1.Holder",
+              options,
+            },
+          ],
+        },
+      ],
+    }),
+    () => undefined,
+  );
+  const service = registry.getService("organizationnames.fixture.v1.Fixture");
+  const holder = registry.getMessage("organizationnames.fixture.v1.Holder");
+  if (service === undefined || holder === undefined) {
+    throw new Error("the fixture descriptor did not build");
+  }
+  return { service, holder };
+}
+
+describe("the walk over every shape the field rule allows", () => {
+  const { service, holder } = fixtureService();
+  const put = service.methods[0] as DescMethodUnary<DescMessage, DescMessage>;
+
+  /** Calls Put through the resolver, answering what reached the handler. */
+  async function putThrough(
+    resolver: OrganizationNameResolver,
+    message: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const seen: Message[] = [];
+    const transport = createRouterTransport(
+      (router) => {
+        router.rpc(put, (request: Message) => {
+          seen.push(request);
+          return request;
+        });
+      },
+      { transport: { interceptors: [createOrganizationNameInterceptor(resolver)] } },
+    );
+    // The fixture's descriptor is built at run time, so its client has no
+    // generated method types; Put is called by the shape it has.
+    const client = createClient(service, transport) as unknown as {
+      put(request: Message): Promise<Message>;
+    };
+    await client.put(create(holder, message));
+    return seen[0] as unknown as Record<string, unknown>;
+  }
+
+  it("lists the repeated orgs, the orgs inside a map's values, and not the annotation that holds no string", () => {
+    expect(organizationFieldsOf(holder).sort()).toEqual(["orgs", "ref.org", "refs.org"]);
+    expect(annotatedOrganizationPath(put), "the annotation is read as written").toBe("ref");
+  });
+
+  it("resolves every element of a repeated orgs and the org in every map value, leaving ids and unknown names", async () => {
+    const resolver = resolverOf({ acme: ACME, globex: GLOBEX });
+    const reached = await putThrough(resolver, {
+      orgs: ["acme", ACME, "", "nobody-holds-this"],
+      refs: {
+        first: { org: "globex" },
+        second: { org: "acme" },
+        third: { org: "" },
+      },
+    });
+
+    expect(reached.orgs).toEqual([ACME, ACME, "", "nobody-holds-this"]);
+    const refs = reached.refs as Record<string, { org: string }>;
+    expect(refs.first?.org).toBe(GLOBEX);
+    expect(refs.second?.org).toBe(ACME);
+    expect(refs.third?.org).toBe("");
+    expect(resolver.lookups.sort()).toEqual(["acme", "globex", "nobody-holds-this"]);
+  });
+
+  it("passes over an annotated path that ends at a message, resolving the org inside it by the field rule alone", async () => {
+    const resolver = resolverOf({ acme: ACME });
+    const reached = await putThrough(resolver, { ref: { org: "acme" } });
+    expect((reached.ref as { org: string }).org).toBe(ACME);
+    expect(resolver.lookups).toEqual(["acme"]);
+  });
+
+  it("passes over an annotated path whose message is unset", async () => {
+    // AgentCommandController.create is annotated at metadata.org; an agent
+    // with no metadata names no organization and reaches the handler as sent.
+    const resolver = resolverOf({ acme: ACME });
+    const { agents, seen } = harness(resolver);
+    await agents.create(create(AgentSchema, { spec: { description: "no metadata" } }));
+    expect((seen[0] as unknown as { metadata?: unknown }).metadata).toBeUndefined();
+    expect(resolver.lookups).toEqual([]);
   });
 });

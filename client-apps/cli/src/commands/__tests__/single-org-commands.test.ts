@@ -1,15 +1,18 @@
 // Command-level contract for the commands that print an organization: on a
 // server that holds one (client/single-org.ts says yes), `get` and
 // `get <execution>` print no Org line and `auth whoami` names none and hints
-// nothing; on a server that holds several they print it as before. The
+// nothing; on a server that holds several they print it as before, except
+// for an organization itself, which belongs to none. The
 // backend, the resource fetch and the account read are stubbed at their module
 // seams; the commands, the renderers and the program are real.
 
 import { create } from "@bufbuild/protobuf";
+import type { DescMessage, Message } from "@bufbuild/protobuf";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb";
 import { AgentExecutionSchema } from "@stigmer/protos/ai/stigmer/agentic/agentexecution/v1/api_pb";
 import { IdentityAccountSchema } from "@stigmer/protos/ai/stigmer/iam/identityaccount/v1/api_pb";
+import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import type { Config } from "../../config/index.js";
 import { buildProgram } from "../../program.js";
 import { runWhoami } from "../auth/whoami.js";
@@ -36,13 +39,17 @@ vi.mock("../../backend.js", () => ({
   connectBackend: () => ({ config: CONFIG, stigmer: {} }),
 }));
 
+// What the stubbed resource fetch answers; an agent unless a test says otherwise.
+let fetched: { schema: DescMessage; message: Message } | undefined;
+
 vi.mock("../../resources/get.js", () => ({
-  fetchResource: async () => ({
-    schema: AgentSchema,
-    message: create(AgentSchema, {
-      metadata: { id: "agt_1", name: "Helper", slug: "helper", org: "stigmer" },
-    }),
-  }),
+  fetchResource: async () =>
+    fetched ?? {
+      schema: AgentSchema,
+      message: create(AgentSchema, {
+        metadata: { id: "agt_1", name: "Helper", slug: "helper", org: "stigmer" },
+      }),
+    },
 }));
 
 vi.mock("../../resources/execution.js", async (importOriginal) => {
@@ -93,6 +100,7 @@ let savedOrg: string | undefined;
 
 beforeEach(() => {
   singleOrg = false;
+  fetched = undefined;
   savedOrg = process.env.STIGMER_ORG;
   delete process.env.STIGMER_ORG;
 });
@@ -111,6 +119,18 @@ describe("stigmer get", () => {
     singleOrg = true;
     const out = await runGet("agent", "helper");
     expect(out).toMatch(/Slug:\s+helper/);
+    expect(out).not.toMatch(/Org:/);
+  });
+
+  it("prints none for an organization, which belongs to none, on a server that holds several", async () => {
+    fetched = {
+      schema: OrganizationSchema,
+      message: create(OrganizationSchema, {
+        metadata: { id: "org_01jaaaaaaaaaaaaaaaaaaaaaaa", name: "Acme", slug: "acme", org: "" },
+      }),
+    };
+    const out = await runGet("organization", "acme");
+    expect(out).toMatch(/Slug:\s+acme/);
     expect(out).not.toMatch(/Org:/);
   });
 

@@ -8,7 +8,7 @@ import { renderHook, waitFor, cleanup } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { Organization } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { StigmerContext } from "../../context";
-import { OrgProvider, useOrg } from "../OrgProvider";
+import { OrgProvider, findOrgByRef, useOrg } from "../OrgProvider";
 import { useOrgIdForRef, useOrgSlugForId } from "../useOrgRefs";
 
 afterEach(cleanup);
@@ -83,5 +83,17 @@ describe("useOrgIdForRef", () => {
     const { result } = renderRefs();
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.idFor("initech")).toBe("initech");
+  });
+});
+
+describe("findOrgByRef", () => {
+  it("finds an organization by id first, then by slug", () => {
+    expect(findOrgByRef(orgs, ACME_ID)?.metadata?.slug).toBe("acme");
+    expect(findOrgByRef(orgs, "acme")?.metadata?.id).toBe(ACME_ID);
+  });
+
+  it("names no organization for an empty reference, even one whose id and slug are unset", () => {
+    const withBlank = [...orgs, { metadata: { id: "", slug: "", name: "Blank" } }] as Organization[];
+    expect(findOrgByRef(withBlank, "")).toBeUndefined();
   });
 });

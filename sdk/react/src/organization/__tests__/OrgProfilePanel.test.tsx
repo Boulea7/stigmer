@@ -263,4 +263,18 @@ describe("OrgProfilePanel rename", () => {
     expect((await screen.findByRole("alert")).textContent).toBeTruthy();
     expect(screen.getByLabelText("Slug")).toHaveProperty("value", "acme-labs");
   });
+
+  it("renames nothing on Enter while the slug is unchanged or blank", async () => {
+    const { rename } = renderRenamable({ owner: true, singleOrg: false });
+
+    const slug = await screen.findByLabelText("Slug");
+    await waitFor(() => expect(slug).toHaveProperty("value", "acme"));
+    fireEvent.keyDown(slug, { key: "Enter" });
+    fireEvent.change(slug, { target: { value: "   " } });
+    fireEvent.keyDown(slug, { key: "Enter" });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(rename).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

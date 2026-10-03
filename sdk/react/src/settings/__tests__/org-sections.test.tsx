@@ -1,24 +1,34 @@
 /**
  * The organization settings sections hand the active organization to their
- * panel as `org`, and show a prompt instead when none is selected. The
+ * panel as `org`, and show a prompt instead when none is selected; the
+ * profile section reselects an organization its panel updated by the
+ * organization's id, which a rename leaves unchanged. The
  * organization context and the panels are stubbed: each panel only records
  * the organization it was given.
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ activeId: "" as string, given: [] as Array<{ panel: string; org: string }> }));
+const state = vi.hoisted(() => ({
+  activeId: "" as string,
+  given: [] as Array<{ panel: string; org: string }>,
+  onUpdated: undefined as ((org: { metadata: { id: string; slug: string } }) => void) | undefined,
+  refreshed: [] as Array<string | undefined>,
+}));
 
 vi.mock("../../organization/OrgProvider.js", () => ({
   useOrg: () => ({
     activeOrg: state.activeId === "" ? undefined : { metadata: { id: state.activeId, slug: state.activeId } },
-    refresh: () => {},
+    refresh: (target?: string) => {
+      state.refreshed.push(target);
+    },
   }),
 }));
 
 function recordingPanel(panel: string) {
-  return ({ org }: { org: string }) => {
+  return ({ org, onUpdated }: { org: string; onUpdated?: typeof state.onUpdated }) => {
     state.given.push({ panel, org });
+    state.onUpdated = onUpdated;
     return null;
   };
 }
@@ -35,6 +45,8 @@ afterEach(() => {
   cleanup();
   state.activeId = "";
   state.given = [];
+  state.onUpdated = undefined;
+  state.refreshed = [];
 });
 
 describe("the organization settings sections", () => {
@@ -55,5 +67,12 @@ describe("the organization settings sections", () => {
     render(<Section />);
     expect(screen.getByText(prompt)).toBeTruthy();
     expect(state.given).toEqual([]);
+  });
+
+  it("profile reselects an updated organization by its id, not its new slug", () => {
+    state.activeId = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+    render(<OrgProfileSection />);
+    state.onUpdated?.({ metadata: { id: "org_01jaaaaaaaaaaaaaaaaaaaaaaa", slug: "acme-labs" } });
+    expect(state.refreshed).toEqual(["org_01jaaaaaaaaaaaaaaaaaaaaaaa"]);
   });
 });

@@ -1673,9 +1673,10 @@ async function removeExpired(
 }
 
 /**
- * The row that won a lost write. Read inside the losing transaction, after
- * the conflict, so it exists: rows leave only through a delete this
- * transaction would have waited on.
+ * The row that won a lost write, read inside the losing transaction after
+ * the conflict. A conflicting insert locks nothing, so a concurrent release
+ * can commit in between; then there is no holder to answer with, and the
+ * write fails as a fault the caller retries rather than inventing one.
  */
 async function holderOf(
   client: PoolClient,
