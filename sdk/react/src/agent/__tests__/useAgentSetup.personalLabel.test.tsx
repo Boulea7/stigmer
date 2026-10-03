@@ -4,18 +4,22 @@
  * and the agent's slug; the lookup must ask for that same label, even when
  * the reference it resolves names the organization by slug (a Start-session
  * link's `?agent=acme/reviewer`). Pinned: the lookup's label equals the
- * builder's, and an agent with a saved instance resolves to it instead of
- * asking for its variables again.
+ * builder's, an agent with a saved instance resolves to it instead of
+ * asking for its variables again, and saving the variables re-checks and
+ * creates under that one label.
  */
 
 import { afterEach, describe, expect, it } from "vitest";
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
 import { createRouterTransport } from "@connectrpc/connect";
 import { Stigmer } from "@stigmer/sdk";
 import { AgentQueryController } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/query_pb";
 import { AgentInstanceQueryController } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/query_pb";
+import { AgentInstanceCommandController } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/command_pb";
+import { EnvironmentCommandController } from "@stigmer/protos/ai/stigmer/agentic/environment/v1/command_pb";
+import { EnvironmentSchema } from "@stigmer/protos/ai/stigmer/agentic/environment/v1/api_pb";
 import { AgentInstanceListSchema } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/io_pb";
 import { AgentInstanceSchema } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/api_pb";
 import { AgentSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb";
@@ -39,9 +43,9 @@ afterEach(cleanup);
 const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
 const FOR_AGENT = "stigmer.ai/for-agent";
 
-/** A client whose saved personal instance answers only the label the builder gives it. */
-function client(asked: Record<string, string>[]) {
-  const saved = buildPersonalInstanceInput({
+/** A client whose saved personal instance (when `saved`) answers only the label the builder gives it. */
+function client(asked: Record<string, string>[], created: Record<string, string>[] = [], saved = true) {
+  const existing = buildPersonalInstanceInput({
     org: ACME_ID,
     agentId: "agt_1",
     agentSlug: "reviewer",
@@ -63,7 +67,7 @@ function client(asked: Record<string, string>[]) {
       service(AgentInstanceQueryController, {
         list: (request) => {
           asked.push({ ...request.labels });
-          const matches = request.labels[FOR_AGENT] === saved.labels?.[FOR_AGENT];
+          const matches = saved && request.labels[FOR_AGENT] === existing.labels?.[FOR_AGENT];
           return create(AgentInstanceListSchema, {
             items: matches
               ? [create(AgentInstanceSchema, { metadata: create(ApiResourceMetadataSchema, { id: "ain_saved", org: ACME_ID }) })]
@@ -72,6 +76,18 @@ function client(asked: Record<string, string>[]) {
         },
       });
       service(EnvironmentQueryController, { list: () => create(EnvironmentListSchema, { items: [] }) });
+      service(AgentInstanceCommandController, {
+        create: (instance) => {
+          created.push({ ...instance.metadata?.labels });
+          return create(AgentInstanceSchema, { metadata: create(ApiResourceMetadataSchema, { id: "ain_new", org: ACME_ID }) });
+        },
+      });
+      service(EnvironmentCommandController, {
+        create: () =>
+          create(EnvironmentSchema, { metadata: create(ApiResourceMetadataSchema, { id: "env_1", org: ACME_ID, slug: "personal" }) }),
+        updateVariables: () =>
+          create(EnvironmentSchema, { metadata: create(ApiResourceMetadataSchema, { id: "env_1", org: ACME_ID, slug: "personal" }) }),
+      });
     }),
   });
 }
@@ -112,5 +128,27 @@ describe("useAgentSetup's personal-instance label", () => {
     if (result.current.state.status === "ready") {
       expect(result.current.state.resolution).toEqual({ mode: "saved", instanceId: "ain_saved" });
     }
+  });
+
+  it("saves the variables, re-checks, and creates the instance under the same label", async () => {
+    const asked: Record<string, string>[] = [];
+    const created: Record<string, string>[] = [];
+    const { result } = renderHook(() => useAgentSetup(ACME_ID), { wrapper: wrapper(client(asked, created, false)) });
+
+    await act(async () => {
+      await result.current.resolveAgent({ org: "acme", slug: "reviewer" });
+    });
+    expect(result.current.state.status).toBe("needsEnvVars");
+    // The personal environment's list must have settled before a save.
+    await waitFor(async () => {
+      await act(async () => {
+        await result.current.submitEnvVars({ API_TOKEN: { value: "t", isSecret: true } }, { saveForFuture: true });
+      });
+    });
+
+    const label = `${ACME_ID}/reviewer`;
+    expect(asked.map((labels) => labels[FOR_AGENT])).toEqual([label, label]);
+    expect(created.map((labels) => labels[FOR_AGENT])).toEqual([label]);
+    expect(result.current.state.status).toBe("ready");
   });
 });
