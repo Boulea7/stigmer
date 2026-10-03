@@ -257,6 +257,56 @@ describe("ensureSingleOrganization", () => {
     );
   });
 
+  it.each([
+    [
+      "refused at the duplicate check (AlreadyExists, no reason)",
+      () => new ConnectError("Organization already exists", Code.AlreadyExists),
+    ],
+    [
+      "refused at the limit (ORGANIZATION_LIMIT_REACHED)",
+      () =>
+        new ConnectError(
+          "this server holds 1 organization, its limit",
+          Code.FailedPrecondition,
+          undefined,
+          [
+            {
+              desc: ErrorInfoSchema,
+              value: create(ErrorInfoSchema, {
+                reason: ORGANIZATION_LIMIT_REACHED,
+                domain: "stigmer.ai",
+              }),
+            },
+          ],
+        ),
+    ],
+  ])(
+    "a create that loses the race to another replica, %s, finds the winner's organization and fills it",
+    async (_name, refusal) => {
+      await composeWith();
+      const holder = newSingleOrganizationHolder();
+      // The winner's row lands while this create is in flight.
+      await ensureSingleOrganization({
+        store: server.store,
+        creator: {
+          createAsCaller: async () => {
+            await seedOrganization("stigmer");
+            throw refusal();
+          },
+        },
+        caller: serverActingFor(SYSTEM_OPERATOR_IDENTITY_ID),
+        holder,
+        logger,
+      });
+
+      expect(holder.current()).toBe("stigmer");
+      expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(
+        "stigmer",
+      );
+    },
+  );
+
+
   it("a create that loses the race before the winner's row is stored finds it on a re-read, and fills it", async () => {
     await composeWith();
     const holder = newSingleOrganizationHolder();
