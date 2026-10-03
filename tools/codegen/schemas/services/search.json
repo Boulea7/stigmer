@@ -94,11 +94,11 @@
           "type": {
             "kind": "string"
           },
-          "description": "Organization to scope the search.\n\n Format: lowercase alphanumeric with hyphens (e.g., \"acme\", \"stigmer\").\n\n Behavior:\n - Empty: Search all organizations the caller has access to\n - Non-empty: Search only within the specified organization",
+          "description": "Organization to scope the search.\n\n The organization's slug (e.g., \"acme\") or its id (org_\u003culid\u003e).\n\n Behavior:\n - Empty: Search all organizations the caller has access to\n - Non-empty: Search only within the specified organization",
           "required": false,
           "validation": {
             "maxLength": 63,
-            "pattern": "^$|^[a-z][a-z0-9-]*$"
+            "pattern": "^$|^[a-z][a-z0-9-]*$|^org_[0-9a-z]{26}$"
           }
         },
         {

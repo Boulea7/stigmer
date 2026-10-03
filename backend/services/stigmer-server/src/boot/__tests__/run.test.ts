@@ -101,11 +101,10 @@ describe("runServer", () => {
       OrganizationQueryController,
       createGrpcTransport({ baseUrl: `http://127.0.0.1:${grpcPort}` }),
     );
-    expect(
-      (await organizations.findMyOrganizations({})).entries.map(
-        (org) => org.metadata?.id,
-      ),
-    ).toEqual(["stigmer"]);
+    // The one organization is named `stigmer` and filed under a minted id.
+    const held = (await organizations.findMyOrganizations({})).entries;
+    expect(held.map((org) => org.metadata?.slug)).toEqual(["stigmer"]);
+    expect(held[0]?.metadata?.id).toMatch(/^org_[0-9a-z]{26}$/);
 
     host.signals.get("SIGTERM")?.();
     host.signals.get("SIGINT")?.();

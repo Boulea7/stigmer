@@ -65,7 +65,10 @@ import {
   PLUGIN_VERSION_LABEL,
   SYSTEM_LABEL,
 } from "../../../pipeline/apiresource-labels.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -73,6 +76,9 @@ const silentLogger = createLogger({
   write: () => {},
 });
 const ORG = "acme";
+// The id the server minted for ORG: the refusal copies name the
+// organization by the id its rows store.
+let ORG_ID: string;
 
 let server: ComposedServer;
 let plugins: Client<typeof PluginCommandController>;
@@ -109,7 +115,7 @@ beforeAll(async () => {
   const transport: Transport = createGrpcTransport({
     baseUrl: `http://127.0.0.1:${port}`,
   });
-  await seedOrganizations(transport, [ORG]);
+  ORG_ID = organizationId(await seedOrganizations(transport, [ORG]), ORG);
   plugins = createClient(PluginCommandController, transport);
   pluginQuery = createClient(PluginQueryController, transport);
   agents = createClient(AgentCommandController, transport);
@@ -504,7 +510,7 @@ describe("Plugin members are the plugin's to redefine", () => {
     await expectCode(
       plugins.push({ org: ORG, artifact: archiveOf(thermosLike(name)) }),
       Code.AlreadyExists,
-      `'${skillName}' exists in org '${ORG}' and is not managed by a plugin`,
+      `'${skillName}' exists in org '${ORG_ID}' and is not managed by a plugin`,
     );
   });
 
@@ -526,7 +532,7 @@ describe("Plugin members are the plugin's to redefine", () => {
     await expectCode(
       plugins.push({ org: ORG, artifact: archiveOf(systemOverlay(name)) }),
       Code.AlreadyExists,
-      `'${name}' exists in org '${ORG}' and is not managed by a plugin`,
+      `'${name}' exists in org '${ORG_ID}' and is not managed by a plugin`,
     );
 
     const seeded = uniqueName("seeded-row");
@@ -564,7 +570,7 @@ describe("Plugin members are the plugin's to redefine", () => {
         ),
       }),
       Code.AlreadyExists,
-      `'${seeded}' exists in org '${ORG}' and is not managed by a plugin`,
+      `'${seeded}' exists in org '${ORG_ID}' and is not managed by a plugin`,
     );
   });
 

@@ -1157,13 +1157,16 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
   // The directory answers are test-mutable so each case can stage its
   // own world without a second composed server.
   const myOrgIds: string[] = [];
+  // The id the server mints for `seededorg` in the first case. Requests
+  // over the port name the organization by slug; every value the server
+  // stores or hands a driver carries this id, so the expectations do too.
+  let seededOrgId = "";
   // Providers by `org/slug` → id, and mappings by `providerId:externalId`:
   // the directory scopes every lookup to the provider the request names.
-  const providers = new Map<string, string>([
-    ["seededorg/test-idp", "idp_viewable"],
-    ["seededorg/other-idp", "idp_other"],
-    ["seededorg/hidden-idp", "idp_hidden"],
-  ]);
+  // A request's reference names the organization by slug and the serving
+  // chain resolves it, so the directory sees the id; the first case fills
+  // this map once the id is minted.
+  const providers = new Map<string, string>();
   const externalOrgMap = new Map<string, string>();
   const fakeDirectory: OrganizationDirectory = {
     refusesEnumeration: true,
@@ -1244,7 +1247,13 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
     expect(event.resourceId).toBe(org.metadata?.id);
     expect(event.parentLinks).toEqual([]);
     expect(event.caller.identityId).not.toBe("");
-    myOrgIds.push(org.metadata?.id ?? "");
+    seededOrgId = org.metadata?.id ?? "";
+    expect(seededOrgId).toMatch(/^org_[0-9a-z]{26}$/);
+    expect(org.metadata?.slug).toBe("seededorg");
+    myOrgIds.push(seededOrgId);
+    providers.set(`${seededOrgId}/test-idp`, "idp_viewable");
+    providers.set(`${seededOrgId}/other-idp`, "idp_other");
+    providers.set(`${seededOrgId}/hidden-idp`, "idp_hidden");
     externalOrgMap.set("idp_viewable:ext-org-42", org.metadata?.id ?? "");
     externalOrgMap.set("idp_hidden:ext-org-42", org.metadata?.id ?? "");
   });
@@ -1276,7 +1285,7 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
       {
         relation: "organization",
         parentKind: ApiResourceKind.organization,
-        parentId: "seededorg",
+        parentId: seededOrgId,
       },
     ]);
     expect(agentEvent?.visibilityShapes).toEqual(["org-viewer"]);
@@ -1379,7 +1388,7 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
 
     function expectOneCallerAndOrganization(events: ReadonlyArray<ResourceDeletedEvent>): void {
       for (const event of events) {
-        expect(event.orgId, `${ApiResourceKind[event.kind]} ${event.resourceId}`).toBe("seededorg");
+        expect(event.orgId, `${ApiResourceKind[event.kind]} ${event.resourceId}`).toBe(seededOrgId);
         expect(event.caller).toEqual(events.at(-1)?.caller);
       }
     }
@@ -1408,9 +1417,9 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
         "ash_seeded_cascade",
         AgentShareSchema,
         create(AgentShareSchema, {
-          metadata: { id: "ash_seeded_cascade", name: "seeded-cascade-share", org: "seededorg" },
+          metadata: { id: "ash_seeded_cascade", name: "seeded-cascade-share", org: seededOrgId },
           spec: {
-            agentRef: { kind: ApiResourceKind.agent, org: "seededorg", slug: agent.metadata?.slug ?? "" },
+            agentRef: { kind: ApiResourceKind.agent, org: seededOrgId, slug: agent.metadata?.slug ?? "" },
           },
         }),
       );
@@ -1472,7 +1481,7 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
         create(SessionSchema, {
           apiVersion: "agentic.stigmer.ai/v1",
           kind: "Session",
-          metadata: { id: sessionId, name: "seeded-cascade-session", org: "seededorg" },
+          metadata: { id: sessionId, name: "seeded-cascade-session", org: seededOrgId },
           spec: { agentInstanceId: "ain_c2_cascade" },
         }),
       );
@@ -1485,7 +1494,7 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
           create(AgentExecutionSchema, {
             apiVersion: "agentic.stigmer.ai/v1",
             kind: "AgentExecution",
-            metadata: { id: runId, name: runId, org: "seededorg" },
+            metadata: { id: runId, name: runId, org: seededOrgId },
             spec: { sessionId },
             status: { phase: ExecutionPhase.EXECUTION_COMPLETED },
           }),
@@ -1642,7 +1651,8 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
       create(ExecutionContextSchema, {
         apiVersion: "agentic.stigmer.ai/v1",
         kind: "ExecutionContext",
-        metadata: { name: `exec-ctx-${executionId}`, org: "seededorg" },
+        // In-process: server code passes the id, which nothing resolves.
+        metadata: { name: `exec-ctx-${executionId}`, org: seededOrgId },
         spec: { executionId },
       }),
     );
@@ -1665,7 +1675,7 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
     await deleteExecutionContextAsTheServer(executionId);
 
     expect(deletedEvents.map((event) => [event.kind, event.resourceId, event.orgId])).toEqual([
-      [ApiResourceKind.execution_context, contextId, "seededorg"],
+      [ApiResourceKind.execution_context, contextId, seededOrgId],
     ]);
     expect(await searchRows(), "the search row went with the context").toBe(0);
     let getError: ConnectError | undefined;
@@ -1742,7 +1752,7 @@ describe("extension composition (tuple lifecycle + organization directory)", () 
         {
           instanceKind: ApiResourceKind.workflow_instance,
           instanceId: shared.metadata?.id,
-          orgId: "seededorg",
+          orgId: seededOrgId,
           shapes: ["org-viewer"],
         },
       ]);

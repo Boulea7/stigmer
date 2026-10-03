@@ -44,7 +44,10 @@ import { composeServer } from "../../../boot/compose.js";
 import type { ComposedServer } from "../../../boot/compose.js";
 import { createLogger } from "../../../boot/logger.js";
 import { TRIGGER_DISABLED_MESSAGE } from "../trigger.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({ level: "error", pretty: false, write: () => {} });
 
@@ -54,6 +57,11 @@ let transport: Transport;
 let command: Client<typeof ScheduleCommandController>;
 let query: Client<typeof ScheduleQueryController>;
 let agentCommand: Client<typeof AgentCommandController>;
+// The ids the server minted for `acme` and `other-org`. Requests name
+// them by slug, which the serving chain resolves; a stored reference and
+// every copy that interpolates an organization carry the id.
+let acmeId: string;
+let otherOrgId: string;
 
 beforeAll(async () => {
   dir = mkdtempSync(path.join(tmpdir(), "schedule-domain-test-"));
@@ -74,7 +82,9 @@ beforeAll(async () => {
   });
   const port = await server.start();
   transport = createGrpcTransport({ baseUrl: `http://127.0.0.1:${port}` });
-  await seedOrganizations(transport, ["acme", "other-org"]);
+  const ids = await seedOrganizations(transport, ["acme", "other-org"]);
+  acmeId = organizationId(ids, "acme");
+  otherOrgId = organizationId(ids, "other-org");
   command = createClient(ScheduleCommandController, transport);
   query = createClient(ScheduleQueryController, transport);
   agentCommand = createClient(AgentCommandController, transport);
@@ -175,7 +185,7 @@ describe("create — the defaults resolver through the real chain", () => {
       created.spec?.target.case === "agent"
         ? created.spec.target.value.agentRef?.org
         : "",
-    ).toBe("acme");
+    ).toBe(acmeId);
   });
 
   it("requires metadata.org", async () => {
@@ -190,7 +200,7 @@ describe("create — the defaults resolver through the real chain", () => {
     );
     expect(err.code).toBe(Code.FailedPrecondition);
     expect(err.rawMessage).toBe(
-      "spec.agent.agent_ref.org must match metadata.org — a schedule must live in the referenced agent's organization (other-org)",
+      `spec.agent.agent_ref.org must match metadata.org — a schedule must live in the referenced agent's organization (${otherOrgId})`,
     );
   });
 
@@ -264,7 +274,7 @@ describe("update — immutable identity and the status-honest graft", () => {
     );
     expect(err.code).toBe(Code.FailedPrecondition);
     expect(err.rawMessage).toBe(
-      "spec.agent.agent_ref is immutable (schedule runs acme/helper) — create a new schedule to run a different agent",
+      `spec.agent.agent_ref is immutable (schedule runs ${acmeId}/helper) — create a new schedule to run a different agent`,
     );
   });
 
@@ -373,7 +383,7 @@ describe("trigger — the two-level contract", () => {
     // exception (no cascade by contract).
     const result = await command.trigger({ value: id });
     expect(result.outcome).toBe(ScheduleRunOutcome.TARGET_MISSING);
-    expect(result.refusalReason).toBe("target agent acme/ephemeral not found");
+    expect(result.refusalReason).toBe(`target agent ${acmeId}/ephemeral not found`);
     expect(result.executionId).toBe("");
     // The post-fire row: last_fire_at stamped by the handler.
     expect(result.schedule?.status?.lastFireAt).toBeDefined();

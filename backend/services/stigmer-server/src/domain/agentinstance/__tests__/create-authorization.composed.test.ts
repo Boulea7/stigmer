@@ -67,6 +67,9 @@ const FOUNDER = "fake|founder";
 const MEMBER = "fake|member";
 const STRANGER = "fake|stranger";
 const ORG = "instance-authz-org";
+// The organization's minted id: requests name it by slug, which the
+// serving chain resolves, and every row it owns records the id.
+let orgId: string;
 
 function organizationInput(slug: string) {
   return {
@@ -151,9 +154,12 @@ describe("agent instance create under the built-in authorizer", () => {
       IdentityAccountCommandController,
       asStranger(),
     ).provisionMyAccount({});
-    await createClient(OrganizationCommandController, asFounder()).create(
-      organizationInput(ORG),
-    );
+    const organization = await createClient(
+      OrganizationCommandController,
+      asFounder(),
+    ).create(organizationInput(ORG));
+    orgId = organization.metadata?.id ?? "";
+    expect(orgId).toMatch(/^org_[0-9a-z]{26}$/);
     await createClient(
       IdentityAccountCommandController,
       asMember(),
@@ -178,7 +184,7 @@ describe("agent instance create under the built-in authorizer", () => {
       AgentInstanceCommandController,
       asMember(),
     ).create(instanceInput("member-personal", orgAgent.metadata!.id));
-    expect(created.metadata?.org).toBe(ORG);
+    expect(created.metadata?.org).toBe(orgId);
     expect(created.status?.audit?.specAudit?.createdBy?.id).toBe(MEMBER);
   });
 
@@ -237,7 +243,7 @@ describe("agent instance create under the built-in authorizer", () => {
     expect(created.metadata?.labels?.[DEFAULT_INSTANCE_LABEL]).toBe(
       RESERVED_LABEL_TRUE,
     );
-    expect(created.metadata?.org).toBe(ORG);
+    expect(created.metadata?.org).toBe(orgId);
     expect(created.status?.audit?.specAudit?.createdBy?.id).toBe(MEMBER);
   });
 });

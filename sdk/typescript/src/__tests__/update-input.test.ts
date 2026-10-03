@@ -36,10 +36,9 @@ function fullOrganization(): Organization {
     apiVersion: "tenancy.stigmer.ai/v1",
     kind: "Organization",
     metadata: {
-      id: "acme",
+      id: "org_01jaaaaaaaaaaaaaaaaaaaaaaa",
       name: "Acme Corp",
       slug: "acme",
-      org: "acme",
       labels: { tier: "gold" },
       visibility: ApiResourceVisibility.visibility_private,
     },
@@ -101,7 +100,7 @@ describe("toOrganizationUpdateInput", () => {
     );
     expect(built.metadata?.name).toBe("Acme Corp");
     expect(built.metadata?.slug).toBe("acme");
-    expect(built.metadata?.org).toBe("acme");
+    expect(built.metadata?.org, "an organization belongs to no organization").toBe("");
     expect(built.metadata?.labels).toEqual({ tier: "gold" });
     expect(built.metadata?.visibility).toBe(
       ApiResourceVisibility.visibility_private,
@@ -134,12 +133,12 @@ describe("toOrganizationUpdateInput", () => {
     expect(toJson(OrganizationSpecSchema, built.spec!)).toEqual({});
   });
 
-  it("falls back to the slug when metadata.org is empty", () => {
+  it("carries no org: an organization's own metadata.org is always empty", () => {
     const org = create(OrganizationSchema, {
       metadata: { name: "Bare", slug: "bare" },
     });
 
-    expect(toOrganizationUpdateInput(org).org).toBe("bare");
+    expect(toOrganizationUpdateInput(org).org).toBeUndefined();
   });
 
   it("carries metadata.id for exact update addressing", () => {
@@ -147,7 +146,7 @@ describe("toOrganizationUpdateInput", () => {
       toOrganizationUpdateInput(fullOrganization()),
     );
 
-    expect(built.metadata?.id).toBe("acme");
+    expect(built.metadata?.id).toBe("org_01jaaaaaaaaaaaaaaaaaaaaaaa");
   });
 });
 

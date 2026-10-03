@@ -83,7 +83,7 @@ async function policiesIn(server: ComposedServer): Promise<IamPolicy[]> {
   return rows.map((row) => fromBinary(IamPolicySchema, row));
 }
 
-/** `<relation>@<organization>` for every row `accountId` holds, sorted. */
+/** `<relation>@<organization id>` for every row `accountId` holds, sorted. */
 function rolesHeldBy(
   policies: ReadonlyArray<IamPolicy>,
   accountId: string,
@@ -169,9 +169,12 @@ describe("iam-policy posture (composed server, a unit's own Authorizer: nothing 
       value: "posture-org",
     });
 
-    expect(created.metadata?.id, "the create itself succeeded").toBe(
-      "posture-org",
+    // The server mints the id and keeps the slug as the organization's
+    // name, which the read above named it by.
+    expect(created.metadata?.id, "the create itself succeeded").toMatch(
+      /^org_[0-9a-z]{26}$/,
     );
+    expect(created.metadata?.slug).toBe("posture-org");
     expect(
       authorizerCalls,
       "the unit's Authorizer was consulted",
@@ -206,6 +209,9 @@ describe("built-in authorization posture (composed server, OIDC with no Authoriz
   let port: number;
   const creatorId = accountIdFor(CREATOR);
   const newcomerId = accountIdFor(NEWCOMER);
+  /** The ids the server mints for the two organizations; every row names these. */
+  let foundedBeforeId = "";
+  let foundedAfterId = "";
 
   beforeAll(async () => {
     dir = mkdtempSync(path.join(tmpdir(), "iam-policy-built-in-oidc-"));
@@ -237,7 +243,9 @@ describe("built-in authorization posture (composed server, OIDC with no Authoriz
       transportFor(port, fakeJwt(CREATOR, "creator@example.com")),
     ).create(organizationInput("founded-before"));
 
-    expect(created.metadata?.id).toBe("founded-before");
+    foundedBeforeId = created.metadata?.id ?? "";
+    expect(foundedBeforeId).toMatch(/^org_[0-9a-z]{26}$/);
+    expect(created.metadata?.slug).toBe("founded-before");
     expect(await policiesIn(server)).toEqual([]);
   });
 
@@ -249,10 +257,12 @@ describe("built-in authorization posture (composed server, OIDC with no Authoriz
     expect(account.metadata?.id).toBe(creatorId);
 
     const policies = await policiesIn(server);
-    expect(rolesHeldBy(policies, creatorId)).toEqual(["owner@founded-before"]);
+    expect(rolesHeldBy(policies, creatorId)).toEqual([
+      `owner@${foundedBeforeId}`,
+    ]);
     expect(policies).toHaveLength(1);
     expect(policies[0]?.metadata?.id).toBe(
-      policyIdFor(orgRole(creatorId, "owner", "founded-before")),
+      policyIdFor(orgRole(creatorId, "owner", foundedBeforeId)),
     );
     expect(policies[0]?.status?.audit?.specAudit?.createdBy?.id).toBe(
       creatorId,
@@ -260,18 +270,19 @@ describe("built-in authorization posture (composed server, OIDC with no Authoriz
   });
 
   it("an organization founded AFTER provisioning is owned through the subject read — the verifier still stamps the raw subject", async () => {
-    await createClient(
+    const created = await createClient(
       OrganizationCommandController,
       transportFor(port, fakeJwt(CREATOR, "creator@example.com")),
     ).create(organizationInput("founded-after"));
+    foundedAfterId = created.metadata?.id ?? "";
+    expect(foundedAfterId).toMatch(/^org_[0-9a-z]{26}$/);
 
     const policies = await policiesIn(server);
-    expect(rolesHeldBy(policies, creatorId)).toEqual([
-      "owner@founded-after",
-      "owner@founded-before",
-    ]);
+    expect(rolesHeldBy(policies, creatorId)).toEqual(
+      [`owner@${foundedAfterId}`, `owner@${foundedBeforeId}`].sort(),
+    );
     expect(
-      policies.find((p) => p.spec?.resource?.id === "founded-after")?.status
+      policies.find((p) => p.spec?.resource?.id === foundedAfterId)?.status
         ?.audit?.specAudit?.createdBy?.id,
     ).toBe(creatorId);
   });
@@ -288,10 +299,9 @@ describe("built-in authorization posture (composed server, OIDC with no Authoriz
     await accounts.provisionMyAccount({});
 
     const policies = await policiesIn(server);
-    expect(rolesHeldBy(policies, newcomerId)).toEqual([
-      "member@founded-after",
-      "member@founded-before",
-    ]);
+    expect(rolesHeldBy(policies, newcomerId)).toEqual(
+      [`member@${foundedAfterId}`, `member@${foundedBeforeId}`].sort(),
+    );
     expect(policies.map((p) => p.metadata?.id).sort()).toEqual(after);
   });
 });
@@ -302,6 +312,8 @@ describe("built-in authorization posture (composed server, trusted-local: the op
   let dir: string;
   let server: ComposedServer;
   let port: number;
+  /** The id the server mints for `laptop-org`; its owner row names it. */
+  let laptopOrgId = "";
 
   /** One boot on the describe's directory — the same database every time. */
   async function boot(): Promise<void> {
@@ -331,13 +343,15 @@ describe("built-in authorization posture (composed server, trusted-local: the op
   });
 
   it("an organization created over the wire is owned by the operator's account — the caller carried an email, the row names the account", async () => {
-    await createClient(
+    const created = await createClient(
       OrganizationCommandController,
       transportFor(port),
     ).create(organizationInput("laptop-org"));
+    laptopOrgId = created.metadata?.id ?? "";
+    expect(laptopOrgId).toMatch(/^org_[0-9a-z]{26}$/);
 
     const policies = await policiesIn(server);
-    expect(rolesHeldBy(policies, operatorId)).toEqual(["owner@laptop-org"]);
+    expect(rolesHeldBy(policies, operatorId)).toEqual([`owner@${laptopOrgId}`]);
     expect(policies[0]?.status?.audit?.specAudit?.createdBy?.id).toBe(
       operatorId,
     );
@@ -367,7 +381,7 @@ describe("built-in authorization posture (composed server, trusted-local: the op
     await boot();
 
     expect(rolesHeldBy(await policiesIn(server), operatorId)).toEqual([
-      "owner@laptop-org",
+      `owner@${laptopOrgId}`,
     ]);
   });
 });

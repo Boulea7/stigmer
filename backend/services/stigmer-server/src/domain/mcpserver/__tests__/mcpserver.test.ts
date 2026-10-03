@@ -40,7 +40,10 @@ import { loadConfig } from "../../../boot/config.js";
 import { composeServer } from "../../../boot/compose.js";
 import type { ComposedServer } from "../../../boot/compose.js";
 import { createLogger } from "../../../boot/logger.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -51,6 +54,11 @@ const silentLogger = createLogger({
 const API_VERSION = "agentic.stigmer.ai/v1";
 const KIND = "McpServer";
 const ORG = "acme";
+const OTHER_ORG = "other-org";
+// The ids the server mints for the two organizations: a stored row and a
+// response name an organization by its id; a request may name it by slug.
+let ORG_ID: string;
+let OTHER_ORG_ID: string;
 
 type CommandClient = Client<typeof McpServerCommandController>;
 type QueryClient = Client<typeof McpServerQueryController>;
@@ -81,7 +89,9 @@ beforeAll(async () => {
   const transport: Transport = createGrpcTransport({
     baseUrl: `http://127.0.0.1:${port}`,
   });
-  await seedOrganizations(transport, [ORG, "other-org"]);
+  const organizations = await seedOrganizations(transport, [ORG, OTHER_ORG]);
+  ORG_ID = organizationId(organizations, ORG);
+  OTHER_ORG_ID = organizationId(organizations, OTHER_ORG);
   command = createClient(McpServerCommandController, transport);
   query = createClient(McpServerQueryController, transport);
 });
@@ -202,8 +212,8 @@ describe("CRUD", () => {
       Code.AlreadyExists,
       "duplicate create",
     );
-    const other = await command.create(serverInput({ name, org: "other-org" }));
-    expect(other.metadata?.org).toBe("other-org");
+    const other = await command.create(serverInput({ name, org: OTHER_ORG }));
+    expect(other.metadata?.org).toBe(OTHER_ORG_ID);
   });
 
   it("apply branches to create then update, keeping the id stable", async () => {
@@ -377,7 +387,7 @@ describe("EnrichOAuthStatus (#523) — response-only oauth_status", () => {
       id,
       OAuthAppSchema,
       create(OAuthAppSchema, {
-        metadata: { id, org: ORG, slug, name: slug },
+        metadata: { id, org: ORG_ID, slug, name: slug },
         spec: {
           vendorApprovalStatus: approval,
           vendorApprovalDocsUrl: docsUrl,

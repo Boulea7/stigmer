@@ -34,12 +34,16 @@ interface BridgeBackend {
   serverAddress: string;
   apiKey: string;
   orgSlug: string;
+  // The org's id, which every resource it owns names: tools name the org by
+  // slug, and the server answers with the id.
+  orgId: string;
   stop(): Promise<void>;
 }
 
 let backend: BridgeBackend;
 let mcpClient: Client;
 let orgSlug: string;
+let orgId: string;
 
 interface ToolResult {
   content: Array<{ type: string; text?: string }>;
@@ -82,6 +86,7 @@ async function resolveLocalBackend(): Promise<BridgeBackend> {
     serverAddress: `127.0.0.1:${server.port}`,
     apiKey: "",
     orgSlug: created.metadata!.slug,
+    orgId: created.metadata!.id,
     stop: () => server.stop(),
   };
 }
@@ -105,6 +110,7 @@ async function resolveCloudBackend(): Promise<BridgeBackend> {
     serverAddress: baseUrl.replace(/^https?:\/\//, ""),
     apiKey: token,
     orgSlug: created.metadata!.slug,
+    orgId: created.metadata!.id,
     // The org is this suite's only footprint; the environment belongs to the
     // global setup.
     stop: async () => {
@@ -130,6 +136,7 @@ beforeAll(async () => {
       ? await resolveCloudBackend()
       : await resolveLocalBackend();
   orgSlug = backend.orgSlug;
+  orgId = backend.orgId;
 
   const mcp = createServer({ serverAddress: backend.serverAddress, apiKey: backend.apiKey });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -168,7 +175,7 @@ describe("MCP server conformance (live backend)", () => {
     expect(applyResult.isError, applyResult.content[0]?.text).toBeFalsy();
 
     const applied = JSON.parse(applyResult.content[0]?.text ?? "{}");
-    expect(applied.metadata?.org).toBe(orgSlug);
+    expect(applied.metadata?.org, "named by slug, filed under the id").toBe(orgId);
     expect(applied.metadata?.slug).toBe(slug);
     expect(applied.spec?.instructions).toBe("Review code carefully and suggest improvements.");
 

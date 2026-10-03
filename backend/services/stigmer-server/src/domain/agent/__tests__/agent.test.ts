@@ -44,7 +44,10 @@ import { composeServer } from "../../../boot/compose.js";
 import type { ComposedServer } from "../../../boot/compose.js";
 import { createLogger } from "../../../boot/logger.js";
 import { ResourceNotFoundError } from "../../../store/interface.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -53,7 +56,12 @@ const silentLogger = createLogger({
 });
 
 const API_VERSION = "agentic.stigmer.ai/v1";
+// Requests name the organizations by slug, which the serving chain turns
+// into the minted id; rows written straight to the store, stored
+// references and error copies carry the id.
 const ORG = "acme";
+let ORG_ID: string;
+let GLOBEX_ID: string;
 
 let dir: string;
 let server: ComposedServer;
@@ -86,7 +94,9 @@ beforeAll(async () => {
   });
   const port = await server.start();
   transport = createGrpcTransport({ baseUrl: `http://127.0.0.1:${port}` });
-  await seedOrganizations(transport, [ORG, "globex"]);
+  const organizationIds = await seedOrganizations(transport, [ORG, "globex"]);
+  ORG_ID = organizationId(organizationIds, ORG);
+  GLOBEX_ID = organizationId(organizationIds, "globex");
   command = createClient(AgentCommandController, transport);
   query = createClient(AgentQueryController, transport);
   instanceCommand = createClient(AgentInstanceCommandController, transport);
@@ -161,7 +171,7 @@ async function seedMcpServer(opts: {
       id: opts.id,
       name: opts.slug,
       slug: opts.slug,
-      org: opts.org ?? ORG,
+      org: opts.org ?? ORG_ID,
       visibility: ApiResourceVisibility.visibility_org,
     },
     spec: { env: opts.env ?? {} },
@@ -268,7 +278,7 @@ describe("agent enabled-tools validation (#402)", () => {
     );
     expect(error.code).toBe(Code.InvalidArgument);
     expect(error.rawMessage).toBe(
-      "MCP server 'conn-srv' (org: acme): enabled_tools names tool(s) the " +
+      `MCP server 'conn-srv' (org: ${ORG_ID}): enabled_tools names tool(s) the ` +
         "server does not expose: 'serach_docs'. Discovered tools: " +
         "'search_docs', 'create_ticket'. If the server's toolset changed, " +
         "run 'stigmer connect' on it to refresh discovered capabilities.",
@@ -286,7 +296,7 @@ describe("agent enabled-tools validation (#402)", () => {
     );
     expect(error.code).toBe(Code.InvalidArgument);
     expect(error.rawMessage).toBe(
-      "MCP server 'conn-srv' (org: acme): enabled_tools names resource " +
+      `MCP server 'conn-srv' (org: ${ORG_ID}): enabled_tools names resource ` +
         "template(s): 'customer-record' — resource templates are read-only " +
         "data endpoints, not callable tools, and must not appear in " +
         "enabled_tools. Discovered tools: 'search_docs', 'create_ticket'. " +
@@ -352,9 +362,9 @@ describe("agent cascade delete (oss#611)", () => {
     // Shares are seeded directly into the store; the cascade matches
     // spec.agent_ref.
     const sameOrgShare = create(AgentShareSchema, {
-      metadata: { id: "ash_same_org", name: "same-org-share", org: ORG },
+      metadata: { id: "ash_same_org", name: "same-org-share", org: ORG_ID },
       spec: {
-        agentRef: { kind: ApiResourceKind.agent, org: ORG, slug: agentSlug },
+        agentRef: { kind: ApiResourceKind.agent, org: ORG_ID, slug: agentSlug },
       },
     });
     await server.store.saveResource(
@@ -368,9 +378,13 @@ describe("agent cascade delete (oss#611)", () => {
     // before that rule is still another organization's row, and the
     // cascade leaves it as it always did.
     const crossOrgShare = create(AgentShareSchema, {
-      metadata: { id: "ash_cross_org", name: "cross-org-share", org: "globex" },
+      metadata: {
+        id: "ash_cross_org",
+        name: "cross-org-share",
+        org: GLOBEX_ID,
+      },
       spec: {
-        agentRef: { kind: ApiResourceKind.agent, org: ORG, slug: agentSlug },
+        agentRef: { kind: ApiResourceKind.agent, org: ORG_ID, slug: agentSlug },
       },
     });
     await server.store.saveResource(
@@ -477,7 +491,7 @@ describe("agent create — CreateDefaultInstance failure wire contract (oss#852)
         id: "ain_wrap_occupier",
         name: "wrapped-error-agent-default",
         slug: "wrapped-error-agent-default",
-        org: ORG,
+        org: ORG_ID,
       },
       spec: { agentId: "agt_wrap_nonexistent" },
     });

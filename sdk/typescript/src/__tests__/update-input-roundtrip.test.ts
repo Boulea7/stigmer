@@ -166,7 +166,9 @@ function assertSpecRoundTrip(
   );
   expect(rebuilt.metadata?.name).toBe(META.name);
   expect(rebuilt.metadata?.slug).toBe(META.slug);
-  expect(rebuilt.metadata?.org).toBe(META.org);
+  // The fixture's own org: META's for an organization-scoped kind, empty
+  // for an organization, which belongs to no organization.
+  expect(rebuilt.metadata?.org).toBe(original.metadata?.org ?? "");
   expect(rebuilt.metadata?.labels).toEqual(META.labels);
   expect(rebuilt.metadata?.visibility).toBe(META.visibility);
 }
@@ -714,9 +716,10 @@ describe("toOAuthAppUpdateInput", () => {
 });
 
 describe("toOrganizationUpdateInput (tripwire)", () => {
+  // An organization belongs to no organization: its own metadata.org is empty.
   const fixture = () =>
     create(OrganizationSchema, {
-      metadata: META,
+      metadata: { ...META, org: "" },
       spec: {
         description: "We make everything.",
         logoUrl: "https://acme.example/logo.png",

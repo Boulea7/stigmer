@@ -3,8 +3,13 @@
  * suite that writes into an Organization: `organizationInput` is the
  * smallest create the chain accepts, and `seedOrganizations` creates each
  * named Organization through the server's own create RPC, so the rows are
- * exactly what a person's first create writes (the slug is the id,
- * domain/organization/steps.ts).
+ * exactly what a person's first create writes: the server mints each id
+ * (org_<ulid>) and keeps the slug as the organization's name
+ * (domain/organization/steps.ts). It answers each slug's minted id, which
+ * a suite uses wherever a value is stored, compared with stored data,
+ * passed in-process or written straight to the store; a serving request
+ * may still name the organization by slug, since the serving chain
+ * resolves it (pipeline/interceptors/organization-names.ts).
  *
  * Why every such suite needs it: every org-scoped lane authorizes on the
  * Organization it names, and under every posture a missing one answers
@@ -29,13 +34,31 @@ export function organizationInput(slug: string) {
   };
 }
 
-/** Creates each Organization, in order, as the transport's caller. */
+/** An organization's minted id by its slug, as `seedOrganizations` answers it. */
+export type OrganizationIds = ReadonlyMap<string, string>;
+
+/**
+ * Creates each Organization, in order, as the transport's caller, and
+ * answers each slug's minted id.
+ */
 export async function seedOrganizations(
   transport: Transport,
   slugs: ReadonlyArray<string>,
-): Promise<void> {
+): Promise<OrganizationIds> {
   const organizations = createClient(OrganizationCommandController, transport);
+  const ids = new Map<string, string>();
   for (const slug of slugs) {
-    await organizations.create(organizationInput(slug));
+    const created = await organizations.create(organizationInput(slug));
+    ids.set(slug, created.metadata?.id ?? "");
   }
+  return ids;
+}
+
+/** The minted id of a seeded slug; a slug the suite never seeded fails loudly. */
+export function organizationId(ids: OrganizationIds, slug: string): string {
+  const id = ids.get(slug);
+  if (id === undefined || id === "") {
+    throw new Error(`organization ${slug} was not seeded`);
+  }
+  return id;
 }

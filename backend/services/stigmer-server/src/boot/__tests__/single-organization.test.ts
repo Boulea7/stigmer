@@ -187,18 +187,20 @@ describe("ensureSingleOrganization", () => {
     const { holder, run } = ensure();
     await run();
 
+    // The server's organization is named `stigmer` and filed under an id
+    // the create minted; the record, the holder and the log carry that id.
     const held = await organizations();
-    expect(held.map((org) => org.metadata?.id)).toEqual(["stigmer"]);
+    expect(held.map((org) => org.metadata?.slug)).toEqual(["stigmer"]);
+    const id = held[0]?.metadata?.id ?? "";
+    expect(id).toMatch(/^org_[0-9a-z]{26}$/);
     expect(held[0]?.metadata?.org).toBe("");
     expect(held[0]?.status?.audit?.specAudit?.createdBy?.id).toBe("system");
-    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(
-      "stigmer",
-    );
-    expect(holder.current()).toBe("stigmer");
+    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(id);
+    expect(holder.current()).toBe(id);
     expect(lines).toContainEqual(
       expect.objectContaining({
         message: "single organization ensured",
-        org: "stigmer",
+        org: id,
       }),
     );
   });

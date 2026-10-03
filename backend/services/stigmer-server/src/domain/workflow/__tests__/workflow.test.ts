@@ -46,12 +46,20 @@ import {
   SYSTEM_MANAGED_LABEL,
 } from "../../../pipeline/apiresource-labels.js";
 import { defaultWorkflowInstanceSlug } from "../../workflowinstance/defaultinstance.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({ level: "error", pretty: false, write: () => {} });
 
 const API_VERSION = "agentic.stigmer.ai/v1";
 const ORG = "acme";
+const OTHER_ORG = "other-org";
+// The ids the server minted for ORG and OTHER_ORG: the cross-org refusal
+// names each organization by the id its rows store.
+let ORG_ID: string;
+let OTHER_ORG_ID: string;
 
 let dir: string;
 let server: ComposedServer;
@@ -84,7 +92,9 @@ beforeAll(async () => {
   });
   const port = await server.start();
   transport = createGrpcTransport({ baseUrl: `http://127.0.0.1:${port}` });
-  await seedOrganizations(transport, [ORG, "other-org"]);
+  const ids = await seedOrganizations(transport, [ORG, OTHER_ORG]);
+  ORG_ID = organizationId(ids, ORG);
+  OTHER_ORG_ID = organizationId(ids, OTHER_ORG);
   command = createClient(WorkflowCommandController, transport);
   query = createClient(WorkflowQueryController, transport);
   instanceCommand = createClient(WorkflowInstanceCommandController, transport);
@@ -357,14 +367,14 @@ describe("workflowinstance guards", () => {
       .create({
         apiVersion: API_VERSION,
         kind: "WorkflowInstance",
-        metadata: { name: `Cross ${counter}`, org: "other-org" },
+        metadata: { name: `Cross ${counter}`, org: OTHER_ORG },
         spec: { workflowId: wf.metadata!.id },
       })
       .then(() => undefined)
       .catch((e: unknown) => e);
     expect((crossOrg as ConnectError).code).toBe(Code.InvalidArgument);
     expect((crossOrg as ConnectError).rawMessage).toContain(
-      `Workflow belongs to org '${ORG}', instance target is org 'other-org'.`,
+      `Workflow belongs to org '${ORG_ID}', instance target is org '${OTHER_ORG_ID}'.`,
     );
   });
 
