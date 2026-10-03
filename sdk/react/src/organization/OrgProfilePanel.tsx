@@ -6,6 +6,8 @@ import { getUserMessage, toOrganizationUpdateInput } from "@stigmer/sdk";
 import type { Organization } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { useOrganization } from "./useOrganization.js";
 import { useUpdateOrganization } from "./useUpdateOrganization.js";
+import { useRenameOrganization } from "./useRenameOrganization.js";
+import { useSingleOrg } from "../server-info.js";
 import { useIdentityProviderList } from "../identity-provider/useIdentityProviderList.js";
 import { IDENTITY_PROVIDERS_MANAGED_BY_ADMINS } from "../identity-provider/copy.js";
 import { useResourceAvailable, ApiResourceKind } from "../deployment-mode.js";
@@ -41,6 +43,12 @@ export interface OrgProfilePanelProps {
  * Fetches the organization by ID, displays editable fields (name,
  * description, logo URL) and read-only identifiers (slug, ID).
  * On save, calls `organization.update()` and fires `onUpdated`.
+ *
+ * The organization's owners (`can_delete` on it) can also rename it: the
+ * slug becomes an editable field whose Rename action calls
+ * `organization.rename()` and fires `onUpdated` with the renamed resource.
+ * The field is never shown on a server that holds one organization, where
+ * the organization is not named anywhere.
  *
  * All visual properties flow through `--stgm-*` design tokens. The
  * component has zero dependencies on Console routing, auth context,
@@ -86,6 +94,17 @@ export function OrgProfilePanel({
   const serverSlug = organization?.metadata?.slug ?? "";
   const serverOrgId = organization?.metadata?.id ?? "";
   const isPersonal = organization?.spec?.isPersonal ?? false;
+
+  // Renaming is the owners' act; the check fails closed so the field never
+  // flashes for someone the server would refuse. A single-organization
+  // server never names its organization, so it offers no rename.
+  const singleOrg = useSingleOrg();
+  const renameCheck = useCheckPermission(
+    serverOrgId ? { kind: "organization", id: serverOrgId } : null,
+    "can_delete",
+    { fail: "closed" },
+  );
+  const canRename = singleOrg === false && renameCheck.allowed;
 
   // Sync form fields when server data changes.
   useEffect(() => {
@@ -203,9 +222,20 @@ export function OrgProfilePanel({
       onSubmit={handleSubmit}
       className={cn("stg:space-y-6", className)}
     >
-      {/* -- Read-only identifiers -- */}
+      {/* -- Identifiers: the slug is renamable by owners, the ID never changes -- */}
       <div className="stg:space-y-3">
-        <ReadOnlyField label="Slug" value={serverSlug} mono />
+        {canRename ? (
+          <RenameSlugField
+            orgId={serverOrgId}
+            currentSlug={serverSlug}
+            onRenamed={(renamed) => {
+              refetch();
+              onUpdated?.(renamed);
+            }}
+          />
+        ) : (
+          <ReadOnlyField label="Slug" value={serverSlug} mono />
+        )}
         <ReadOnlyField label="Organization ID" value={serverOrgId} />
         {isPersonal && (
           <div>
@@ -342,7 +372,7 @@ export function OrgProfilePanel({
       </div>
 
       {/* -- Identity Providers summary -- */}
-      <IdentityProvidersSummary org={org} orgSlug={serverSlug} />
+      <IdentityProvidersSummary orgId={serverOrgId} />
     </form>
   );
 }
@@ -356,24 +386,18 @@ export function OrgProfilePanel({
  * invites setting one up only when the server has not said the caller may
  * not create providers; otherwise it says who manages them.
  */
-function IdentityProvidersSummary({
-  org,
-  orgSlug,
-}: {
-  org: string;
-  orgSlug: string;
-}) {
+function IdentityProvidersSummary({ orgId }: { orgId: string }) {
   const idpAvailable = useResourceAvailable(ApiResourceKind.identity_provider);
   const { identityProviders, isLoading } = useIdentityProviderList(
-    idpAvailable && orgSlug ? orgSlug : null,
+    idpAvailable && orgId ? orgId : null,
   );
   const createCheck = useCheckPermission(
-    idpAvailable && org ? { kind: "organization", id: org } : null,
+    idpAvailable && orgId ? { kind: "organization", id: orgId } : null,
     "can_create_idp",
   );
   const deniedCreate = !createCheck.isLoading && !createCheck.allowed;
 
-  if (!idpAvailable || !orgSlug) return null;
+  if (!idpAvailable || !orgId) return null;
 
   return (
     <>
@@ -457,6 +481,107 @@ function ShieldSmallIcon() {
     >
       <path d="M8 1.5L2 4v4c0 3.5 2.5 5.5 6 7 3.5-1.5 6-3.5 6-7V4L8 1.5z" />
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RenameSlugField — the owners' slug editor
+// ---------------------------------------------------------------------------
+
+/**
+ * The slug as an editable field with its own Rename action, apart from the
+ * profile's Save: a rename changes the name in every link to the
+ * organization, so it is a deliberate act of its own. It sits inside the
+ * profile form, so Enter in the field renames rather than submitting the
+ * profile.
+ */
+function RenameSlugField({
+  orgId,
+  currentSlug,
+  onRenamed,
+}: {
+  orgId: string;
+  currentSlug: string;
+  onRenamed: (org: Organization) => void;
+}) {
+  const inputId = useId();
+  const { rename, isRenaming, error, clearError } = useRenameOrganization();
+  const [slug, setSlug] = useState(currentSlug);
+
+  useEffect(() => {
+    setSlug(currentSlug);
+  }, [currentSlug]);
+
+  const next = slug.trim();
+  const canRename = next.length > 0 && next !== currentSlug && !isRenaming;
+
+  const submit = useCallback(async () => {
+    if (!canRename) return;
+    clearError();
+    try {
+      onRenamed(await rename(orgId, next));
+    } catch {
+      // error state is managed by useRenameOrganization
+    }
+  }, [canRename, clearError, rename, orgId, next, onRenamed]);
+
+  return (
+    <div className="stg:space-y-1">
+      <label
+        htmlFor={inputId}
+        className="stg:text-[0.65rem] stg:font-medium stg:text-muted-foreground stg:uppercase stg:tracking-wider"
+      >
+        Slug
+      </label>
+      <div className="stg:flex stg:items-center stg:gap-2">
+        <input
+          id={inputId}
+          type="text"
+          value={slug}
+          onChange={(e) => {
+            setSlug(e.target.value);
+            clearError();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void submit();
+            }
+          }}
+          disabled={isRenaming}
+          spellCheck={false}
+          autoComplete="off"
+          className={cn(
+            "stg:w-full stg:rounded-md stg:border stg:border-input stg:bg-background stg:px-2.5 stg:py-1.5 stg:font-mono stg:text-xs stg:text-foreground",
+            "stg:focus-visible:outline-none stg:focus-visible:ring-1 stg:focus-visible:ring-ring",
+            "stg:disabled:pointer-events-none stg:disabled:opacity-50",
+          )}
+        />
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={!canRename}
+          className={cn(
+            "stg:inline-flex stg:shrink-0 stg:items-center stg:gap-1.5 stg:rounded-md stg:px-3 stg:py-1.5 stg:text-xs stg:font-medium",
+            "stg:border stg:border-input stg:text-foreground stg:hover:bg-accent-hover",
+            "stg:disabled:pointer-events-none stg:disabled:opacity-40",
+          )}
+        >
+          {isRenaming && <SpinnerIcon size={12} />}
+          Rename
+        </button>
+      </div>
+      {error ? (
+        <p className="stg:text-destructive stg:text-[0.65rem]" role="alert">
+          {getUserMessage(error)}
+        </p>
+      ) : (
+        <p className="stg:text-[0.65rem] stg:text-muted-foreground">
+          The name in links to this organization. Links with the old slug keep
+          working for 30 days after a rename.
+        </p>
+      )}
+    </div>
   );
 }
 

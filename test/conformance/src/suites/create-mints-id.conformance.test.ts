@@ -8,10 +8,9 @@
 // exported manifest applied again carries its id and must keep working. For a
 // kind whose id other grants hang off, choosing the id would be choosing a
 // grant, so the promise is held on every create and every creating apply.
-// Organization is the one kind that derives its id from its slug after the id
-// is minted (CopySlugToId), so its row asserts id equals slug instead of the
-// minted shape. Memory mints its id early, and that early mint is still the
-// server's, never the caller's.
+// Organization mints its id like every kind, apart from its slug. Memory
+// mints its id early, and that early mint is still the server's, never the
+// caller's.
 //
 // Each row sends the request with `metadata.id` set to a well-formed id of the
 // kind's own shape (`foreignId`), so the refusal proven is of a plausible id,
@@ -138,9 +137,6 @@ interface Row {
   // `<Service>.<method>`, as declaredMethods keys it.
   readonly key: string;
   readonly kind: ApiResourceKind;
-  // "minted": the id is BuildNewState's. "slug": the kind derives its id from
-  // its slug after the mint (Organization's CopySlugToId).
-  readonly idRule: "minted" | "slug";
   // The edition the row needs, when not every target serves its RPC to this
   // caller: "engine" (an execution create), "memory" (first-party memory).
   readonly edition?: "engine" | "memory";
@@ -186,7 +182,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentCommandController.create] Agent",
     key: "AgentCommandController.create",
     kind: ApiResourceKind.agent,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-agent");
       const created = await clients.agentCommand.create({ ...makeAgent({ org, name }), metadata: { id: chosenId, name, org } });
@@ -201,7 +196,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentCommandController.apply] Agent (apply as a create)",
     key: "AgentCommandController.apply",
     kind: ApiResourceKind.agent,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-agent");
       const applied = await clients.agentCommand.apply({ ...makeAgent({ org, name }), metadata: { id: chosenId, name, org } });
@@ -216,7 +210,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentChannelCommandController.create] AgentChannel",
     key: "AgentChannelCommandController.create",
     kind: ApiResourceKind.agent_channel,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-channel");
@@ -235,7 +228,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentChannelCommandController.apply] AgentChannel (apply as a create)",
     key: "AgentChannelCommandController.apply",
     kind: ApiResourceKind.agent_channel,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-channel");
@@ -254,7 +246,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentExecutionCommandController.create] AgentExecution",
     key: "AgentExecutionCommandController.create",
     kind: ApiResourceKind.agent_execution,
-    idRule: "minted",
     edition: "engine",
     async send({ org }, chosenId) {
       await fundedWhereMetered(org);
@@ -277,7 +268,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentInstanceCommandController.create] AgentInstance",
     key: "AgentInstanceCommandController.create",
     kind: ApiResourceKind.agent_instance,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-ain");
@@ -296,7 +286,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentInstanceCommandController.apply] AgentInstance (apply as a create)",
     key: "AgentInstanceCommandController.apply",
     kind: ApiResourceKind.agent_instance,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-ain");
@@ -315,7 +304,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentShareCommandController.create] AgentShare",
     key: "AgentShareCommandController.create",
     kind: ApiResourceKind.agent_share,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-share");
@@ -334,7 +322,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:AgentShareCommandController.apply] AgentShare (apply as a create)",
     key: "AgentShareCommandController.apply",
     kind: ApiResourceKind.agent_share,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-share");
@@ -353,7 +340,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:ChannelAppCommandController.create] ChannelApp",
     key: "ChannelAppCommandController.create",
     kind: ApiResourceKind.channel_app,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-chapp");
       const created = await clients.channelAppCommand.create({
@@ -371,7 +357,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:ChannelAppCommandController.apply] ChannelApp (apply as a create)",
     key: "ChannelAppCommandController.apply",
     kind: ApiResourceKind.channel_app,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-chapp");
       const applied = await clients.channelAppCommand.apply({
@@ -389,7 +374,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:EnvironmentCommandController.create] Environment",
     key: "EnvironmentCommandController.create",
     kind: ApiResourceKind.environment,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-env");
       const created = await clients.environmentCommand.create({
@@ -407,7 +391,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:EnvironmentCommandController.apply] Environment (apply as a create)",
     key: "EnvironmentCommandController.apply",
     kind: ApiResourceKind.environment,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-env");
       const applied = await clients.environmentCommand.apply({
@@ -425,7 +408,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:ExecutionContextCommandController.create] ExecutionContext",
     key: "ExecutionContextCommandController.create",
     kind: ApiResourceKind.execution_context,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-ectx");
       // A unique parent execution id: a context is looked up by it, so two
@@ -445,7 +427,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:ExecutionContextCommandController.apply] ExecutionContext (apply as a create)",
     key: "ExecutionContextCommandController.apply",
     kind: ApiResourceKind.execution_context,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-ectx");
       const applied = await clients.executionContextCommand.apply({
@@ -463,7 +444,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:McpServerCommandController.create] McpServer",
     key: "McpServerCommandController.create",
     kind: ApiResourceKind.mcp_server,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-mcp");
       const created = await clients.mcpServerCommand.create({
@@ -481,7 +461,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:McpServerCommandController.apply] McpServer (apply as a create)",
     key: "McpServerCommandController.apply",
     kind: ApiResourceKind.mcp_server,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-mcp");
       const applied = await clients.mcpServerCommand.apply({
@@ -499,7 +478,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:MemoryCommandController.create] Memory",
     key: "MemoryCommandController.create",
     kind: ApiResourceKind.memory,
-    idRule: "minted",
     edition: "memory",
     async send({ org }, chosenId) {
       // Memory create fails closed while the organization's switch is off.
@@ -517,7 +495,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:ScheduleCommandController.create] Schedule",
     key: "ScheduleCommandController.create",
     kind: ApiResourceKind.schedule,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-sched");
@@ -536,7 +513,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:ScheduleCommandController.apply] Schedule (apply as a create)",
     key: "ScheduleCommandController.apply",
     kind: ApiResourceKind.schedule,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-sched");
@@ -555,7 +531,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:SessionCommandController.create] Session",
     key: "SessionCommandController.create",
     kind: ApiResourceKind.session,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-ses");
@@ -574,7 +549,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:SessionCommandController.apply] Session (apply as a create)",
     key: "SessionCommandController.apply",
     kind: ApiResourceKind.session,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const agent = await agentIn(org);
       const name = uniqueName("mint-ses");
@@ -593,7 +567,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:WorkflowCommandController.create] Workflow",
     key: "WorkflowCommandController.create",
     kind: ApiResourceKind.workflow,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-wfl");
       const created = await clients.workflowCommand.create({ ...makeWorkflow({ org, name }), metadata: { id: chosenId, name, org } });
@@ -608,7 +581,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:WorkflowCommandController.apply] Workflow (apply as a create)",
     key: "WorkflowCommandController.apply",
     kind: ApiResourceKind.workflow,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-wfl");
       const applied = await clients.workflowCommand.apply({ ...makeWorkflow({ org, name }), metadata: { id: chosenId, name, org } });
@@ -623,7 +595,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:WorkflowExecutionCommandController.create] WorkflowExecution",
     key: "WorkflowExecutionCommandController.create",
     kind: ApiResourceKind.workflow_execution,
-    idRule: "minted",
     edition: "engine",
     async send({ org }, chosenId) {
       await fundedWhereMetered(org);
@@ -646,7 +617,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:WorkflowInstanceCommandController.create] WorkflowInstance",
     key: "WorkflowInstanceCommandController.create",
     kind: ApiResourceKind.workflow_instance,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const workflowId = await workflowIn(org);
       const name = uniqueName("mint-win");
@@ -665,7 +635,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:WorkflowInstanceCommandController.apply] WorkflowInstance (apply as a create)",
     key: "WorkflowInstanceCommandController.apply",
     kind: ApiResourceKind.workflow_instance,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const workflowId = await workflowIn(org);
       const name = uniqueName("mint-win");
@@ -684,7 +653,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:ApiKeyCommandController.create] ApiKey",
     key: "ApiKeyCommandController.create",
     kind: ApiResourceKind.api_key,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-key");
       const created = await clients.apiKeyCommand.create({ ...makeApiKey({ org, name }), metadata: { id: chosenId, name, org } });
@@ -699,7 +667,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:OAuthAppCommandController.create] OAuthApp",
     key: "OAuthAppCommandController.create",
     kind: ApiResourceKind.oauth_app,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-oapp");
       const created = await clients.oauthAppCommand.create({ ...makeOAuthApp(org, name), metadata: { id: chosenId, name, org } });
@@ -714,7 +681,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:OAuthAppCommandController.apply] OAuthApp (apply as a create)",
     key: "OAuthAppCommandController.apply",
     kind: ApiResourceKind.oauth_app,
-    idRule: "minted",
     async send({ org }, chosenId) {
       const name = uniqueName("mint-oapp");
       const applied = await clients.oauthAppCommand.apply({ ...makeOAuthApp(org, name), metadata: { id: chosenId, name, org } });
@@ -729,7 +695,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:PlatformClientCommandController.create] PlatformClient",
     key: "PlatformClientCommandController.create",
     kind: ApiResourceKind.platform_client,
-    idRule: "minted",
     async send({ org }, chosenId) {
       // Built here rather than through support/platformclients.ts, whose
       // builder sends no id: the request is the support module's, plus the id.
@@ -753,7 +718,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:OrganizationCommandController.create] Organization",
     key: "OrganizationCommandController.create",
     kind: ApiResourceKind.organization,
-    idRule: "slug",
     async send(_scope, chosenId) {
       // The organization is the scope itself, so the provisioned one goes
       // unused: the row founds its own.
@@ -773,7 +737,6 @@ const ROWS: readonly Row[] = [
     title: "[rpc:OrganizationCommandController.apply] Organization (apply as a create)",
     key: "OrganizationCommandController.apply",
     kind: ApiResourceKind.organization,
-    idRule: "slug",
     async send(_scope, chosenId) {
       const applied = await clients.organizationCommand.apply({
         apiVersion: "tenancy.stigmer.ai/v1",
@@ -799,7 +762,7 @@ const EXEMPT_BY_NAME: ReadonlyMap<string, string> = new Map([
 ]);
 
 // The row's three assertions: the caller's id replaced, the answered id the
-// kind's shape (or its slug), and a read-back under the answered id.
+// kind's shape, and a read-back under the answered id.
 async function assertMintsItsOwnId(row: Row): Promise<void> {
   const prefix = kindMetaOf(row.kind).idPrefix;
   const chosenId = foreignId(prefix);
@@ -809,13 +772,9 @@ async function assertMintsItsOwnId(row: Row): Promise<void> {
   const answered = await row.send({ org: context.org }, chosenId);
 
   expect(answered.id, `${row.key} kept the caller's id ${chosenId}; the server must assign its own`).not.toBe(chosenId);
-  if (row.idRule === "slug") {
-    expect(answered.id, `${row.key} answered id ${answered.id}, expected the slug ${answered.slug}`).toBe(answered.slug);
-  } else {
-    expect(answered.id, `${row.key} answered id ${answered.id}, not a ${prefix}_ id the server minted`).toMatch(
-      mintedIdPattern(prefix),
-    );
-  }
+  expect(answered.id, `${row.key} answered id ${answered.id}, not a ${prefix}_ id the server minted`).toMatch(
+    mintedIdPattern(prefix),
+  );
   const read = await row.read(answered.id);
   expect(read, `${row.key}: a read of ${answered.id} answered id ${read ?? "(none)"}`).toBe(answered.id);
 }

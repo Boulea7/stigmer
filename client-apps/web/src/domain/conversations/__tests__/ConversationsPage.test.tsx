@@ -36,7 +36,9 @@ vi.mock("@stigmer/react", () => ({
     page.access.push(props);
     return null;
   },
-  useActiveOrgSlug: () => "acme",
+  useActiveOrgId: () => "org_acme",
+  // The person's organizations: org_acme reads "acme" in a URL.
+  useOrgSlugForId: () => (id: string) => (id === "org_acme" ? "acme" : id),
 }));
 
 vi.mock("@/domain/_shared/navigation/app-navigation", () => ({
@@ -67,7 +69,7 @@ describe("web ConversationsPage", () => {
         kind: ApiResourceKind.agent_channel,
         kindString: "agent_channel",
         id: "ach_1",
-        org: "acme",
+        org: "org_acme",
         name: "support",
       },
     });
@@ -94,6 +96,10 @@ describe("web ConversationsPage", () => {
     const href = page.workbench.at(-1)?.channelHref;
 
     expect(href?.({ spec: { agentRef: { org: "", slug: "helper" } } })).toBe("/library/agents/acme/helper?tab=channels");
+    // A stored reference names its org by id; the link carries the slug.
+    expect(href?.({ spec: { agentRef: { org: "org_acme", slug: "helper" } } })).toBe(
+      "/library/agents/acme/helper?tab=channels",
+    );
     expect(href?.({ spec: {} })).toBeNull();
   });
 });

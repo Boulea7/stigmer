@@ -463,16 +463,19 @@ export {
   AuditNotFoundError,
   ResourceNotFoundError,
 } from "./store/interface.js";
-// The organization-slug ledger (`Store.organizationSlugs`): an
-// organization's slug is its for good. A composition that keeps its own
-// rows by organization id retires the slugs its history holds through it,
-// and a create of a retired slug carries the reason below.
+// The resource-name table (`Store.resourceNames`): the names a resource
+// answers to, an organization's slug among them, each resolving to the id
+// the resource is filed under. A create or rename of a slug another
+// organization recently left carries the reason below.
 export type {
-  OrganizationSlugClaim,
-  OrganizationSlugEntry,
-  OrganizationSlugStore,
+  ResourceNameClaim,
+  ResourceNameEntry,
+  ResourceNameKey,
+  ResourceNameRename,
+  ResourceNameState,
+  ResourceNameStore,
 } from "./store/interface.js";
-export { ORGANIZATION_SLUG_RESERVED } from "./domain/organization/slug-ledger.js";
+export { ORGANIZATION_SLUG_RESERVED } from "./domain/organization/names.js";
 // The API-key verifier's refusal of a key created before sign-in was
 // turned on (stigmer/stigmer#1169): a client branches on the reason, not
 // the copy.

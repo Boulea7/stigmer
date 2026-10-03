@@ -59,9 +59,11 @@ export const SCHEMA_VERSION_5 = 5;
 export const SCHEMA_VERSION_6 = 6;
 /** v7: the organization-slug ledger, filled with every slug taken before it. */
 export const SCHEMA_VERSION_7 = 7;
+/** v8: the resource-name table replaces the organization-slug ledger. */
+export const SCHEMA_VERSION_8 = 8;
 
 /** Target version for new databases. */
-export const CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_7;
+export const CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_8;
 
 /**
  * Advisory lock key for the migration chain. Arbitrary but stable 64-bit
@@ -103,6 +105,7 @@ export async function runMigrations(
       [SCHEMA_VERSION_5, migrateToV5],
       [SCHEMA_VERSION_6, migrateToV6],
       [SCHEMA_VERSION_7, migrateToV7],
+      [SCHEMA_VERSION_8, migrateToV8],
     ];
 
     for (const [version, migrate] of chain) {
@@ -435,8 +438,8 @@ async function migrateToV6(client: PoolClient): Promise<void> {
 }
 
 /**
- * v7: the organization-slug ledger (the Store's `organizationSlugs`,
- * interface.ts says what it guarantees), created and filled in one step so
+ * v7: the organization-slug ledger (replaced by v8's resource-name table),
+ * created and filled in one step so
  * it is complete before the first request. organization-slug-history.ts
  * says what the fill records, why it is a migration, why its kind table is
  * frozen, and why an undecodable row fails the step; this step owns the SQL.
@@ -506,4 +509,46 @@ async function migrateToV7(client: PoolClient): Promise<void> {
       [slug, recordedAt],
     );
   }
+}
+
+/**
+ * v8: the resource-name table (the Store's `resourceNames`, interface.ts
+ * says what it guarantees) replaces the organization-slug ledger.
+ *
+ * - An organization is filed under a minted id from this version on, and
+ *   its slug is a name it answers to, so the table maps a name to an id
+ *   and lets a name go. The ledger only knew which slugs were ever taken.
+ * - Every live organization's slug is recorded as its current name. Before
+ *   this version an organization's id was its slug, so the fill copies the
+ *   id into both columns with no decode, the way v7 did. Such a name equals
+ *   its id, which is what keeps it held for good (interface.ts).
+ * - A retired ledger entry is not carried: nothing is filed under a name
+ *   any more, so a name a deleted organization held is free.
+ * - `claimed_at` and `expires_at` are ledger time crossing the Store
+ *   interface, TEXT holding exact RFC-3339 strings, byte-collated so the
+ *   expiry comparison is the strings' order whatever the database locale.
+ * - The by-id index serves the release of every name one resource holds.
+ */
+async function migrateToV8(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE resource_names (
+      kind TEXT NOT NULL,
+      org TEXT NOT NULL,
+      name TEXT NOT NULL,
+      id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      claimed_at TEXT COLLATE "C" NOT NULL,
+      expires_at TEXT COLLATE "C" NOT NULL DEFAULT '',
+      PRIMARY KEY (kind, org, name)
+    );
+
+    CREATE INDEX idx_resource_names_id ON resource_names (kind, org, id);
+  `);
+  await client.query(
+    `INSERT INTO resource_names (kind, org, name, id, state, claimed_at)
+     SELECT 'organization', '', id, id, 'current', $1
+     FROM resources WHERE kind = 'organization'`,
+    [new Date().toISOString()],
+  );
+  await client.query(`DROP TABLE organization_slugs`);
 }

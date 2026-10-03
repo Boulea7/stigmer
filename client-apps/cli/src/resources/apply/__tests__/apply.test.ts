@@ -1,14 +1,18 @@
-// Unit tests for the shared apply core's declared-visibility follow-up
-// (oss#573). Plain updates preserve stored visibility on both editions, so
-// the apply RPC's response carries the STORED level; when a manifest
-// declares a different one, the core must land it through the guarded
-// updateVisibility RPC — or warn when the kind has no such door.
+// Unit tests for the shared apply core's follow-ups through guarded doors.
+// Plain updates preserve stored visibility (oss#573) and an organization's
+// slug, so the apply RPC's response carries the STORED values; when a
+// manifest declares a different level the core lands it through
+// updateVisibility (or warns when the kind has no such door), and when an
+// organization manifest carries its id and a different slug, through rename.
+// And the org-mismatch warning: an organization is named by id or slug, so
+// two different strings are asked about before they are called different.
 
 import { create, type Message } from "@bufbuild/protobuf";
 import { AgentSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { ApiResourceVisibility } from "@stigmer/protos/ai/stigmer/commons/apiresource/enum_pb";
-import type { UpdateVisibilityInput } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
+import type { RenameInput, UpdateVisibilityInput } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
+import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { describe, expect, it } from "vitest";
 import { applyMessage } from "../apply.js";
 import type { ApplyHandler, ControllerFn } from "../handlers.js";
@@ -130,5 +134,93 @@ describe("applyMessage declared-visibility follow-up", () => {
 
     expect(calls).toHaveLength(0);
     expect(outcome.applied).toBeUndefined();
+  });
+});
+
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+
+function organization(slug: string, id = ACME_ID) {
+  return create(OrganizationSchema, { metadata: { id, name: "Acme", slug } });
+}
+
+function organizationHandler(applyReturns: Message, rename: (input: RenameInput) => Promise<Message>) {
+  const calls: RenameInput[] = [];
+  const handler: ApplyHandler = {
+    kind: ApiResourceKind.organization,
+    displayName: "Organization",
+    schema: OrganizationSchema,
+    applyOrder: 0,
+    apply: () => Promise.resolve(applyReturns),
+    rename: (_c: ControllerFn, input: RenameInput) => {
+      calls.push(input);
+      return rename(input);
+    },
+  };
+  return { handler, calls };
+}
+
+describe("applyMessage declared-slug follow-up", () => {
+  it("renames an organization whose manifest carries its id and a new slug, and reflects it on the outcome", async () => {
+    const { handler, calls } = organizationHandler(organization("acme"), () => Promise.resolve(organization("acme-corp")));
+
+    const outcome = await applyMessage(controller, handler, organization("acme-corp"), "", false);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].resourceId).toBe(ACME_ID);
+    expect(calls[0].slug).toBe("acme-corp");
+    expect((outcome.applied as { metadata?: { slug?: string } }).metadata?.slug).toBe("acme-corp");
+  });
+
+  it("does not rename when the manifest carries no id (the slug is how apply finds it) or the same slug", async () => {
+    const { handler, calls } = organizationHandler(organization("acme"), () => Promise.reject(new Error("must not be called")));
+
+    await applyMessage(controller, handler, organization("acme-corp", ""), "", false);
+    await applyMessage(controller, handler, organization("acme"), "", false);
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it("fails loudly when the rename is refused, naming the partial state", async () => {
+    const { handler } = organizationHandler(organization("acme"), () => Promise.reject(new Error("the slug is taken")));
+
+    await expect(applyMessage(controller, handler, organization("taken"), "", false)).rejects.toThrow(
+      /spec applied, but the manifest's slug change was rejected: the slug is taken/,
+    );
+  });
+});
+
+describe("applyMessage org-mismatch warning", () => {
+  /** A controller whose organization get answers the id each value names, or NotFound. */
+  function organizationsNaming(ids: Record<string, string>): ControllerFn {
+    return (() => ({
+      get: ({ value }: { value: string }) =>
+        ids[value] === undefined
+          ? Promise.reject(new Error("not found"))
+          : Promise.resolve(organization(value, ids[value])),
+    })) as unknown as ControllerFn;
+  }
+
+  it("stays quiet when the manifest's org and the target name the same organization in different forms", async () => {
+    const { handler } = handlerWith({ applyReturns: agent(ApiResourceVisibility.visibility_org) });
+    const outcome = await applyMessage(
+      organizationsNaming({ acme: ACME_ID, [ACME_ID]: ACME_ID }),
+      handler,
+      agent(ApiResourceVisibility.api_resource_visibility_unspecified),
+      ACME_ID,
+      true,
+    );
+    expect(outcome.warning).toBeUndefined();
+  });
+
+  it("warns when they name different organizations, or one the caller cannot see", async () => {
+    const { handler } = handlerWith({ applyReturns: agent(ApiResourceVisibility.visibility_org) });
+    const outcome = await applyMessage(
+      organizationsNaming({ acme: ACME_ID, globex: "org_01jbbbbbbbbbbbbbbbbbbbbbbb" }),
+      handler,
+      agent(ApiResourceVisibility.api_resource_visibility_unspecified),
+      "globex",
+      true,
+    );
+    expect(outcome.warning).toMatch(/resource org 'acme' differs from target org 'globex'; using 'acme'/);
   });
 });

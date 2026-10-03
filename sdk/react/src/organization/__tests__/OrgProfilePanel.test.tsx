@@ -1,3 +1,9 @@
+/**
+ * OrgProfilePanel: the profile save keeps every spec field it does not
+ * edit, the identity-provider summary's empty state follows the caller's
+ * rights, and the slug is renamable by owners only, and never on a server
+ * that holds one organization.
+ */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { create } from "@bufbuild/protobuf";
@@ -25,12 +31,15 @@ import { OrgProfilePanel } from "../OrgProfilePanel";
  * the organization's admins manage them, and is not invited to set one up.
  */
 
+// The id differs from the slug, as for every organization made today; an
+// organization belongs to no organization, so its metadata.org is unset.
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+
 const ORG: Organization = create(OrganizationSchema, {
   metadata: {
-    id: "acme",
+    id: ACME_ID,
     name: "Acme Corp",
     slug: "acme",
-    org: "acme",
   },
   spec: {
     description: "We make everything.",
@@ -47,6 +56,8 @@ function createMockStigmer(overrides?: {
       get: vi.fn(async () => ORG),
       update: overrides?.update ?? vi.fn(async () => ORG),
     },
+    platform: { getServerInfo: vi.fn(async () => ({ singleOrg: false })) },
+    iamPolicy: { checkMyPermission: vi.fn(async () => ({ isAuthorized: false })) },
   } as never;
 }
 
@@ -57,7 +68,7 @@ function renderPanel(client: unknown) {
   return render(
     <StigmerContext.Provider value={client as never}>
       <DeploymentModeContext.Provider value="local">
-        <OrgProfilePanel org="acme" />
+        <OrgProfilePanel org={ACME_ID} />
       </DeploymentModeContext.Provider>
     </StigmerContext.Provider>,
   );
@@ -90,8 +101,8 @@ describe("OrgProfilePanel save payload", () => {
       standingContext: "We deploy to us-east-1.",
     });
     expect(input.logoUrl).toBe("https://acme.example/logo.png");
-    // Addressing fields for the update pipeline's org+slug lookup.
-    expect(input.org).toBe("acme");
+    // The update addresses the organization by its id.
+    expect(input.id).toBe(ACME_ID);
     expect(input.slug).toBe("acme");
     expect(input.name).toBe("Acme Corp");
   });
@@ -122,11 +133,12 @@ describe("OrgProfilePanel identity-provider summary", () => {
       organization: { get: vi.fn(async () => ORG), update: vi.fn(async () => ORG) },
       identityProvider: { listByOrg: vi.fn(async () => ({ entries: [] })) },
       iamPolicy: { checkMyPermission },
+      platform: { getServerInfo: vi.fn(async () => ({ singleOrg: false })) },
     };
     render(
       <StigmerContext.Provider value={client as never}>
         <DeploymentModeContext.Provider value="cloud">
-          <OrgProfilePanel org="acme" />
+          <OrgProfilePanel org={ACME_ID} />
         </DeploymentModeContext.Provider>
       </StigmerContext.Provider>,
     );
@@ -144,7 +156,7 @@ describe("OrgProfilePanel identity-provider summary", () => {
       input.resource?.id,
       input.relation,
     ]);
-    expect(asked).toContainEqual(["organization", "acme", "can_create_idp"]);
+    expect(asked).toContainEqual(["organization", ACME_ID, "can_create_idp"]);
   });
 
   it("invites setting one up when the caller may create identity providers", async () => {
@@ -153,5 +165,102 @@ describe("OrgProfilePanel identity-provider summary", () => {
     expect(
       screen.queryByText("Identity providers are managed by your organization's admins."),
     ).toBeNull();
+  });
+});
+
+describe("OrgProfilePanel rename", () => {
+  const RENAMED: Organization = create(OrganizationSchema, {
+    metadata: { id: ACME_ID, name: "Acme Corp", slug: "acme-labs" },
+  });
+
+  function renderRenamable({
+    owner,
+    singleOrg,
+    rename = vi.fn(async () => RENAMED),
+    onUpdated,
+  }: {
+    owner: boolean;
+    singleOrg: boolean;
+    rename?: ReturnType<typeof vi.fn>;
+    onUpdated?: (org: Organization) => void;
+  }) {
+    const checkMyPermission = vi.fn(async (input: CheckMyPermissionInput) => ({
+      isAuthorized: input.relation === "can_delete" ? owner : false,
+    }));
+    const client = {
+      organization: {
+        get: vi.fn(async () => ORG),
+        update: vi.fn(async () => ORG),
+        rename,
+      },
+      iamPolicy: { checkMyPermission },
+      platform: { getServerInfo: vi.fn(async () => ({ singleOrg })) },
+    };
+    render(
+      <StigmerContext.Provider value={client as never}>
+        <DeploymentModeContext.Provider value="local">
+          <OrgProfilePanel org={ACME_ID} onUpdated={onUpdated} />
+        </DeploymentModeContext.Provider>
+      </StigmerContext.Provider>,
+    );
+    return { checkMyPermission, rename };
+  }
+
+  it("lets an owner rename the slug, by the organization's id", async () => {
+    const onUpdated = vi.fn();
+    const { rename, checkMyPermission } = renderRenamable({
+      owner: true,
+      singleOrg: false,
+      onUpdated,
+    });
+
+    const slug = await screen.findByLabelText("Slug");
+    await waitFor(() => expect(slug).toHaveProperty("value", "acme"));
+    const button = screen.getByRole("button", { name: "Rename" });
+    expect(button).toHaveProperty("disabled", true);
+
+    fireEvent.change(slug, { target: { value: "acme-labs" } });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(rename).toHaveBeenCalledTimes(1));
+    const input = rename.mock.calls[0]![0];
+    expect(input.resourceId).toBe(ACME_ID);
+    expect(input.slug).toBe("acme-labs");
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(RENAMED));
+    expect(
+      checkMyPermission.mock.calls.map(([i]) => [i.resource?.id, i.relation]),
+    ).toContainEqual([ACME_ID, "can_delete"]);
+  });
+
+  it("shows a non-owner the slug read-only", async () => {
+    renderRenamable({ owner: false, singleOrg: false });
+
+    expect(await screen.findByText("acme")).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
+    expect(screen.queryByLabelText("Slug")).toBeNull();
+  });
+
+  it("offers no rename on a server that holds one organization", async () => {
+    renderRenamable({ owner: true, singleOrg: true });
+
+    expect(await screen.findByText("acme")).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
+  });
+
+  it("shows the server's refusal and keeps the field", async () => {
+    const rename = vi.fn(async () => {
+      throw new Error("slug acme-labs is taken");
+    });
+    renderRenamable({ owner: true, singleOrg: false, rename });
+
+    const slug = await screen.findByLabelText("Slug");
+    await waitFor(() => expect(slug).toHaveProperty("value", "acme"));
+    fireEvent.change(slug, { target: { value: "acme-labs" } });
+    fireEvent.keyDown(slug, { key: "Enter" });
+
+    expect((await screen.findByRole("alert")).textContent).toBeTruthy();
+    expect(screen.getByLabelText("Slug")).toHaveProperty("value", "acme-labs");
   });
 });

@@ -567,6 +567,11 @@ together; nothing outside it sees them.
   filter by one say `Org` (`listByOrg`, `getForOrg`). The kind itself, and the
   messages and RPCs that return it, keep the full word (`Organization`,
   `findMyOrganizations`), as `Agent` does.
+- **Identity**: a permanent id, `org_` and a ULID, minted when the Organization
+  is made; every resource names its Organization by it in `metadata.org`. The
+  slug is the name people type, unique across the server and changed only by
+  `rename`. A request may name an Organization by either; responses carry the
+  id, and clients show the slug.
 - **Key fields**: `description`, `logo_url`, `preferences`, `is_personal`, and
   the child-organization fields `management_mode`, `identity_provider_ref` and
   `external_org_id`.

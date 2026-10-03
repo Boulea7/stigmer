@@ -44,7 +44,7 @@ export interface GuestAuthConfig {
   /** Stigmer API server URL (e.g., "https://api.stigmer.ai"). */
   readonly baseUrl: string;
 
-  /** Organization slug from the share URL. */
+  /** The organization from the share URL, by id or slug. */
   readonly org: string;
 
   /**
@@ -327,7 +327,7 @@ export function createGuestAuth(config: GuestAuthConfig): GuestAuth {
   }
   if (!config.org) {
     throw new Error(
-      "createGuestAuth: org is required — the organization slug from the share URL",
+      "createGuestAuth: org is required — the organization from the share URL",
     );
   }
   if (!config.slug) {

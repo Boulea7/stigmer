@@ -28,14 +28,20 @@ async function fetchOrganization(client: Stigmer, ref: ParsedReference): Promise
   if (ref.kind === "id") {
     return { schema: OrganizationSchema, message: await client.organization.get(ref.id) };
   }
-  // Organizations are not org-scoped, so a bare token is a slug to resolve
-  // against the caller's memberships rather than an org/slug pair.
+  // Organizations are not org-scoped, so a bare token is a slug (or a name)
+  // to resolve against the caller's memberships rather than an org/slug
+  // pair. A token no membership's current slug or name matches may still be
+  // an organization's earlier slug or an id, which the server resolves.
   const mine = await client.organization.findMyOrganizations();
   const match = mine.entries.find(
     (org) => org.metadata?.slug === ref.slug || org.metadata?.name === ref.slug,
   );
-  if (match === undefined) {
+  if (match !== undefined) {
+    return { schema: OrganizationSchema, message: match };
+  }
+  try {
+    return { schema: OrganizationSchema, message: await client.organization.get(ref.slug) };
+  } catch {
     throw new CliExitError(`organization "${ref.slug}" not found`, ExitCode.NotFound);
   }
-  return { schema: OrganizationSchema, message: match };
 }

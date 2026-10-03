@@ -233,11 +233,11 @@
           "type": {
             "kind": "string"
           },
-          "description": "Organization that owns the referenced resource.\n\n When non-empty: must be a valid org slug (lowercase alphanumeric with hyphens,\n starts with a letter, 1-63 characters). Example: \"stigmer\", \"acme-corp\".\n\n When empty: the reference is relative — the server resolves it to the parent\n resource's organization at write time. All stored and returned references\n always have org populated (absolute form).\n\n Use empty org for same-org references (the common case).\n An explicit other org is accepted only when that organization is a\n platform that shares the resource with yours (visibility_platform).",
+          "description": "Organization that owns the referenced resource, by slug or id.\n\n When non-empty: an organization slug (lowercase alphanumeric with hyphens,\n starts with a letter, 2-63 characters; e.g. \"stigmer\", \"acme-corp\") or an\n organization id (org_\u003culid\u003e). The server stores the id, so a stored\n reference keeps pointing at its organization across a rename.\n\n When empty: the reference is relative — the server resolves it to the parent\n resource's organization at write time. All stored and returned references\n always have org populated (absolute form, the id).\n\n Use empty org for same-org references (the common case).\n An explicit other org is accepted only when that organization is a\n platform that shares the resource with yours (visibility_platform).",
           "required": false,
           "validation": {
             "maxLength": 63,
-            "pattern": "^$|^[a-z][a-z0-9-]*[a-z0-9]$"
+            "pattern": "^$|^[a-z][a-z0-9-]*[a-z0-9]$|^org_[0-9a-z]{26}$"
           }
         },
         {
@@ -550,7 +550,7 @@
         {
           "name": "organization",
           "number": 30,
-          "description": "The boundary that holds people, Agents, Workflows, Sessions and secrets\n together; nothing outside it sees them.\n\n Organization is the one resource whose metadata.id equals its metadata.slug\n (set by the create pipeline), not a minted org_\u003culid\u003e. It is the immutable,\n globally unique tenancy root that every child resource references by slug\n (metadata.org), so its slug is globally unique and doubles as its id.\n id_prefix below is retained deliberately: it still anchors legacy org_\u003culid\u003e\n records and the CLI's id-vs-slug detection — it is not used to mint new ids."
+          "description": "The boundary that holds people, Agents, Workflows, Sessions and secrets\n together; nothing outside it sees them.\n\n Its id is a minted org_\u003culid\u003e that never changes; every organization-scoped\n resource names it by that id (metadata.org). Its slug is unique across the\n server and may change through rename; requests may name the organization\n by either."
         },
         {
           "name": "platform",

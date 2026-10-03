@@ -7,8 +7,12 @@ import { FetchCache } from "../../internal/fetch-cache";
 import { FetchCacheContext } from "../../internal/FetchCacheProvider";
 import { OrgProvider, useOrg } from "../OrgProvider";
 
-const acme = { metadata: { id: "acme", slug: "acme", name: "Acme" } } as Organization;
-const globex = { metadata: { id: "globex", slug: "globex", name: "Globex" } } as Organization;
+const acme = {
+  metadata: { id: "org_01jaaaaaaaaaaaaaaaaaaaaaaa", slug: "acme", name: "Acme" },
+} as Organization;
+const globex = {
+  metadata: { id: "org_01jbbbbbbbbbbbbbbbbbbbbbbb", slug: "globex", name: "Globex" },
+} as Organization;
 
 function createMockStigmer(orgs: Organization[]) {
   return {

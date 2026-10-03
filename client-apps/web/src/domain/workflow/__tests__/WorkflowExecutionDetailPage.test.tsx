@@ -40,8 +40,9 @@ vi.mock("@stigmer/react", async () => {
       page.access.push(props);
       return null;
     },
-    useActiveOrgSlug: () => "acme",
     useActiveOrgId: () => "org_acme",
+    // The person's organizations: org_acme reads "acme" in a URL.
+    useOrgSlugForId: () => (id: string) => (id === "org_acme" ? "acme" : id),
     useResolveAgentExecutionSession: (id: string | null) => ({
       sessionId: id ? page.sessionFor.get(id) : undefined,
       isLoading: false,
@@ -69,7 +70,7 @@ describe("web WorkflowExecutionDetailPage", () => {
   it("shows the execution in the active org, with that execution's access dialog", () => {
     render(<WorkflowExecutionDetailPage executionId="wfe_1" />);
 
-    expect(page.viewer.at(-1)).toMatchObject({ executionId: "wfe_1", org: "acme", nodesDraggable: true });
+    expect(page.viewer.at(-1)).toMatchObject({ executionId: "wfe_1", org: "org_acme", nodesDraggable: true });
     expect(page.access.at(-1)?.resource).toEqual({
       kind: ApiResourceKind.workflow_execution,
       kindString: "workflow_execution",

@@ -80,7 +80,10 @@ export interface BackendConfig {
 }
 
 export interface ContextConfig {
+  /** The context organization's id (or, set by hand, whatever value was given). */
   org?: string;
+  /** Its slug when `context set` stored it, for output; never sent to the server. */
+  org_slug?: string;
 }
 
 /**

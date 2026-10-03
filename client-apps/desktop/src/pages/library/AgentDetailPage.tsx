@@ -15,9 +15,10 @@ import {
   useExportResource,
   ConfirmDialog,
   useBreadcrumbOverride,
-  useActiveOrgSlug,
   type AdditionalTab,
   type DetailAction,
+  useActiveOrgId,
+  useOrgSlugForId,
 } from "@stigmer/react";
 import type { AgentInstance } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/api_pb";
 import { CONSOLE_URL } from "../../config";
@@ -43,9 +44,11 @@ function agentSessionUrl(org: string, slug: string, instanceId?: string): string
 export default function AgentDetailPage() {
   const { org, slug } = useParams<{ org: string; slug: string }>();
   const navigate = useNavigate();
+  const slugForOrg = useOrgSlugForId();
   // The viewer's own org scopes the Instances tab: an instance of a
   // platform-visible agent is created in the viewer's org, not the agent's.
-  const viewerOrg = useActiveOrgSlug();
+  // By id, the way the server names every org.
+  const viewerOrg = useActiveOrgId();
   const { setLabel } = useBreadcrumbOverride();
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [resourceName, setResourceName] = useState<string>("Agent");
@@ -264,13 +267,13 @@ export default function AgentDetailPage() {
         editable
         onResourceLoad={handleResourceLoad}
         onMcpServerClick={(ref) =>
-          navigate(`/library/mcp-servers/${ref.org}/${ref.slug}`)
+          navigate(`/library/mcp-servers/${slugForOrg(ref.org)}/${ref.slug}`)
         }
         onSkillClick={(ref) =>
-          navigate(`/library/skills/${ref.org}/${ref.slug}`)
+          navigate(`/library/skills/${slugForOrg(ref.org)}/${ref.slug}`)
         }
         onPluginClick={(ref) =>
-          navigate(`/library/plugins/${ref.org}/${ref.slug}`)
+          navigate(`/library/plugins/${slugForOrg(ref.org)}/${ref.slug}`)
         }
         primaryAction={primaryAction}
         actions={actions}

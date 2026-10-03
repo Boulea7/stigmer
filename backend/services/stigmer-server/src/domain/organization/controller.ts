@@ -33,7 +33,10 @@ import { fromBinary } from "@bufbuild/protobuf";
 import { create } from "@bufbuild/protobuf";
 
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
-import type { FindApiResourcesRequest } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
+import type {
+  FindApiResourcesRequest,
+  RenameInput,
+} from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
 import { OrganizationCommandController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/command_pb";
 import { OrganizationQueryController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/query_pb";
 import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
@@ -84,13 +87,9 @@ import {
   newDeleteSearchIndexStep,
   newIndexSearchStep,
 } from "../../pipeline/steps/index-search.js";
-import {
-  EXISTING_RESOURCE_KEY,
-  newLoadExistingStep,
-} from "../../pipeline/steps/load-existing.js";
+import { EXISTING_RESOURCE_KEY } from "../../pipeline/steps/load-existing.js";
 import {
   SHOULD_CREATE_KEY,
-  newLoadForApplyStep,
   withResolvedApplyId,
 } from "../../pipeline/steps/load-for-apply.js";
 import {
@@ -116,10 +115,19 @@ import {
   newClaimOrganizationSlugStep,
   newRetireOrganizationSlugStep,
   releaseSlugClaimAfterFailure,
-} from "./slug-ledger.js";
+} from "./names.js";
+import {
+  RENAMED_ORGANIZATION_KEY,
+  newIndexOrganizationAfterRenameStep,
+  newLoadOrganizationForRenameStep,
+  newPersistRenamedOrganizationStep,
+  newRenameOrganizationSlugStep,
+} from "./rename.js";
 import {
   newCheckOrgDuplicateStep,
-  newCopySlugToIdStep,
+  newLoadExistingOrganizationStep,
+  newLoadOrganizationForApplyStep,
+  newRefuseOrganizationOrgStep,
   newRevokeOrganizationPoliciesStep,
 } from "./steps.js";
 
@@ -153,6 +161,7 @@ export function registerOrganizationServices(
     apply: (org, ctx) => apply(deps, org, ctx),
     create: (org, ctx) => createOrganization(deps, org, ctx),
     update: (org, ctx) => update(deps, org, ctx),
+    rename: (input, ctx) => rename(deps, input, ctx),
     delete: (orgId, ctx) => deleteOrganization(deps, orgId, ctx),
   });
   // getByExternalOrgId registers ONLY when the composed directory carries
@@ -185,7 +194,9 @@ function kindOf(ctx: HandlerContext): ApiResourceKind {
 /**
  * Create — chain per Go buildCreatePipeline: ResolveSlug runs before
  * ValidateProto so clients can omit the slug and have it derived before
- * field constraints (slug pattern, 2–15 chars) are checked.
+ * the slug pattern is checked. BuildNewState mints the organization's id
+ * (org_<ulid>), which every resource it owns will name; an organization
+ * names no organization of its own (RefuseOrganizationOrg).
  *
  * The pre-side-effect gate slot splices before Persist, after the last pure
  * step, the session chain's position: every step above it only reads, so a
@@ -195,11 +206,10 @@ function kindOf(ctx: HandlerContext): ApiResourceKind {
  * OrganizationLimit step (limit.ts).
  *
  * ClaimOrganizationSlug follows the slot, immediately before Persist: the
- * slug is claimed in the ledger atomically, so of two concurrent creates of
- * one slug exactly one proceeds, and a slug any organization ever held is
- * refused (slug-ledger.ts). When the chain fails after the claim and the
- * organization was never stored, the claim is released so a retry can take
- * the slug.
+ * slug is claimed in the name table atomically for the minted id, so of two
+ * concurrent creates of one slug exactly one proceeds (names.ts). When the
+ * chain fails after the claim and the organization was never stored, the
+ * claim is released so a retry can take the slug.
  *
  * The post-persist gate slot splices after Persist, before IndexSearch —
  * the verified Java OrganizationCreateHandler ordering (FGA tuple
@@ -231,11 +241,11 @@ async function createOrganization(
     )
     .addStep(newResolveSlugStep())
     .addStep(newValidateProtoStep())
+    .addStep(newRefuseOrganizationOrgStep())
     .addStep(newValidateVisibilityStep())
     .addStep(newCheckOrgDuplicateStep(deps.store))
     .addStep(newBuildNewStateStep())
-    .addStep(newGuardReservedLabelsStep(deps.authorizer))
-    .addStep(newCopySlugToIdStep());
+    .addStep(newGuardReservedLabelsStep(deps.authorizer));
   // The composition's organization count, at the slot's seat and before its
   // steps: the chain's own rule, not a unit's (limit.ts).
   if (deps.orgLimit !== undefined) {
@@ -312,7 +322,7 @@ async function update(
     )
     .addStep(newValidateProtoStep())
     .addStep(newResolveSlugStep())
-    .addStep(newLoadExistingStep(deps.store))
+    .addStep(newLoadExistingOrganizationStep(deps.store))
     .addStep(newBuildUpdateStateStep())
     .addStep(newGuardReservedLabelsStep(deps.authorizer))
     .addStep(newPersistStep(deps.store))
@@ -322,6 +332,40 @@ async function update(
     .build()
     .execute(reqCtx);
   return reqCtx.newState;
+}
+
+/**
+ * Rename — the only writer of an organization's slug (rename.ts): the
+ * names move, then the row; the old slug keeps leading to the organization
+ * for a while. Returns the renamed organization.
+ */
+async function rename(
+  deps: OrganizationControllerDeps,
+  input: RenameInput,
+  ctx: HandlerContext,
+): Promise<Organization> {
+  type RenameDesc = typeof OrganizationCommandController.method.rename.input;
+  const reqCtx = new RequestContext(
+    OrganizationCommandController.method.rename.input,
+    input,
+    callerIdentityOf(ctx),
+    kindOf(ctx),
+  );
+  await newPipeline<RenameDesc>("organization-rename", deps.logger)
+    .addStep(
+      newAuthorizeStep(
+        OrganizationCommandController.method.rename,
+        deps.authorizer,
+      ),
+    )
+    .addStep(newValidateProtoStep())
+    .addStep(newLoadOrganizationForRenameStep(deps.store))
+    .addStep(newRenameOrganizationSlugStep(deps.store))
+    .addStep(newPersistRenamedOrganizationStep(deps.store, deps.logger))
+    .addStep(newIndexOrganizationAfterRenameStep(deps.store, deps.logger))
+    .build()
+    .execute(reqCtx);
+  return reqCtx.get(RENAMED_ORGANIZATION_KEY) as Organization;
 }
 
 /**
@@ -353,7 +397,8 @@ async function apply(
     )
     .addStep(newValidateProtoStep())
     .addStep(newResolveSlugStep())
-    .addStep(newLoadForApplyStep(deps.store))
+    .addStep(newRefuseOrganizationOrgStep())
+    .addStep(newLoadOrganizationForApplyStep(deps.store))
     .build()
     .execute(reqCtx);
 
@@ -372,25 +417,26 @@ async function apply(
 /**
  * Delete — returns the deleted organization (gRPC audit-trail convention).
  *
- * An organization's id is its slug, and a slug is never taken again
- * (slug-ledger.ts), so whatever outlives the row can never pass to a new
- * holder of the slug. Everything that grants on the organization still
- * goes before its row, and a fault stops the delete with the organization
- * intact, so nothing it granted outlives it. After the load:
+ * Whatever outlives the row names the organization's id, which no later
+ * organization can carry, so its slug is released once the row is gone and
+ * a later organization of that slug sees nothing of this one. Everything
+ * that grants on the organization still goes before its row, and a fault
+ * stops the delete with the organization intact, so nothing it granted
+ * outlives it. After the load:
  *
  *   0. under a declared limit of 1, RefuseDeletingSingleOrganization: the
  *      store's only organization is never deleted, refused before any
  *      write (limit.ts);
- *   1. RetireOrganizationSlug, the slug marked retired in the ledger, so it
- *      is retired before the row can go;
- *   2. the `org-delete:pre-delete` slot, where an edition refuses or
+ *   1. the `org-delete:pre-delete` slot, where an edition refuses or
  *      removes the rows it keeps for the organization (empty in OSS);
- *   3. RevokeOrganizationPolicies, every policy row naming the
+ *   2. RevokeOrganizationPolicies, every policy row naming the
  *      organization, through the grant path, never caught;
- *   4. the row;
+ *   3. the row;
+ *   4. RetireOrganizationSlug, every name the organization held released,
+ *      best-effort (names.ts says why after the row);
  *   5. CleanupIamPolicies, the lifecycle's post-delete event: best-effort
  *      like every delete chain's, it revokes whatever a concurrent write
- *      named the organization with after step 3, and runs a composed
+ *      named the organization with after step 2, and runs a composed
  *      driver's post-delete companions;
  *   6. the search entry.
  */
@@ -423,7 +469,6 @@ async function deleteOrganization(
       newRefuseDeletingSingleOrganizationStep<DeleteInput>(deps.store),
     );
   }
-  builder.addStep(newRetireOrganizationSlugStep<DeleteInput>(deps.store));
   // The pre-delete gate slot (see the doc comment above). No unit fills it
   // in OSS.
   for (const step of stepsForSlot<DeleteInput>(
@@ -435,6 +480,9 @@ async function deleteOrganization(
   await builder
     .addStep(newRevokeOrganizationPoliciesStep<DeleteInput>(deps.grantPath))
     .addStep(newDeleteResourceStep(deps.store))
+    .addStep(
+      newRetireOrganizationSlugStep<DeleteInput>(deps.store, deps.logger),
+    )
     .addStep(
       newCleanupIamPoliciesStep(deps.authorizationLifecycle, deps.logger),
     )

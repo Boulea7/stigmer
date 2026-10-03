@@ -31,9 +31,15 @@ export interface TableShape {
   readonly row: (json: JsonObject) => readonly string[];
 }
 
-/** How the human field view renders: `hideOrg` leaves the Org line out (a server that holds one organization never names it). */
+/**
+ * How the human field view renders: `hideOrg` leaves the Org line out (a
+ * server that holds one organization never names it); `orgLabel` is how
+ * the Org line names it, the organization's slug in place of the id the
+ * resource carries.
+ */
 export interface RenderFieldsOptions {
   readonly hideOrg?: boolean;
+  readonly orgLabel?: string;
 }
 
 /** Render a single resource for a read verb (json/yaml = protojson, always complete; table = fields). */
@@ -94,7 +100,7 @@ function renderResourceFields(json: JsonValue, options: RenderFieldsOptions): st
   pushField(fields, "ID", metadata.id);
   pushField(fields, "Name", metadata.name);
   pushField(fields, "Slug", metadata.slug);
-  if (options.hideOrg !== true) pushField(fields, "Org", metadata.org);
+  if (options.hideOrg !== true) pushField(fields, "Org", options.orgLabel ?? metadata.org);
   pushField(fields, "Visibility", metadata.visibility);
   pushField(fields, "Description", spec.description);
 

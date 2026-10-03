@@ -13,7 +13,7 @@ export function OrgProfileSection() {
 
   const handleUpdated = useCallback(
     (org: Organization) => {
-      refresh(org.metadata?.slug);
+      refresh(org.metadata?.id);
     },
     [refresh],
   );

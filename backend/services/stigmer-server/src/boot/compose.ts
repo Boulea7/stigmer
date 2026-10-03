@@ -179,6 +179,8 @@ import {
   createSingleOrganizationInterceptor,
   newSingleOrganizationHolder,
 } from "../pipeline/interceptors/single-organization.js";
+import { createOrganizationNameInterceptor } from "../pipeline/interceptors/organization-names.js";
+import { newOrganizationNameResolver } from "../domain/organization/names.js";
 import { accountAsCaller } from "../domain/identityaccount/actor.js";
 import { ensureSingleOrganization } from "./single-organization.js";
 import { operatorIdentitySnapshot } from "../pipeline/steps/defaults.js";
@@ -1954,6 +1956,9 @@ export async function composeServer(
           extensions.drivers.visitorErrorPolicy,
         ),
         requestMetrics: createRequestMetricsInterceptor(),
+        organizationNames: createOrganizationNameInterceptor(
+          newOrganizationNameResolver(store),
+        ),
         ...(singleOrganization === undefined
           ? {}
           : {

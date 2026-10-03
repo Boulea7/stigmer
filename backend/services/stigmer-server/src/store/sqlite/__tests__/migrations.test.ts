@@ -40,6 +40,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   SCHEMA_VERSION_10,
   SCHEMA_VERSION_12,
+  SCHEMA_VERSION_13,
   getSchemaVersion,
   runMigrations,
 } from "../migrations.js";
@@ -91,10 +92,13 @@ describe("fresh database", () => {
       "signal_dedupe",
       "oauth_grant",
       "pending_oauth_state",
-      "organization_slugs",
+      "resource_names",
     ]) {
       expect(tables, `table ${expected} should exist`).toContain(expected);
     }
+    expect(tables, "v13 replaced the slug ledger").not.toContain(
+      "organization_slugs",
+    );
   });
 
   it("records one schema_version row per migration (MAX semantics, as Go computes it)", () => {
@@ -636,11 +640,11 @@ describe("v12: the organization-slug ledger records every slug taken before it",
     );
     setup.close();
 
-    const store = SqliteStore.open(dbPath);
-    cleanups.push(() => store.close());
+    // To v12 alone: v13 replaces the ledger this step makes.
     const db = new DatabaseSync(dbPath);
     cleanups.push(() => db.close());
-    expect(getSchemaVersion(db)).toBe(CURRENT_SCHEMA_VERSION);
+    runMigrations(db, SCHEMA_VERSION_12);
+    expect(getSchemaVersion(db)).toBe(SCHEMA_VERSION_12);
     expect(ledger(db)).toEqual([
       { slug: "acme", retired: 0 },
       { slug: "deleted-one", retired: 1 },
@@ -669,10 +673,10 @@ describe("v12: the organization-slug ledger records every slug taken before it",
     setup.exec("COMMIT");
     setup.close();
 
-    const store = SqliteStore.open(dbPath);
-    cleanups.push(() => store.close());
+    // To v12 alone: v13 replaces the ledger this step makes.
     const db = new DatabaseSync(dbPath);
     cleanups.push(() => db.close());
+    runMigrations(db, SCHEMA_VERSION_12);
     expect(ledger(db)).toEqual([
       { slug: "on-the-page", retired: 1 },
       { slug: "past-the-page", retired: 1 },
@@ -692,5 +696,47 @@ describe("v12: the organization-slug ledger records every slug taken before it",
     cleanups.push(() => db.close());
     expect(getSchemaVersion(db)).toBe(SCHEMA_VERSION_12 - 1);
     expect(tableNames(db)).not.toContain("organization_slugs");
+  });
+});
+
+describe("v13: the resource-name table replaces the organization-slug ledger", () => {
+  it("records every live organization's slug as its current name, drops the ledger, and carries no retired slug", () => {
+    const dbPath = tempDbPath();
+    const setup = new DatabaseSync(dbPath);
+    runMigrations(setup, SCHEMA_VERSION_13 - 1);
+    // Before minted ids an organization's id was its slug.
+    setup
+      .prepare(`INSERT INTO resources (kind, id, data) VALUES (?, ?, ?)`)
+      .run("organization", "acme", new Uint8Array([0x00]));
+    setup
+      .prepare(
+        `INSERT INTO organization_slugs (slug, claimed_at, retired_at) VALUES (?, ?, ?)`,
+      )
+      .run("deleted-one", "2026-01-01T00:00:00.000Z", "2026-01-02T00:00:00.000Z");
+    setup.close();
+
+    const store = SqliteStore.open(dbPath);
+    cleanups.push(() => store.close());
+    const db = new DatabaseSync(dbPath);
+    cleanups.push(() => db.close());
+
+    expect(getSchemaVersion(db)).toBe(SCHEMA_VERSION_13);
+    expect(tableNames(db)).not.toContain("organization_slugs");
+    expect(
+      db
+        .prepare(
+          `SELECT kind, org, name, id, state, expires_at FROM resource_names ORDER BY name`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        kind: "organization",
+        org: "",
+        name: "acme",
+        id: "acme",
+        state: "current",
+        expires_at: "",
+      },
+    ]);
   });
 });

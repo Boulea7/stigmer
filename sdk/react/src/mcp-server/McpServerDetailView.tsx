@@ -51,6 +51,7 @@ import type { KeyValueRow, SelectOption } from "../inline-edit/types.js";
 import { ManagedByPluginNotice } from "../plugin/ManagedByPluginNotice.js";
 import { useManagingPlugin } from "../plugin/useManagingPlugin.js";
 import { LoadingRegion } from "../internal/LoadingRegion.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Tab identifier for the MCP server capability panel. */
 export type CapabilityTab = "tools" | "policies" | "resources";
@@ -205,6 +206,7 @@ export function McpServerDetailView({
   onResourceUpdated,
   className,
 }: McpServerDetailViewProps) {
+  const slugForOrg = useOrgSlugForId();
   // Hoisted-state mode: when the caller supplies `mcpServerState`, disable
   // the internal fetch via the hook's documented null-skip (a stable no-op,
   // so `fetched` reports isLoading=false with no RPC) and render from the
@@ -484,7 +486,7 @@ export function McpServerDetailView({
     org: meta?.org,
     slug: meta?.slug,
     qualifiedSlug: meta?.slug
-      ? (meta.org ? `${meta.org}/${meta.slug}` : meta.slug)
+      ? (meta.org ? `${slugForOrg(meta.org)}/${meta.slug}` : meta.slug)
       : undefined,
     icon: editable && saveMcpField ? (
       <InlineEditImage

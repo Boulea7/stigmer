@@ -5,6 +5,7 @@ import { StatusBadge } from "../resource-workbench/components/StatusBadge.js";
 import { Tabs } from "../tabs/Tabs.js";
 import { ResourceActionBar } from "./ResourceActionBar.js";
 import type { ResourceDetailShellProps } from "./types.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /**
  * Shared layout shell for resource detail pages.
@@ -119,6 +120,7 @@ function Header({
   } = header;
 
   const showSlug = slug && slug !== name && !qualifiedSlug;
+  const slugForOrg = useOrgSlugForId();
 
   return (
     <div className="stg:flex stg:min-w-0 stg:items-start stg:gap-3">
@@ -157,7 +159,7 @@ function Header({
           </span>
         )}
         <div className="stg:mt-0.5 stg:flex stg:flex-wrap stg:items-center stg:gap-x-1.5 stg:text-xs stg:text-muted-foreground">
-          {org && <span>{org}</span>}
+          {org && <span>{slugForOrg(org)}</span>}
           {metaExtra}
           {createdAt && (
             <>

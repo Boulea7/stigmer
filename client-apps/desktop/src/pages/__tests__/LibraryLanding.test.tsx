@@ -49,7 +49,7 @@ vi.mock("@stigmer/react", () => ({
   useMcpServerCount: counter(1),
   useScheduleCount: counter(4),
   usePluginCount: counter(0),
-  useActiveOrgSlug: () => "acme",
+  useActiveOrgId: () => "org_acme",
 }));
 
 import LibraryLanding from "../library/LibraryLanding";
@@ -100,7 +100,7 @@ describe("desktop LibraryLanding", () => {
 
   it("opens Apply YAML in the active org, and an apply recounts every card", () => {
     renderLanding();
-    expect(page.dialog.at(-1)).toMatchObject({ open: false, org: "acme" });
+    expect(page.dialog.at(-1)).toMatchObject({ open: false, org: "org_acme" });
 
     fireEvent.click(screen.getByRole("button", { name: "Apply YAML" }));
     expect(page.dialog.at(-1)?.open).toBe(true);

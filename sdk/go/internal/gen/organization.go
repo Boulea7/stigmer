@@ -51,6 +51,11 @@ func (o *OrganizationClient) Update(ctx context.Context, input *OrganizationInpu
 	return resp, wrapErr(err)
 }
 
+func (o *OrganizationClient) Rename(ctx context.Context, input *apiresource.RenameInput) (*organizationv1.Organization, error) {
+	resp, err := o.command.Rename(ctx, input)
+	return resp, wrapErr(err)
+}
+
 func (o *OrganizationClient) Delete(ctx context.Context, id string) (*organizationv1.Organization, error) {
 	resp, err := o.command.Delete(ctx, &organizationv1.OrganizationId{Value: id})
 	return resp, wrapErr(err)

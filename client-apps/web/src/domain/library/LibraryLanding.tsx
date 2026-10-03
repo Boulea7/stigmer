@@ -15,7 +15,7 @@ import {
   usePluginCount,
   useWorkflowCount,
   ResourceCountCard,
-  useActiveOrgSlug,
+  useActiveOrgId,
 } from "@stigmer/react";
 
 function isPlainClick(e: MouseEvent): boolean {
@@ -122,7 +122,7 @@ function useResourceCounts(org: string | null, refetchToken?: unknown) {
 }
 
 export function LibraryLanding() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const router = useRouter();
   // Apply YAML here can create any kind, so a bump recounts every card.
   const [refetchToken, refreshCounts] = useReducer((n: number) => n + 1, 0);

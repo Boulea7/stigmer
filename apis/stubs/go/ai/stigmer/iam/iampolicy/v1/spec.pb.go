@@ -114,7 +114,9 @@ type ApiResourceRef struct {
 	// "cloud_resource", "service", etc.
 	Kind string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
 	// Unique identifier of the resource
-	// This is the resource's ID field (e.g., ia-01HQUSER123, tm-01HQTEAM456)
+	// This is the resource's ID field (e.g., ida_01hqu..., tm_01hqt...). For an
+	// organization a request may give its slug instead; the server stores the
+	// id.
 	Id string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
 	// Optional relation qualifier for the resource reference.
 	// Used when the reference needs additional context about the relationship.

@@ -6,6 +6,7 @@ import { formatRelativeTime } from "../activity/format-relative-time.js";
 import { StatusBadge } from "../resource-workbench/components/StatusBadge.js";
 import type { WorkbenchColumnDef } from "../resource-workbench/types.js";
 import { deriveScheduleState, formatNextFire } from "./scheduleState.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Options for {@link createScheduleColumns}. */
 export interface ScheduleColumnsOptions {
@@ -106,13 +107,25 @@ export function createScheduleColumns(
           item.spec?.target?.case === "agent" ? item.spec.target.value : undefined;
         return (
           <span className="stg:text-muted-foreground">
-            {target?.agentRef
-              ? `${target.agentRef.org}/${target.agentRef.slug}`
-              : "—"}
+            {target?.agentRef ? (
+              <QualifiedAgentRef org={target.agentRef.org} slug={target.agentRef.slug} />
+            ) : (
+              "—"
+            )}
           </span>
         );
       },
       flex: 1.5,
     },
   ];
+}
+
+/**
+ * `<org>/<slug>` for a target agent, its org read as a slug: a stored
+ * reference names its org by id. A component so the column's plain render
+ * callback can read the person's organizations.
+ */
+function QualifiedAgentRef({ org, slug }: { readonly org: string; readonly slug: string }) {
+  const slugForOrg = useOrgSlugForId();
+  return <>{`${slugForOrg(org)}/${slug}`}</>;
 }

@@ -26,6 +26,7 @@ import { TimeZoneField, browserTimeZone } from "./TimeZoneField.js";
 import { useCreateSchedule } from "./useCreateSchedule.js";
 import { cadenceToCron, validateCron, type CadencePreset } from "./cadence.js";
 import { SpinnerIcon } from "../internal/SpinnerIcon.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -86,6 +87,7 @@ export function ScheduleForm({
   onCancel,
   className,
 }: ScheduleFormProps) {
+  const slugForOrg = useOrgSlugForId();
   const baseId = useId();
   const { create, isCreating, error, clearError } = useCreateSchedule();
 
@@ -249,7 +251,7 @@ export function ScheduleForm({
           >
             <span className="stg:truncate">
               {agentRef
-                ? (agentName ?? `${agentRef.org}/${agentRef.slug}`)
+                ? (agentName ?? `${slugForOrg(agentRef.org)}/${agentRef.slug}`)
                 : "Choose an agent…"}
             </span>
             <ChevronIcon />
@@ -266,7 +268,7 @@ export function ScheduleForm({
         </Popover.Root>
         <p className={hintClasses}>
           Each fire runs this agent unattended in a fresh session. Only
-          agents in <span className="stg:font-medium">{org}</span> can be
+          agents in <span className="stg:font-medium">{slugForOrg(org)}</span> can be
           scheduled.
         </p>
       </div>

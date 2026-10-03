@@ -9,7 +9,8 @@ import {
   McpServerConnectDialog,
   ApplyManifestDialog,
   useStigmer,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  OrgSlugText,
   type WorkbenchColumnDef,
 } from "@stigmer/react";
 import type { SearchResult } from "@stigmer/protos/ai/stigmer/search/v1/io_pb";
@@ -37,7 +38,7 @@ const MCP_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
     id: "org",
     header: "Organization",
     cell: (item) => (
-      <span className="text-muted-foreground">{item.org}</span>
+      <OrgSlugText orgId={item.org} className="text-muted-foreground" />
     ),
     flex: 1,
   },
@@ -54,7 +55,7 @@ const MCP_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
 ];
 
 export function McpServerListPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const stigmer = useStigmer();
   const { navigateToDetail } = useLibraryNavigation();
 

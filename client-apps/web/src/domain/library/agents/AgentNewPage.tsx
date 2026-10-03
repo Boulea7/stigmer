@@ -7,8 +7,9 @@ import {
   CreationPicker,
   ApplyManifestDialog,
   AGENT_TEMPLATES,
-  useActiveOrgSlug,
+  useActiveOrgId,
   useBreadcrumbOverride,
+  useOrgSlugForId,
 } from "@stigmer/react";
 import type { CreationPath } from "@stigmer/react";
 import type { AgentWizardData } from "@stigmer/react";
@@ -42,7 +43,8 @@ type PageState =
  * MCP servers preselected (a plugin's "Create a new agent with these tools").
  */
 export function AgentNewPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setLabel } = useBreadcrumbOverride();
@@ -76,9 +78,9 @@ export function AgentNewPage() {
 
   const handleWizardComplete = useCallback(
     (result: { org: string; slug: string }) => {
-      router.push(`/library/agents/${result.org}/${result.slug}`);
+      router.push(`/library/agents/${slugForOrg(result.org)}/${result.slug}`);
     },
-    [router],
+    [router, slugForOrg],
   );
 
   const handleCancel = useCallback(() => {

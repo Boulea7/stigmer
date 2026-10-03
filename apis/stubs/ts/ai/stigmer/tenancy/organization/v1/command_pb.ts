@@ -4,6 +4,8 @@
 
 import type { GenFile, GenService } from "@bufbuild/protobuf/codegenv1";
 import { fileDesc, serviceDesc } from "@bufbuild/protobuf/codegenv1";
+import type { RenameInputSchema } from "../../../commons/apiresource/io_pb.js";
+import { file_ai_stigmer_commons_apiresource_io } from "../../../commons/apiresource/io_pb.js";
 import { file_ai_stigmer_commons_apiresource_rpc_service_options } from "../../../commons/apiresource/rpc_service_options_pb.js";
 import { file_ai_stigmer_commons_rpc_method_options } from "../../../commons/rpc/method_options_pb.js";
 import type { OrganizationSchema } from "./api_pb.js";
@@ -15,7 +17,7 @@ import { file_ai_stigmer_tenancy_organization_v1_io } from "./io_pb.js";
  * Describes the file ai/stigmer/tenancy/organization/v1/command.proto.
  */
 export const file_ai_stigmer_tenancy_organization_v1_command: GenFile = /*@__PURE__*/
-  fileDesc("CjBhaS9zdGlnbWVyL3RlbmFuY3kvb3JnYW5pemF0aW9uL3YxL2NvbW1hbmQucHJvdG8SImFpLnN0aWdtZXIudGVuYW5jeS5vcmdhbml6YXRpb24udjEy2AQKHU9yZ2FuaXphdGlvbkNvbW1hbmRDb250cm9sbGVyEmsKBWFwcGx5EjAuYWkuc3RpZ21lci50ZW5hbmN5Lm9yZ2FuaXphdGlvbi52MS5Pcmdhbml6YXRpb24aMC5haS5zdGlnbWVyLnRlbmFuY3kub3JnYW5pemF0aW9uLnYxLk9yZ2FuaXphdGlvbhJyCgZjcmVhdGUSMC5haS5zdGlnbWVyLnRlbmFuY3kub3JnYW5pemF0aW9uLnYxLk9yZ2FuaXphdGlvbhowLmFpLnN0aWdtZXIudGVuYW5jeS5vcmdhbml6YXRpb24udjEuT3JnYW5pemF0aW9uIgTQuBgBEqgBCgZ1cGRhdGUSMC5haS5zdGlnbWVyLnRlbmFuY3kub3JnYW5pemF0aW9uLnYxLk9yZ2FuaXphdGlvbhowLmFpLnN0aWdtZXIudGVuYW5jeS5vcmdhbml6YXRpb24udjEuT3JnYW5pemF0aW9uIjrCuBg2CAIQHiILbWV0YWRhdGEuaWQqI3VuYXV0aG9yaXplZCB0byB1cGRhdGUgb3JnYW5pemF0aW9uEqQBCgZkZWxldGUSMi5haS5zdGlnbWVyLnRlbmFuY3kub3JnYW5pemF0aW9uLnYxLk9yZ2FuaXphdGlvbklkGjAuYWkuc3RpZ21lci50ZW5hbmN5Lm9yZ2FuaXphdGlvbi52MS5Pcmdhbml6YXRpb24iNMK4GDAIAxAeIgV2YWx1ZSojdW5hdXRob3JpemVkIHRvIGRlbGV0ZSBvcmdhbml6YXRpb24aBKD/Kx5iBnByb3RvMw", [file_ai_stigmer_commons_apiresource_rpc_service_options, file_ai_stigmer_commons_rpc_method_options, file_ai_stigmer_tenancy_organization_v1_api, file_ai_stigmer_tenancy_organization_v1_io]);
+  fileDesc("CjBhaS9zdGlnbWVyL3RlbmFuY3kvb3JnYW5pemF0aW9uL3YxL2NvbW1hbmQucHJvdG8SImFpLnN0aWdtZXIudGVuYW5jeS5vcmdhbml6YXRpb24udjEy/gUKHU9yZ2FuaXphdGlvbkNvbW1hbmRDb250cm9sbGVyEmsKBWFwcGx5EjAuYWkuc3RpZ21lci50ZW5hbmN5Lm9yZ2FuaXphdGlvbi52MS5Pcmdhbml6YXRpb24aMC5haS5zdGlnbWVyLnRlbmFuY3kub3JnYW5pemF0aW9uLnYxLk9yZ2FuaXphdGlvbhJyCgZjcmVhdGUSMC5haS5zdGlnbWVyLnRlbmFuY3kub3JnYW5pemF0aW9uLnYxLk9yZ2FuaXphdGlvbhowLmFpLnN0aWdtZXIudGVuYW5jeS5vcmdhbml6YXRpb24udjEuT3JnYW5pemF0aW9uIgTQuBgBEqgBCgZ1cGRhdGUSMC5haS5zdGlnbWVyLnRlbmFuY3kub3JnYW5pemF0aW9uLnYxLk9yZ2FuaXphdGlvbhowLmFpLnN0aWdtZXIudGVuYW5jeS5vcmdhbml6YXRpb24udjEuT3JnYW5pemF0aW9uIjrCuBg2CAIQHiILbWV0YWRhdGEuaWQqI3VuYXV0aG9yaXplZCB0byB1cGRhdGUgb3JnYW5pemF0aW9uEqMBCgZyZW5hbWUSKy5haS5zdGlnbWVyLmNvbW1vbnMuYXBpcmVzb3VyY2UuUmVuYW1lSW5wdXQaMC5haS5zdGlnbWVyLnRlbmFuY3kub3JnYW5pemF0aW9uLnYxLk9yZ2FuaXphdGlvbiI6wrgYNggDEB4iC3Jlc291cmNlX2lkKiN1bmF1dGhvcml6ZWQgdG8gcmVuYW1lIG9yZ2FuaXphdGlvbhKkAQoGZGVsZXRlEjIuYWkuc3RpZ21lci50ZW5hbmN5Lm9yZ2FuaXphdGlvbi52MS5Pcmdhbml6YXRpb25JZBowLmFpLnN0aWdtZXIudGVuYW5jeS5vcmdhbml6YXRpb24udjEuT3JnYW5pemF0aW9uIjTCuBgwCAMQHiIFdmFsdWUqI3VuYXV0aG9yaXplZCB0byBkZWxldGUgb3JnYW5pemF0aW9uGgSg/yseYgZwcm90bzM", [file_ai_stigmer_commons_apiresource_io, file_ai_stigmer_commons_apiresource_rpc_service_options, file_ai_stigmer_commons_rpc_method_options, file_ai_stigmer_tenancy_organization_v1_api, file_ai_stigmer_tenancy_organization_v1_io]);
 
 /**
  * OrganizationCommandController handles write operations for organizations.
@@ -39,15 +41,15 @@ export const OrganizationCommandController: GenService<{
   /**
    * Create an organization.
    *
-   * An organization's slug is its id, and it is the organization's for good:
-   * a slug any organization has ever held, one since deleted included, is
-   * never taken again. A create of a held slug is refused with
-   * ALREADY_EXISTS; a create of a slug whose organization was deleted is
+   * The server mints the organization's id (org_<ulid>); metadata.org must be
+   * empty, because an organization belongs to no organization. A slug held by
+   * another organization is refused with ALREADY_EXISTS; a slug another
+   * organization was renamed away from, and which still resolves to it, is
    * refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
    * (domain "stigmer.ai"):
    *
-   *   - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-   *     and a slug is never reused. Metadata: slug.
+   *   - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+   *     until a recent rename, and it still resolves there. Metadata: slug.
    *
    * On Stigmer Cloud, creating a platform-managed organization is a plan
    * feature of its integrator. An integrator whose plan lacks it is refused
@@ -77,6 +79,9 @@ export const OrganizationCommandController: GenService<{
   /**
    * Update an existing organization.
    *
+   * The slug is not changed by an update (it is ignored, as for every
+   * kind); rename changes it.
+   *
    * @generated from rpc ai.stigmer.tenancy.organization.v1.OrganizationCommandController.update
    */
   update: {
@@ -85,8 +90,26 @@ export const OrganizationCommandController: GenService<{
     output: typeof OrganizationSchema;
   },
   /**
-   * Delete an organization. Its slug stays reserved: no organization can be
-   * created with it again.
+   * Rename an organization: change its slug, the name people type.
+   *
+   * Nothing the organization owns moves, because every resource names it by
+   * id. The old slug keeps resolving to the organization for 30 days, during
+   * which no other organization can take it and this one can take it back;
+   * then it is released. A slug another organization holds is refused with
+   * ALREADY_EXISTS, and one another organization was recently renamed away
+   * from with ORGANIZATION_SLUG_RESERVED (see create).
+   *
+   * @generated from rpc ai.stigmer.tenancy.organization.v1.OrganizationCommandController.rename
+   */
+  rename: {
+    methodKind: "unary";
+    input: typeof RenameInputSchema;
+    output: typeof OrganizationSchema;
+  },
+  /**
+   * Delete an organization. Its slug is released once the organization is
+   * gone: a later organization may take it, and sees nothing the deleted one
+   * owned, because every resource names its organization by id.
    *
    * A server that holds one organization (GetServerInfoOutput.single_org's
    * composition) refuses to delete it with FAILED_PRECONDITION carrying a

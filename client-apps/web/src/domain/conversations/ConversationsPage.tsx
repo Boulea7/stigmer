@@ -4,7 +4,8 @@ import { useCallback, useMemo } from "react";
 import {
   ConversationsWorkbench,
   ManageAccessButton,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  useOrgSlugForId,
   type ConversationIdentity,
 } from "@stigmer/react";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
@@ -38,7 +39,8 @@ function parseSelection(path: string): ConversationIdentity | null {
  * tab (channels have no standalone page).
  */
 export function ConversationsPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const { currentPath, navigate } = useAppNavigation();
 
   const selected = useMemo(() => parseSelection(currentPath), [currentPath]);
@@ -80,7 +82,7 @@ export function ConversationsPage() {
         }
         channelHref={(channel) =>
           channel.spec?.agentRef
-            ? `/library/agents/${channel.spec.agentRef.org || org}/${channel.spec.agentRef.slug}?tab=channels`
+            ? `/library/agents/${slugForOrg(channel.spec.agentRef.org || org)}/${channel.spec.agentRef.slug}?tab=channels`
             : null
         }
       />

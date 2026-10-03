@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file ai/stigmer/commons/apiresource/io.proto.
  */
 export const file_ai_stigmer_commons_apiresource_io: GenFile = /*@__PURE__*/
-  fileDesc("CidhaS9zdGlnbWVyL2NvbW1vbnMvYXBpcmVzb3VyY2UvaW8ucHJvdG8SHmFpLnN0aWdtZXIuY29tbW9ucy5hcGlyZXNvdXJjZSImCg1BcGlSZXNvdXJjZUlkEhUKBXZhbHVlGAEgASgJQga6SAPIAQEiXQoWQXBpUmVzb3VyY2VEZWxldGVJbnB1dBIbCgtyZXNvdXJjZV9pZBgBIAEoCUIGukgDyAEBEhcKD3ZlcnNpb25fbWVzc2FnZRgCIAEoCRINCgVmb3JjZRgDIAEoCCJKCh1BcGlSZXNvdXJjZUJ5T3JnQnlTbHVnUmVxdWVzdBITCgNvcmcYASABKAlCBrpIA8gBARIUCgRzbHVnGAIgASgJQga6SAPIAQEilAEKF0ZpbmRBcGlSZXNvdXJjZXNSZXF1ZXN0EhMKA29yZxgBIAEoCUIGukgDyAEBEgwKBGtpbmQYAyABKAkSLgoEcGFnZRgEIAEoCzIgLmFpLnN0aWdtZXIuY29tbW9ucy5ycGMuUGFnZUluZm8SEwoLcGFnZV9udW1iZXIYBSABKAUSEQoJcGFnZV9zaXplGAYgASgFIosBChVVcGRhdGVWaXNpYmlsaXR5SW5wdXQSGwoLcmVzb3VyY2VfaWQYASABKAlCBrpIA8gBARJVCgp2aXNpYmlsaXR5GAIgASgOMjUuYWkuc3RpZ21lci5jb21tb25zLmFwaXJlc291cmNlLkFwaVJlc291cmNlVmlzaWJpbGl0eUIKukgHggEEEAEgACKWAgoUQXBpUmVzb3VyY2VSZWZlcmVuY2USMgoDb3JnGAEgASgJQiW6SCJyIBg/MhxeJHxeW2Etel1bYS16MC05LV0qW2EtejAtOV0kEk0KBGtpbmQYAiABKA4yPy5haS5zdGlnbWVyLmNvbW1vbnMuYXBpcmVzb3VyY2UuYXBpcmVzb3VyY2VraW5kLkFwaVJlc291cmNlS2luZBI1CgRzbHVnGAMgASgJQie6SCTIAQFyHxACGD8yGV5bYS16XVthLXowLTktXSpbYS16MC05XSQSRAoHdmVyc2lvbhgEIAEoCUIzukgwci4yLF4kfF5sYXRlc3QkfF5bYS16QS1aMC05Ll8tXSskfF5bYS1mMC05XXs2NH0kYgZwcm90bzM", [file_ai_stigmer_commons_apiresource_apiresourcekind_api_resource_kind, file_ai_stigmer_commons_apiresource_enum, file_ai_stigmer_commons_rpc_pagination, file_buf_validate_validate]);
+  fileDesc("CidhaS9zdGlnbWVyL2NvbW1vbnMvYXBpcmVzb3VyY2UvaW8ucHJvdG8SHmFpLnN0aWdtZXIuY29tbW9ucy5hcGlyZXNvdXJjZSImCg1BcGlSZXNvdXJjZUlkEhUKBXZhbHVlGAEgASgJQga6SAPIAQEiXQoWQXBpUmVzb3VyY2VEZWxldGVJbnB1dBIbCgtyZXNvdXJjZV9pZBgBIAEoCUIGukgDyAEBEhcKD3ZlcnNpb25fbWVzc2FnZRgCIAEoCRINCgVmb3JjZRgDIAEoCCJKCh1BcGlSZXNvdXJjZUJ5T3JnQnlTbHVnUmVxdWVzdBITCgNvcmcYASABKAlCBrpIA8gBARIUCgRzbHVnGAIgASgJQga6SAPIAQEilAEKF0ZpbmRBcGlSZXNvdXJjZXNSZXF1ZXN0EhMKA29yZxgBIAEoCUIGukgDyAEBEgwKBGtpbmQYAyABKAkSLgoEcGFnZRgEIAEoCzIgLmFpLnN0aWdtZXIuY29tbW9ucy5ycGMuUGFnZUluZm8SEwoLcGFnZV9udW1iZXIYBSABKAUSEQoJcGFnZV9zaXplGAYgASgFIosBChVVcGRhdGVWaXNpYmlsaXR5SW5wdXQSGwoLcmVzb3VyY2VfaWQYASABKAlCBrpIA8gBARJVCgp2aXNpYmlsaXR5GAIgASgOMjUuYWkuc3RpZ21lci5jb21tb25zLmFwaXJlc291cmNlLkFwaVJlc291cmNlVmlzaWJpbGl0eUIKukgHggEEEAEgACJfCgtSZW5hbWVJbnB1dBIbCgtyZXNvdXJjZV9pZBgBIAEoCUIGukgDyAEBEjMKBHNsdWcYAiABKAlCJbpIIsgBAXIdEAIyGV5bYS16XVthLXowLTktXSpbYS16MC05XSQiqQIKFEFwaVJlc291cmNlUmVmZXJlbmNlEkUKA29yZxgBIAEoCUI4ukg1cjMYPzIvXiR8XlthLXpdW2EtejAtOS1dKlthLXowLTldJHxeb3JnX1swLTlhLXpdezI2fSQSTQoEa2luZBgCIAEoDjI/LmFpLnN0aWdtZXIuY29tbW9ucy5hcGlyZXNvdXJjZS5hcGlyZXNvdXJjZWtpbmQuQXBpUmVzb3VyY2VLaW5kEjUKBHNsdWcYAyABKAlCJ7pIJMgBAXIfEAIYPzIZXlthLXpdW2EtejAtOS1dKlthLXowLTldJBJECgd2ZXJzaW9uGAQgASgJQjO6SDByLjIsXiR8XmxhdGVzdCR8XlthLXpBLVowLTkuXy1dKyR8XlthLWYwLTldezY0fSRiBnByb3RvMw", [file_ai_stigmer_commons_apiresource_apiresourcekind_api_resource_kind, file_ai_stigmer_commons_apiresource_enum, file_ai_stigmer_commons_rpc_pagination, file_buf_validate_validate]);
 
 /**
  * Wraps a system-generated resource identifier.
@@ -81,7 +81,7 @@ export const ApiResourceDeleteInputSchema: GenMessage<ApiResourceDeleteInput> = 
  */
 export type ApiResourceByOrgBySlugRequest = Message<"ai.stigmer.commons.apiresource.ApiResourceByOrgBySlugRequest"> & {
   /**
-   * ID of the organization
+   * The organization, by id or slug
    *
    * @generated from field: string org = 1;
    */
@@ -109,7 +109,7 @@ export const ApiResourceByOrgBySlugRequestSchema: GenMessage<ApiResourceByOrgByS
  */
 export type FindApiResourcesRequest = Message<"ai.stigmer.commons.apiresource.FindApiResourcesRequest"> & {
   /**
-   * Organization ID to filter by
+   * Organization to filter by, by id or slug
    *
    * @generated from field: string org = 1;
    */
@@ -207,6 +207,39 @@ export const UpdateVisibilityInputSchema: GenMessage<UpdateVisibilityInput> = /*
   messageDesc(file_ai_stigmer_commons_apiresource_io, 4);
 
 /**
+ * Input for renaming any API resource: changing its slug.
+ *
+ * Used by resource-specific command controllers whose kind lets a slug
+ * change. Each controller's rename RPC accepts this shared input and returns
+ * the full updated resource. A resource's slug never changes through update
+ * or apply; rename is its only writer.
+ *
+ * @generated from message ai.stigmer.commons.apiresource.RenameInput
+ */
+export type RenameInput = Message<"ai.stigmer.commons.apiresource.RenameInput"> & {
+  /**
+   * ID of the resource being renamed.
+   *
+   * @generated from field: string resource_id = 1;
+   */
+  resourceId: string;
+
+  /**
+   * The new slug. Same format as metadata.slug.
+   *
+   * @generated from field: string slug = 2;
+   */
+  slug: string;
+};
+
+/**
+ * Describes the message ai.stigmer.commons.apiresource.RenameInput.
+ * Use `create(RenameInputSchema)` to create a new message.
+ */
+export const RenameInputSchema: GenMessage<RenameInput> = /*@__PURE__*/
+  messageDesc(file_ai_stigmer_commons_apiresource_io, 5);
+
+/**
  * Generic reference to any API resource by org and slug.
  * Used across resources to reference other resources (e.g., Environment, Agent, Skill).
  * Canonical format: "org/slug" (e.g., "acme/web-search", "acme/my-agent").
@@ -222,14 +255,16 @@ export const UpdateVisibilityInputSchema: GenMessage<UpdateVisibilityInput> = /*
  */
 export type ApiResourceReference = Message<"ai.stigmer.commons.apiresource.ApiResourceReference"> & {
   /**
-   * Organization that owns the referenced resource.
+   * Organization that owns the referenced resource, by slug or id.
    *
-   * When non-empty: must be a valid org slug (lowercase alphanumeric with hyphens,
-   * starts with a letter, 1-63 characters). Example: "stigmer", "acme-corp".
+   * When non-empty: an organization slug (lowercase alphanumeric with hyphens,
+   * starts with a letter, 2-63 characters; e.g. "stigmer", "acme-corp") or an
+   * organization id (org_<ulid>). The server stores the id, so a stored
+   * reference keeps pointing at its organization across a rename.
    *
    * When empty: the reference is relative — the server resolves it to the parent
    * resource's organization at write time. All stored and returned references
-   * always have org populated (absolute form).
+   * always have org populated (absolute form, the id).
    *
    * Use empty org for same-org references (the common case).
    * An explicit other org is accepted only when that organization is a
@@ -283,5 +318,5 @@ export type ApiResourceReference = Message<"ai.stigmer.commons.apiresource.ApiRe
  * Use `create(ApiResourceReferenceSchema)` to create a new message.
  */
 export const ApiResourceReferenceSchema: GenMessage<ApiResourceReference> = /*@__PURE__*/
-  messageDesc(file_ai_stigmer_commons_apiresource_io, 5);
+  messageDesc(file_ai_stigmer_commons_apiresource_io, 6);
 

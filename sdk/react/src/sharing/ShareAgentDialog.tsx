@@ -42,6 +42,7 @@ import {
 import { useRotateShareLink } from "./useRotateShareLink.js";
 import { useShareToolReadiness } from "./useShareToolReadiness.js";
 import { trimTrailing } from "../internal/trim.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Maximum length of each visitor message (proto: `string.max_len = 300`). */
 const MAX_MESSAGE_LENGTH = 300;
@@ -794,9 +795,10 @@ function WhoPaysLine({
   readonly org: string;
   readonly audience: SharingAudience;
 }) {
+  const slugForOrg = useOrgSlugForId();
   const mode = useDeploymentMode();
-  // An Organization's id equals its slug (see ApiResourceMetadata.id), so
-  // the share's org reference is directly usable as the billing org id.
+  // The share's org reference holds the organization's id, so it is
+  // directly usable as the billing org id.
   // The wallet is a cloud-only facility: neither
   // the open-source nor the Enterprise edition has billing accounts.
   const { account } = useBillingAccount(mode === "cloud" ? org : null);
@@ -809,7 +811,7 @@ function WhoPaysLine({
   return (
     <p className="stg:mt-0.5 stg:text-xs stg:text-muted-foreground">
       {audience === "org" ? "Members" : "Visitors"} chat on{" "}
-      <span className="stg:font-medium">{org}</span>&apos;s credits
+      <span className="stg:font-medium">{slugForOrg(org)}</span>&apos;s credits
       {balance !== null && <> ({balance} available)</>}.
     </p>
   );
@@ -860,6 +862,7 @@ function LinkTab({
   readonly isRotating: boolean;
   readonly onResetLink: () => void;
 }) {
+  const slugForOrg = useOrgSlugForId();
   const isOrgAudience = draft.audience === "org";
 
   return (
@@ -875,7 +878,7 @@ function LinkTab({
 
       {isOrgAudience ? (
         <p className="stg:text-xs stg:text-muted-foreground">
-          Only signed-in members of <span className="stg:font-medium">{org}</span>{" "}
+          Only signed-in members of <span className="stg:font-medium">{slugForOrg(org)}</span>{" "}
           can chat. Access is checked on every message, so it ends the moment
           someone leaves the organization. The link is safe to forward — it
           shows nothing to anyone else.

@@ -22,9 +22,10 @@ import {
 /** Options for {@link parseManifest}. */
 export interface ParseManifestOptions {
   /**
-   * Target organization slug. Injected into `metadata.org` when the document
-   * omits it. When the document specifies a *different* org, the document's
-   * value wins and a warning is attached (matching `stigmer apply`).
+   * Target organization, by slug or id. Injected into `metadata.org` when
+   * the document omits it. When the document specifies a *different* org,
+   * the document's value wins and a warning is attached (matching
+   * `stigmer apply`).
    */
   readonly org?: string;
 }
@@ -179,7 +180,9 @@ export function metadataOf(message: Message): ApiResourceMetadata | undefined {
 
 // Inject the target org into metadata.org when the document omitted it. When
 // the document specifies a *different* org, the document's value is honored
-// and a warning is returned (matching `stigmer apply`).
+// and a warning is returned (matching `stigmer apply`). An organization is
+// named by its id or its slug, and parsing asks no server, so only two
+// values of the same form (two ids, or two slugs) are known to differ.
 function injectOrg(message: Message, org: string): string | undefined {
   if (org === "") return undefined;
   const holder = message as unknown as { metadata?: ApiResourceMetadata };
@@ -191,7 +194,10 @@ function injectOrg(message: Message, org: string): string | undefined {
     holder.metadata.org = org;
     return undefined;
   }
-  if (holder.metadata.org !== org) {
+  if (
+    holder.metadata.org !== org &&
+    isOrganizationId(holder.metadata.org) === isOrganizationId(org)
+  ) {
     return (
       `The document's org "${holder.metadata.org}" differs from the ` +
       `target org "${org}"; applying to "${holder.metadata.org}".`
@@ -202,4 +208,9 @@ function injectOrg(message: Message, org: string): string | undefined {
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Whether a value is a minted organization id (`org_` and a lowercase ULID) rather than a slug. */
+function isOrganizationId(value: string): boolean {
+  return /^org_[0-9a-z]{26}$/.test(value);
 }

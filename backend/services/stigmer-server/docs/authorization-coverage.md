@@ -38,6 +38,7 @@ The standard gRPC health protocol — an external proto with no Stigmer annotati
 | OrganizationCommandController.apply | none | chain-with-Authorize |
 | OrganizationCommandController.create | is_skip_authorization | chain-with-Authorize (by design: any authenticated person may found an organization and becomes its owner; there is no organization yet to hold a permission on) |
 | OrganizationCommandController.update | config: can_edit on organization (field metadata.id), error_msg yes | chain-with-Authorize |
+| OrganizationCommandController.rename | config: can_delete on organization (field resource_id), error_msg yes | chain-with-Authorize (owners only: a rename moves every member's links and scripts) |
 | OrganizationCommandController.delete | config: can_delete on organization (field value), error_msg yes | chain-with-Authorize |
 | OrganizationQueryController.get | config: can_view on organization (field value), error_msg yes | chain-with-Authorize |
 | OrganizationQueryController.find | is_skip_authorization | chain-with-Authorize (driver: OrganizationDirectory — the composed directory's `refusesEnumeration` answers UNIMPLEMENTED before any work under the built-in posture and on the cloud; trusted-local enumerates) |

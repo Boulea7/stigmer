@@ -159,3 +159,11 @@ export function ensureAuthenticated(config: Config): void {
     "  stigmer auth login",
   ]);
 }
+
+/** How output names the context organization: its slug and id when `set` stored them, else the value as configured. */
+export function contextOrganizationLabel(config: Config): string {
+  const org = resolveContextOrganization(config);
+  const slug = config.context?.org_slug ?? "";
+  if (org === "" || slug === "" || slug === org) return org;
+  return `${slug} (${org})`;
+}

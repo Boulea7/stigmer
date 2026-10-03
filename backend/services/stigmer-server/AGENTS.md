@@ -24,6 +24,8 @@ advances. This guide is an index; the files it names are the truth.
 - `docs/authorization-coverage.md`: every entry point's authorization posture.
 - `docs/single-organization.md`: which field a server that holds one
   organization fills, per method.
+- `docs/organization-names.md`: which fields the serving chain turns from an
+  organization's slug into its id, per method.
 - `fga/model/README.md`: the authorization model and its compiled file's
   contract.
 - `test/conformance/README.md`: the cross-edition suite this server is held to.

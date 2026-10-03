@@ -39,6 +39,7 @@ import { CommandResult } from "../output/index.js";
 import { isAgentId } from "./reference.js";
 import { resolveAgentRef } from "./run/resolve.js";
 import { requireOrganization } from "../client/single-org.js";
+import { organizationLabel, sameOrganization } from "../client/organizations.js";
 
 /** Who can chat over the shared link. Mirrors the SDK's SharingAudience. */
 export type ShareAudience = "public" | "org";
@@ -98,14 +99,17 @@ export async function shareAgent(
   // The server refuses an agent_ref in any other organization; refusing
   // here names the remedy instead of surfacing a bare FAILED_PRECONDITION,
   // and mirrors the share dialog, which never offers another org's agent.
-  // An empty org (an ID ref without context) is the agent's own.
-  if (org !== "" && org !== agentOrg) {
+  // An empty org (an ID ref without context) is the agent's own. The agent
+  // names its organization by id and the caller may name it by slug, so a
+  // mismatch is asked about before it is refused.
+  if (org !== "" && !(await sameOrganization(client, org, agentOrg))) {
+    const agentOrgLabel = await organizationLabel(client, agentOrg);
     throw new UsageError(
-      `a share of ${agentOrg}/${agent.metadata?.slug ?? ""} lives in ${agentOrg}, not ${org}\n\n` +
+      `a share of ${agentOrgLabel}/${agent.metadata?.slug ?? ""} lives in ${agentOrgLabel}, not ${org}\n\n` +
         "A share is the agent's own organization's channel. To share another\n" +
         "organization's agent from yours, install the plugin that carries it and\n" +
         "share the installed copy. To manage this agent's own share:\n" +
-        `  stigmer share agent ${ref} --org ${agentOrg}`,
+        `  stigmer share agent ${ref} --org ${agentOrgLabel}`,
     );
   }
   const shareOrg = agentOrg;

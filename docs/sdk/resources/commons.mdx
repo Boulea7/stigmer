@@ -16,9 +16,9 @@ ApiResourceMetadata contains standard metadata for all API resources.
 <TypeTable
   type={{
     name: { type: "string", description: "Human-readable name of the resource." },
-    slug: { type: "string", description: "URL-friendly identifier, unique within the organization." },
+    slug: { type: "string", description: "URL-friendly identifier, unique within the organization (an Organization's own slug is unique across the server)." },
     id: { type: "string", description: "System-generated unique identifier." },
-    org: { type: "string", description: "Organization that owns this resource." },
+    org: { type: "string", description: "Organization that owns this resource, by id." },
     visibility: { type: "ApiResourceVisibility", description: "Visibility controls who can read this resource.", typeDescriptionLink: "#apiresourcevisibility" },
     labels: { type: "Record<string, string>", description: "Key-value labels for organization and filtering." },
     annotations: { type: "Record<string, string>", description: "Key-value annotations for additional metadata." },

@@ -11,7 +11,8 @@ import type { McpServer } from "@stigmer/protos/ai/stigmer/agentic/mcpserver/v1/
 import type { Workflow } from "@stigmer/protos/ai/stigmer/agentic/workflow/v1/api_pb";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { ApiResourceVisibility } from "@stigmer/protos/ai/stigmer/commons/apiresource/enum_pb";
-import { UpdateVisibilityInputSchema } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
+import { RenameInputSchema, UpdateVisibilityInputSchema } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
+import { OrganizationQueryController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/query_pb";
 import {
   type ApiResourceMetadata,
   ApiResourceMetadataSchema,
@@ -132,7 +133,7 @@ export async function applyMessage(
   org: string,
   dryRun: boolean,
 ): Promise<ApplyOutcome> {
-  const orgWarning = injectOrg(message, org);
+  const orgWarning = await injectOrg(controller, message, org);
   const created = (metaOf(message)?.id ?? "") === "";
 
   if (dryRun) {
@@ -140,6 +141,7 @@ export async function applyMessage(
   }
 
   const applied = await handler.apply(controller, message);
+  await applyDeclaredSlug(controller, handler, message, applied);
   const visibilityWarning = await applyDeclaredVisibility(controller, handler, message, applied);
   const warning = combineWarnings(orgWarning, visibilityWarning);
   const result = buildApplyResult(handler, applied, created);
@@ -201,6 +203,48 @@ async function applyDeclaredVisibility(
   }
 }
 
+/**
+ * Land a manifest-declared slug change through the guarded door. An apply
+ * finds its resource by the manifest's id when it carries one, and an
+ * update ignores the slug, so a manifest that carries the id and a new slug
+ * (an organization's `get -o yaml`, edited) updates the resource and leaves
+ * the slug as it was; this follows up with one `rename`, as visibility is
+ * followed up. Only kinds with the RPC are driven, and only when the
+ * manifest names the id: without it the slug is how apply finds the
+ * resource, so a new slug means a new resource. A refusal (the slug is
+ * taken) fails the command after the spec has landed, and the error says so.
+ */
+async function applyDeclaredSlug(
+  controller: ControllerFn,
+  handler: ApplyHandler,
+  message: Message,
+  applied: Message,
+): Promise<void> {
+  const declared = metaOf(message);
+  const appliedMeta = metaOf(applied);
+  if (
+    handler.rename === undefined ||
+    declared === undefined ||
+    appliedMeta === undefined ||
+    declared.id === "" ||
+    declared.slug === "" ||
+    declared.slug === appliedMeta.slug
+  ) {
+    return;
+  }
+  try {
+    const renamed = await handler.rename(
+      controller,
+      create(RenameInputSchema, { resourceId: appliedMeta.id, slug: declared.slug }),
+    );
+    appliedMeta.slug = metaOf(renamed)?.slug ?? declared.slug;
+  } catch (err) {
+    throw new UsageError(
+      `${handler.displayName} spec applied, but the manifest's slug change was rejected: ${(err as Error).message}`,
+    );
+  }
+}
+
 function combineWarnings(...warnings: (string | undefined)[]): string | undefined {
   const present = warnings.filter((w): w is string => w !== undefined);
   return present.length > 0 ? present.join("; ") : undefined;
@@ -217,8 +261,14 @@ function metaOf(message: Message): ApiResourceMetadata | undefined {
 
 // Inject the resolved org into metadata.org when the document omitted it. When
 // the document specifies a *different* org, return a warning (Go warns but
-// honors the document's value — we do the same).
-function injectOrg(message: Message, org: string): string | undefined {
+// honors the document's value — we do the same). An organization is named
+// by its id or its slug, so two different strings are asked about before
+// they are called different organizations.
+async function injectOrg(
+  controller: ControllerFn,
+  message: Message,
+  org: string,
+): Promise<string | undefined> {
   if (org === "") return undefined;
   const holder = message as unknown as { metadata?: ApiResourceMetadata };
   if (holder.metadata === undefined) {
@@ -229,10 +279,26 @@ function injectOrg(message: Message, org: string): string | undefined {
     holder.metadata.org = org;
     return undefined;
   }
-  if (holder.metadata.org !== org) {
+  if (
+    holder.metadata.org !== org &&
+    !(await sameOrganization(controller, holder.metadata.org, org))
+  ) {
     return `resource org '${holder.metadata.org}' differs from target org '${org}'; using '${holder.metadata.org}'`;
   }
   return undefined;
+}
+
+/** Whether two organization values (ids or slugs) name one organization, as the server resolves them. */
+async function sameOrganization(controller: ControllerFn, a: string, b: string): Promise<boolean> {
+  const idOf = async (value: string): Promise<string | undefined> => {
+    try {
+      return (await controller(OrganizationQueryController).get({ value })).metadata?.id;
+    } catch {
+      return undefined;
+    }
+  };
+  const [first, second] = await Promise.all([idOf(a), idOf(b)]);
+  return first !== undefined && first !== "" && first === second;
 }
 
 function buildApplyResult(handler: ApplyHandler, applied: Message, created: boolean): CommandResult {

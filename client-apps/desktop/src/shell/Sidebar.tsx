@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { NavLink, useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "@stigmer/theme";
 import {
-  useActiveOrgSlug,
   useConversationsWantsHumanCount,
   useRecentActivity,
   WorkspaceSidebar,
+  useActiveOrgId,
 } from "@stigmer/react";
 import type {
   RecentActivityEntry,
@@ -41,7 +41,7 @@ export function Sidebar() {
 
   const recentActivity = useRecentActivity();
   const { refetch, prependOptimistic } = recentActivity;
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   // The Conversations badge: conversations wanting a human right now. Data as
   // props — the SDK sidebar never fetches for itself. Mirrors web.
   const { count: wantsHumanCount } = useConversationsWantsHumanCount(org || null);

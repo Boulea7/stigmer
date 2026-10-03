@@ -45,13 +45,10 @@
  * people that store already held get their roles on the organization made
  * for them, and no other store's people do.
  *
- * One failure is not fatal. A store whose ledger retired the slug and that
- * holds no organization (a laptop that deleted it before the server made
- * its own) cannot get it back: the step warns, the fill stays off, and the
- * console's onboarding lets the person make one under another slug, which
- * the next boot fills. Every other failure is a boot throw: a server
- * composed to hold one organization cannot serve without it, and the port
- * stays closed.
+ * A failure is a boot throw: a server composed to hold one organization
+ * cannot serve without it, and the port stays closed. A store with no
+ * organization holds no organization names either (a delete releases its
+ * organization's names), so the slug is always free to take here.
  */
 import { create, fromBinary } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -70,7 +67,6 @@ import {
   SINGLE_ORGANIZATION_SLUG,
   SINGLE_ORG_KEY,
 } from "../domain/organization/limit.js";
-import { ORGANIZATION_SLUG_RESERVED } from "../domain/organization/slug-ledger.js";
 import {
   SERVER_ORGANIZATION_ROLES_KEY,
   SERVER_ORGANIZATION_ROLES_OWED,
@@ -157,8 +153,9 @@ export async function ensureSingleOrganization(
       { organizations: others.length + 1 },
     );
   } else if (outcome === "lost") {
-    // Refused as a duplicate, yet nothing holds the slug's row: a slug claim
-    // left with no organization (the ledger never releases a claim).
+    // Refused as a duplicate, yet nothing holds the slug's row: a name left
+    // by an interrupted create, which a claim frees once it is a minute old
+    // (domain/organization/names.ts), so the next start makes it.
     logger.warn(
       `this server cannot make its organization: its create was refused as a duplicate, but the store holds none; create an organization to start`,
       { slug: SINGLE_ORGANIZATION_SLUG },
@@ -178,11 +175,11 @@ async function organizationIds(store: Store): Promise<string[]> {
 
 /**
  * What the create did: made the organization; lost it to another replica
- * (refused as a duplicate or at the limit, whose row the store read finds);
- * or found the slug retired, which it has already warned about. "present":
+ * (refused as a duplicate or at the limit, whose row the store read finds).
+ * "present":
  * the store already held one, so nothing was created.
  */
-type CreateOutcome = "made" | "lost" | "reserved" | "present";
+type CreateOutcome = "made" | "lost" | "present";
 
 async function createSingleOrganization(
   deps: SingleOrganizationBootDeps,
@@ -206,16 +203,6 @@ async function createSingleOrganization(
       const reasons = error
         .findDetails(ErrorInfoSchema)
         .map((info) => info.reason);
-      if (
-        error.code === Code.AlreadyExists &&
-        reasons.includes(ORGANIZATION_SLUG_RESERVED)
-      ) {
-        deps.logger.warn(
-          `this server cannot make its organization: the slug '${SINGLE_ORGANIZATION_SLUG}' belonged to a deleted organization, and a slug is never reused; create an organization to start`,
-          { slug: SINGLE_ORGANIZATION_SLUG },
-        );
-        return "reserved";
-      }
       // Another replica made it first. Its row reached this create either at
       // the duplicate check (AlreadyExists) or, persisted a moment later, at
       // the limit (ORGANIZATION_LIMIT_REACHED); the store read that follows

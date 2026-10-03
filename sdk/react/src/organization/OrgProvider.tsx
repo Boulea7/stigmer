@@ -29,18 +29,20 @@ export interface OrgContextValue {
   /** Re-attempt the organization fetch after a failure. */
   readonly retry: () => void;
   /**
-   * Refetch the organization list. If `targetSlug` is provided, the
-   * org matching that slug will be auto-selected after the fetch
-   * completes (useful after creating a new organization).
+   * Refetch the organization list. If `target` is provided, the org it
+   * names — by id or by slug — is selected after the fetch completes
+   * (useful after creating or renaming an organization).
    */
-  readonly refresh: (targetSlug?: string) => void;
+  readonly refresh: (target?: string) => void;
 }
 
 const OrgContext = createContext<OrgContextValue | null>(null);
 
-const STORAGE_KEY = "stigmer:activeOrgSlug";
+// The active org is remembered by its id: an id never changes, while a
+// slug can be renamed and would then restore nothing.
+const STORAGE_KEY = "stigmer:activeOrg";
 
-function readPersistedSlug(): string | null {
+function readPersistedOrgId(): string | null {
   try {
     return localStorage.getItem(STORAGE_KEY);
   } catch {
@@ -48,12 +50,29 @@ function readPersistedSlug(): string | null {
   }
 }
 
-function persistSlug(slug: string): void {
+function persistOrgId(id: string): void {
   try {
-    localStorage.setItem(STORAGE_KEY, slug);
+    localStorage.setItem(STORAGE_KEY, id);
   } catch {
     // SSR or private browsing — silently ignore.
   }
+}
+
+/**
+ * Find the org a reference names. A reference is an id or a slug; ids and
+ * slugs are each unique, so an id match is tried first and a slug match
+ * second (an older organization's id equals its slug, which either match
+ * answers the same).
+ */
+export function findOrgByRef(
+  orgs: readonly Organization[],
+  ref: string,
+): Organization | undefined {
+  if (!ref) return undefined;
+  return (
+    orgs.find((o) => o.metadata?.id === ref) ??
+    orgs.find((o) => o.metadata?.slug === ref)
+  );
 }
 
 /**
@@ -62,7 +81,7 @@ function persistSlug(slug: string): void {
  * Fetches the authenticated user's organizations via
  * `stigmer.organization.findMyOrganizations()`, manages the active
  * organization selection, and persists the choice to `localStorage`
- * under the key `stigmer:activeOrgSlug`.
+ * under the key `stigmer:activeOrg` by the organization's id.
  *
  * Must be rendered inside a {@link StigmerProvider}. Mount it BELOW
  * `FetchCacheProvider` (when one is used): switching the active org clears
@@ -93,7 +112,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const fetchIdRef = useRef(0);
 
   const load = useCallback(
-    async (targetSlug?: string) => {
+    async (target?: string) => {
       const fetchId = ++fetchIdRef.current;
       setIsLoading(true);
       setError(null);
@@ -111,15 +130,15 @@ export function OrgProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const preferred = targetSlug ?? readPersistedSlug();
+        const preferred = target ?? readPersistedOrgId();
         const restored = preferred
-          ? entries.find((o) => o.metadata?.slug === preferred)
+          ? findOrgByRef(entries, preferred)
           : undefined;
 
         const selected = restored ?? entries[0];
         setActiveOrgState(selected);
-        if (selected.metadata?.slug) {
-          persistSlug(selected.metadata.slug);
+        if (selected.metadata?.id) {
+          persistOrgId(selected.metadata.id);
         }
       } catch (err: unknown) {
         if (fetchId !== fetchIdRef.current) return;
@@ -144,26 +163,27 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
   const setActiveOrg = useCallback((org: Organization) => {
     setActiveOrgState(org);
-    if (org.metadata?.slug) {
-      persistSlug(org.metadata.slug);
+    if (org.metadata?.id) {
+      persistOrgId(org.metadata.id);
     }
   }, []);
 
   // Org-switch invariant: view state cached under one org context must not
   // survive into another. Covers every path that changes the active org
   // (explicit switch, post-create refresh) while skipping the initial
-  // restore (previous slug is null). Cache keys for sessions/executions are
-  // id-scoped, not org-scoped, so a TTL'd entry would otherwise outlive the
-  // switch. No-op when no FetchCacheProvider is mounted.
-  const previousSlugRef = useRef<string | null>(null);
-  const activeSlug = activeOrg?.metadata?.slug ?? null;
+  // restore (previous id is null). Keyed on the id, so renaming the active
+  // org is not a switch. Cache keys for sessions/executions are id-scoped,
+  // not org-scoped, so a TTL'd entry would otherwise outlive the switch.
+  // No-op when no FetchCacheProvider is mounted.
+  const previousIdRef = useRef<string | null>(null);
+  const activeId = activeOrg?.metadata?.id ?? null;
   useEffect(() => {
-    const previous = previousSlugRef.current;
-    previousSlugRef.current = activeSlug;
-    if (previous !== null && activeSlug !== null && previous !== activeSlug) {
+    const previous = previousIdRef.current;
+    previousIdRef.current = activeId;
+    if (previous !== null && activeId !== null && previous !== activeId) {
       fetchCache?.clear();
     }
-  }, [activeSlug, fetchCache]);
+  }, [activeId, fetchCache]);
 
   const value = useMemo<OrgContextValue>(
     () => ({
@@ -200,8 +220,19 @@ export function useOrg(): OrgContextValue {
 }
 
 /**
- * Convenience accessor: returns the active org's slug for use in API
- * calls, or an empty string when no org is selected.
+ * The org context from the nearest {@link OrgProvider}, or `null` when none
+ * is mounted. For SDK helpers that work with or without the provider.
+ *
+ * @internal Not part of the public `@stigmer/react` API.
+ */
+export function useOptionalOrg(): OrgContextValue | null {
+  return useContext(OrgContext);
+}
+
+/**
+ * Convenience accessor: returns the active org's slug for display text and
+ * URLs, or an empty string when no org is selected. A request names the
+ * org by id ({@link useActiveOrgId}): the slug can be renamed.
  */
 export function useActiveOrgSlug(): string {
   const { activeOrg } = useOrg();
@@ -212,9 +243,11 @@ export function useActiveOrgSlug(): string {
  * Convenience accessor: returns the active org's system ID (`metadata.id`),
  * or an empty string when no org is selected.
  *
- * This is the identifier used as the `organization` object in authorization
- * (FGA) — e.g. for member lookups in the share picker — as opposed to the
- * human-readable slug returned by {@link useActiveOrgSlug}.
+ * Every request field that names the active org (`org`, `metadata.org`, a
+ * reference's `org`) carries this id, and stored resources name their org
+ * by it, so comparisons against `metadata.org` use it too. It never
+ * changes, unlike the human-readable slug returned by
+ * {@link useActiveOrgSlug}, which is for display and URLs.
  */
 export function useActiveOrgId(): string {
   const { activeOrg } = useOrg();

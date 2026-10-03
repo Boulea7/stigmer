@@ -13,7 +13,7 @@ import type { IdentityAccount } from "@stigmer/protos/ai/stigmer/iam/identityacc
 import { ensureMyIdentityAccount } from "@stigmer/sdk";
 import {
   ensureAuthenticated,
-  resolveContextOrganization,
+  contextOrganizationLabel,
 } from "../../config/index.js";
 import { CommandResult } from "../../output/index.js";
 import { omitsOrganization } from "../../client/single-org.js";
@@ -88,7 +88,7 @@ export async function runWhoami(): Promise<CommandResult> {
   });
   return whoamiResult(account, {
     created,
-    org: resolveContextOrganization(client.config),
+    org: contextOrganizationLabel(client.config),
     singleOrg: await omitsOrganization(client.stigmer),
   });
 }

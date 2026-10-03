@@ -41,6 +41,7 @@ import {
 } from "../library/detect-plan-artifact.js";
 import { findStreamingPlan } from "../library/detect-streaming-plan.js";
 import { useSessionPageFlow } from "./useSessionPageFlow.js";
+import { useOrgIdForRef } from "../organization/useOrgRefs.js";
 import { isChannelOriginSession } from "./channelOrigin.js";
 import { useOpenFileChange } from "./useOpenFileChange.js";
 import { usePlanDraft, planDraftKey, type PlanDraftController } from "./usePlanDraft.js";
@@ -1300,26 +1301,33 @@ function SessionPanelRegion({
   // chip disappearing: the flow's clear rides the next follow-up to the server.
   const handleRemoveAgent = flow.clearAgent;
 
+  // A reference may name its org by slug (one a host or URL supplied) or by
+  // id (a stored or picked one), so both sides are compared by id.
+  const orgIdFor = useOrgIdForRef();
+
   const handleRemoveMcp = useCallback(
     (ref: ResourceRef) => {
+      const refOrg = orgIdFor(ref.org);
       flow.setMcpServerUsages(
         flow.mcpServerUsages.filter(
-          (u) => !(u.mcpServerRef.org === ref.org && u.mcpServerRef.slug === ref.slug),
+          (u) =>
+            !(orgIdFor(u.mcpServerRef.org) === refOrg && u.mcpServerRef.slug === ref.slug),
         ),
       );
     },
-    [flow.mcpServerUsages, flow.setMcpServerUsages],
+    [flow.mcpServerUsages, flow.setMcpServerUsages, orgIdFor],
   );
 
   const handleRemoveSkill = useCallback(
     (ref: ResourceRef) => {
+      const refOrg = orgIdFor(ref.org);
       flow.setSkillRefs(
         flow.skillRefs.filter(
-          (r) => !(r.org === ref.org && r.slug === ref.slug),
+          (r) => !(orgIdFor(r.org) === refOrg && r.slug === ref.slug),
         ),
       );
     },
-    [flow.skillRefs, flow.setSkillRefs],
+    [flow.skillRefs, flow.setSkillRefs, orgIdFor],
   );
 
   const sessionConfig = useMemo<SetupTabProps>(

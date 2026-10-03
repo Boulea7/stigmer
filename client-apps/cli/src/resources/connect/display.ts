@@ -11,19 +11,23 @@ export type ConnectSink = (line: string) => void;
 
 const NAME_COLUMN = 30;
 
+/**
+ * `orgLabel` names the server's organization (its slug, in place of the id
+ * the server carries); undefined leaves it out, as on a server that holds
+ * one organization, which never names it.
+ */
 export function renderConnectResult(
   result: ConnectResult,
   sink: ConnectSink,
   colorize: boolean,
-  hideOrg = false,
+  orgLabel?: string,
 ): void {
   const style = styler(colorize);
   const meta = result.server.metadata;
 
   sink("");
-  // A server that holds one organization never names it.
   const name = meta?.name ?? "";
-  sink(style.cyan(`MCP Server: ${hideOrg ? name : `${meta?.org ?? ""}/${name}`}`));
+  sink(style.cyan(`MCP Server: ${orgLabel === undefined ? name : `${orgLabel}/${name}`}`));
   sink(transportLine(result.server));
   sink("");
 

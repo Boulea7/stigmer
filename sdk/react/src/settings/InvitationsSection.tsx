@@ -25,7 +25,6 @@ export function InvitationsSection() {
   const headingId = useId();
   const { activeOrg } = useOrg();
   const invitationsAvailable = useResourceAvailable(ApiResourceKind.invitation);
-  const orgSlug = activeOrg?.metadata?.slug ?? "";
   const orgId = activeOrg?.metadata?.id ?? "";
 
   return (
@@ -48,7 +47,7 @@ export function InvitationsSection() {
         <CloudFeatureNotice>
           Invitations are not available in local mode.
         </CloudFeatureNotice>
-      ) : !orgSlug ? (
+      ) : !orgId ? (
         <p className="stg:text-muted-foreground stg:py-4 stg:text-center stg:text-xs">
           Select an organization to manage invitations.
         </p>
@@ -62,7 +61,7 @@ export function InvitationsSection() {
             </p>
           }
         >
-          <InvitationManager org={orgSlug} />
+          <InvitationManager org={orgId} />
         </PermissionGate>
       )}
     </section>

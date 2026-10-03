@@ -7,7 +7,7 @@ import { CreateApiKeyForm } from "../api-key/CreateApiKeyForm.js";
 import { ApiKeyCreatedAlert } from "../api-key/ApiKeyCreatedAlert.js";
 import { useResourceAvailable, ApiResourceKind } from "../deployment-mode.js";
 import { CloudFeatureNotice } from "../internal/CloudFeatureNotice.js";
-import { useActiveOrgSlug } from "../organization/OrgProvider.js";
+import { useActiveOrgId } from "../organization/OrgProvider.js";
 
 type FlowState =
   | { phase: "idle" }
@@ -17,7 +17,7 @@ type FlowState =
 /** Settings section for listing and creating organization API keys. */
 export function ApiKeysSection() {
   const headingId = useId();
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const apiKeysAvailable = useResourceAvailable(ApiResourceKind.api_key);
   const [flow, setFlow] = useState<FlowState>({ phase: "idle" });
   const listRefetchRef = useRef<(() => void) | null>(null);

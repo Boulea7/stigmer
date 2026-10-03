@@ -16,7 +16,7 @@ const page = vi.hoisted(() => ({
   access: [] as Array<Record<string, unknown>>,
 }));
 
-const SESSION = { metadata: { id: "ses_1", org: "acme" } };
+const SESSION = { metadata: { id: "ses_1", org: "org_acme" } };
 
 vi.mock("@stigmer/react", () => ({
   SessionViewer: (props: Record<string, unknown>) => {
@@ -32,8 +32,7 @@ vi.mock("@stigmer/react", () => ({
   useFollowSessionOrganization: (session: unknown) => {
     page.followed.push(session);
   },
-  useActiveOrgSlug: () => "acme",
-  useActiveOrgId: () => "acme",
+  useActiveOrgId: () => "org_acme",
   useAccountExecutionDefaults: () => undefined,
   useWorkspaceSources: () => ({ enableGitHub: false, enableLocal: true }),
 }));
@@ -80,7 +79,7 @@ describe("desktop SessionPage", () => {
   it("gives the viewer and the share dialog the active organization", () => {
     renderAt("/sessions/ses_1");
 
-    expect(page.viewer.at(-1)?.org).toBe("acme");
-    expect((page.access.at(-1)?.resource as { org: string }).org).toBe("acme");
+    expect(page.viewer.at(-1)?.org).toBe("org_acme");
+    expect((page.access.at(-1)?.resource as { org: string }).org).toBe("org_acme");
   });
 });

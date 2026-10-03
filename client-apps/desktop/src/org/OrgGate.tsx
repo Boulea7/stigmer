@@ -75,11 +75,11 @@ function ErrorState({
 function OnboardingState({
   onRefresh,
 }: {
-  onRefresh: (targetSlug?: string) => void;
+  onRefresh: (target?: string) => void;
 }) {
   const handleCreated = useCallback(
     (org: Organization) => {
-      onRefresh(org.metadata?.slug);
+      onRefresh(org.metadata?.id);
     },
     [onRefresh],
   );

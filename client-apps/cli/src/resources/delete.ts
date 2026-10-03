@@ -33,6 +33,7 @@ import {
 import { fetchResource } from "./get.js";
 import { getterFor } from "./get-bindings.js";
 import { parseReference } from "./reference.js";
+import { organizationLabel } from "../client/organizations.js";
 
 /** A staged delete: confirmation content plus the mutation to run on approval. */
 export interface DeletePlan {
@@ -177,7 +178,7 @@ async function planStandardDelete(
   const id = metaOf(resource).id;
 
   return {
-    warning: buildDeleteWarning(info, resource, await omitsOrganization(client)),
+    warning: buildDeleteWarning(info, resource, await deleteOrgLabel(client, resource)),
     confirmPrompt: "Proceed with deletion? [y/N]",
     perform: async () =>
       buildDeleteSuccess(info, await deleteFn(client, id, force)),
@@ -260,10 +261,21 @@ function planExecutionCancel(client: Stigmer, reference: string): DeletePlan {
 
 // --- Warning + success rendering (mirrors Go's per-type delete handlers) ---
 
+/**
+ * How the delete warning names the resource's organization: its slug in
+ * place of the id the resource carries, or undefined on a server that holds
+ * one organization, which never names it.
+ */
+async function deleteOrgLabel(client: Stigmer, message: HasMetadata): Promise<string | undefined> {
+  if (await omitsOrganization(client)) return undefined;
+  const org = metaOf(message).org;
+  return org === "" ? org : organizationLabel(client, org);
+}
+
 function buildDeleteWarning(
   info: TypeInfo,
   message: HasMetadata,
-  hideOrg: boolean,
+  orgLabel: string | undefined,
 ): CommandResult {
   if (info.kind === ApiResourceKind.api_key) {
     return buildApiKeyWarning(message);
@@ -279,7 +291,7 @@ function buildDeleteWarning(
     .field("Name", meta.name)
     .field("Slug", meta.slug);
   // A server that holds one organization never names it.
-  if (!hideOrg) section.field("Org", meta.org);
+  if (orgLabel !== undefined) section.field("Org", orgLabel);
 
   if (info.kind === ApiResourceKind.skill) {
     const tag = (message as { spec?: { tag?: string } }).spec?.tag;

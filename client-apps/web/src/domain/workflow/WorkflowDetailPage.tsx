@@ -19,7 +19,7 @@ import {
   useElkLayoutEngine,
   ConfirmDialog,
   useBreadcrumbOverride,
-  useActiveOrgSlug,
+  useActiveOrgId,
   type DetailAction,
   type AdditionalTab,
 } from "@stigmer/react";
@@ -57,7 +57,7 @@ export function WorkflowDetailPageInner({
   );
   const { yaml: initialYaml } = useWorkflowYaml(org, slug);
   const { workflow } = useWorkflow(org, slug);
-  const viewerOrg = useActiveOrgSlug();
+  const viewerOrg = useActiveOrgId();
   // Scoped to the active org so the run dialog's instance picker offers
   // the same rows as the Instances tab (falls back to the workflow's org
   // when no org context is active). This is a separate fetch from the

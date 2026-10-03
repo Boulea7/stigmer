@@ -4,7 +4,6 @@ import {
   EditResourceYamlDialog,
   McpServerDetailView,
   useMcpServer,
-  useActiveOrgSlug,
   useCopyResource,
   useConfirmAction,
   useDeleteResource,
@@ -12,12 +11,15 @@ import {
   ConfirmDialog,
   useBreadcrumbOverride,
   type DetailAction,
+  useActiveOrgId,
+  useOrgSlugForId,
 } from "@stigmer/react";
 
 export default function McpServerDetailPage() {
   const { org, slug } = useParams<{ org: string; slug: string }>();
   const navigate = useNavigate();
-  const activeOrg = useActiveOrgSlug();
+  const slugForOrg = useOrgSlugForId();
+  const activeOrg = useActiveOrgId();
   const { setLabel } = useBreadcrumbOverride();
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [resourceName, setResourceName] = useState<string>("MCP Server");
@@ -149,7 +151,7 @@ export default function McpServerDetailPage() {
         editable
         activeOrg={activeOrg}
         onResourceLoad={handleResourceLoad}
-        onPluginClick={({ org: o, slug: s }) => navigate(`/library/plugins/${o}/${s}`)}
+        onPluginClick={({ org: o, slug: s }) => navigate(`/library/plugins/${slugForOrg(o)}/${s}`)}
         actions={actions}
       />
       <EditResourceYamlDialog

@@ -10,7 +10,7 @@ import { PlatformClientSecretAlert } from "../platform-client/PlatformClientSecr
 import { PLATFORM_CLIENTS_MANAGED_BY_ADMINS } from "../platform-client/copy.js";
 import { useCheckPermission } from "../iam-policy/useCheckPermission.js";
 import { CloudFeatureNotice } from "../internal/CloudFeatureNotice.js";
-import { useActiveOrgId, useActiveOrgSlug } from "../organization/OrgProvider.js";
+import { useActiveOrgId } from "../organization/OrgProvider.js";
 import { useServerInfo } from "../server-info.js";
 
 type FlowState =
@@ -44,13 +44,12 @@ type FlowState =
  */
 export function PlatformClientsSection() {
   const headingId = useId();
-  const org = useActiveOrgSlug();
-  const orgId = useActiveOrgId();
+  const org = useActiveOrgId();
   const { serverInfo } = useServerInfo();
   const trustsEveryRequest = serverInfo?.authenticationRequired === false;
   const canMint = serverInfo !== null && !trustsEveryRequest;
   const createCheck = useCheckPermission(
-    orgId ? { kind: "organization", id: orgId } : null,
+    org ? { kind: "organization", id: org } : null,
     "can_create_platform_client",
   );
   const canCreate = !createCheck.isLoading && createCheck.allowed;

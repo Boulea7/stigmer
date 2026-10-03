@@ -30,33 +30,40 @@ type ApiResourceMetadata struct {
 	// Validation is skipped when the field is empty (e.g., server-generated
 	// responses or partial messages).
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// URL-friendly identifier, unique within the organization.
+	// URL-friendly identifier, unique within the organization (an
+	// Organization's own slug is unique across the server).
 	// Combined with org, forms the canonical reference: "org/slug".
+	// Fixed once created: update and apply ignore a changed slug. A kind
+	// whose slug may change has a rename RPC (Organization does).
 	// Format: lowercase alphanumeric characters and hyphens (min 2 chars);
 	// must start with a letter and end with a letter or digit. When empty,
 	// the server derives the slug from the name.
 	Slug string `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
 	// System-generated unique identifier.
 	//
-	// For every kind this is a generated, prefixed id (e.g. agt_<ulid>). Three
-	// kinds derive it from their natural key instead: Organization's id equals
-	// its slug (the globally unique tenancy root is addressed by slug, not a
-	// minted id); a direct IdentityAccount's id is derived from its issuer
-	// subject (`ida_` followed by 26 Crockford-base32 characters of
+	// For every kind this is a generated, prefixed id (e.g. agt_<ulid>,
+	// org_<ulid>). An organization made by a release before organization ids
+	// were minted keeps the id it was given then, which equals its first slug.
+	// Two kinds derive it from their natural key instead: a direct
+	// IdentityAccount's id is derived from its issuer subject (`ida_` followed by 26 Crockford-base32 characters of
 	// sha256(spec.idp_id)), so one subject can only ever be one account; and
 	// an IamPolicy's id is derived from its triple (`iamp_` followed by 26
 	// Crockford-base32 characters of sha256 over
 	// `principal.kind:principal.id#principal.relation@resource.kind:resource.id#relation`),
 	// so one grant can only ever be one row.
 	Id string `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
-	// Organization that owns this resource.
+	// Organization that owns this resource, by id.
+	// A request may name it by id or by slug; the server stores, and answers
+	// with, the id, so a resource stays in its organization across a rename.
 	// On a server that holds one organization (the open-source edition,
 	// GetServerInfoOutput.single_org), an empty org is that organization:
 	// the server makes it the first time it starts and fills it into every
 	// request that leaves it empty.
 	// On a server that holds several: required, and enforced by
 	// authorization.
-	// All resources belong to exactly one organization.
+	// Every organization-scoped resource belongs to exactly one organization.
+	// An Organization's own org is always empty: it belongs to no
+	// organization.
 	Org string `protobuf:"bytes,4,opt,name=org,proto3" json:"org,omitempty"`
 	// Visibility controls who can read this resource.
 	//   - PRIVATE: the owner and explicit grants.

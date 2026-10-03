@@ -33,9 +33,13 @@ vi.mock("@stigmer/react", () => ({
   CreateOrganizationForm: ({
     onCreated,
   }: {
-    onCreated: (org: { metadata?: { slug?: string } }) => void;
+    onCreated: (org: { metadata?: { id?: string; slug?: string } }) => void;
   }) => (
-    <button onClick={() => onCreated({ metadata: { slug: "new-org" } })}>
+    <button
+      onClick={() =>
+        onCreated({ metadata: { id: "org_01jnnnnnnnnnnnnnnnnnnnnnnn", slug: "new-org" } })
+      }
+    >
       create org
     </button>
   ),
@@ -105,7 +109,7 @@ describe("OrgGate", () => {
     expect(screen.getByText("Welcome to Stigmer")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "create org" }));
-    expect(gate.refresh).toHaveBeenCalledWith("new-org");
+    expect(gate.refresh).toHaveBeenCalledWith("org_01jnnnnnnnnnnnnnnnnnnnnnnn");
   });
 
   it("offers sign-out to a signed-in visitor stuck at the gate", async () => {

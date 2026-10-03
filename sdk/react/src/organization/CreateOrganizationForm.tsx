@@ -30,8 +30,9 @@ export interface CreateOrganizationFormProps {
  *
  * Collects a name, auto-generates a URL-friendly slug, and accepts an
  * optional description. The slug is derived from the name by default
- * but can be manually overridden. It is sent to the server as both
- * `metadata.slug` and `metadata.org` (organizations are self-owning).
+ * but can be manually overridden. It is sent as `metadata.slug`; the
+ * server gives the new organization its permanent id, and an organization
+ * belongs to no organization, so `metadata.org` stays unset.
  *
  * All visual properties flow through `--stgm-*` design tokens.
  *
@@ -105,7 +106,6 @@ export function CreateOrganizationForm({
         const org = await create({
           name: trimmedName,
           slug,
-          org: slug,
           description: description.trim() || undefined,
         });
         onCreated?.(org);

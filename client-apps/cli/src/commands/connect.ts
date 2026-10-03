@@ -103,11 +103,15 @@ async function runConnect(
   });
 
   const colorize = shouldColorize(process.stdout);
+  const { organizationLabel } = await import("../client/organizations.js");
+  const serverOrg = result.server.metadata?.org ?? "";
   renderConnectResult(
     result,
     (line) => process.stdout.write(`${line}\n`),
     colorize,
-    await omitsOrganization(client.stigmer),
+    (await omitsOrganization(client.stigmer))
+      ? undefined
+      : await organizationLabel(client.stigmer, serverOrg),
   );
 }
 

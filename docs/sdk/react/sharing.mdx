@@ -75,9 +75,8 @@ organization, both of which the create handler enforces:
   the definition, may not publish it.
 - `can_create_agent_share` on the organization (admin by default) — a
   share spends the organization's credits with anyone on the internet,
-  so it is an admin-level decision. The org check uses the org slug as
-  the resource id — an Organization's id equals its slug
-  (ApiResourceMetadata.id).
+  so it is an admin-level decision. The org check uses the agent's
+  `metadata.org` as the resource id, which is the organization's id.
 
 A viewer from another organization looking at a platform-visible agent
 needs no special case: both checks answer false for them, so the

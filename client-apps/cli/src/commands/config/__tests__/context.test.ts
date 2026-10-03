@@ -1,6 +1,7 @@
 // Command-level contract for `stigmer config context set --org`: an
-// organization the caller belongs to on the active backend is persisted as
-// the context and then resolved by every command; a slug the backend does not
+// organization the caller belongs to on the active backend, named by slug or
+// id, is persisted as the context by its id (with its slug for output) and
+// then resolved by every command; a value the backend does not
 // list among the caller's own is refused as not found and the config file is
 // left byte-for-byte as it was; an empty slug clears the context without
 // asking the backend; no `--org` at all is a usage error. And `context show`
@@ -28,6 +29,8 @@ import { load, resolveOrganization } from "../../../config/index.js";
 import { classify, ExitCode } from "../../../errors/index.js";
 import { buildProgram } from "../../../program.js";
 
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+
 let backend: Http2Server;
 let port: number;
 const openSessions = new Set<ServerHttp2Session>();
@@ -42,7 +45,7 @@ beforeAll(async () => {
       findMyOrganizations: () => {
         lookups += 1;
         return create(OrganizationsSchema, {
-          entries: [create(OrganizationSchema, { metadata: { id: "acme", slug: "acme" } })],
+          entries: [create(OrganizationSchema, { metadata: { id: ACME_ID, slug: "acme" } })],
         });
       },
     });
@@ -127,11 +130,19 @@ async function runContext(...args: string[]): Promise<RunOutcome> {
 }
 
 describe("config context set --org", () => {
-  it("persists an organization the caller belongs to, which every command then resolves", async () => {
+  it("persists an organization the caller belongs to by its id, which every command then resolves", async () => {
     const outcome = await run("--org", "acme");
     expect(outcome.exitCode).toBe(ExitCode.Success);
     expect(lookups).toBe(1);
-    expect(resolveOrganization(load())).toBe("acme");
+    expect(resolveOrganization(load())).toBe(ACME_ID);
+    expect(load().context?.org_slug).toBe("acme");
+  });
+
+  it("accepts the organization's id as well as its slug", async () => {
+    const outcome = await run("--org", ACME_ID);
+    expect(outcome.exitCode).toBe(ExitCode.Success);
+    expect(resolveOrganization(load())).toBe(ACME_ID);
+    expect(load().context?.org_slug).toBe("acme");
   });
 
   it("refuses a slug the backend does not list as the caller's and leaves the config untouched", async () => {
@@ -148,6 +159,7 @@ describe("config context set --org", () => {
     expect(outcome.exitCode).toBe(ExitCode.Success);
     expect(lookups).toBe(1);
     expect(resolveOrganization(load())).toBe("");
+    expect(load().context?.org_slug).toBeUndefined();
   });
 
   it("is a usage error without --org", async () => {
@@ -164,7 +176,7 @@ describe("config context show", () => {
     expect(outcome.exitCode).toBe(ExitCode.Success);
     const fields = JSON.parse(outcome.stdout).sections[0].fields as { key: string; value: string }[];
     expect(fields).toEqual([
-      { key: "Organization", value: "acme" },
+      { key: "Organization", value: `acme (${ACME_ID})` },
       { key: "Backend", value: "team" },
     ]);
   });

@@ -115,7 +115,7 @@ describe("TeamsSection", () => {
       }),
     ];
     renderSection("enterprise");
-    expect(stubs.listedOrg).toBe("acme");
+    expect(stubs.listedOrg).toBe("org_acme");
     expect(screen.getByRole("button", { name: /Site Reliability/ })).toBeTruthy();
     expect(screen.queryByText(/available in Stigmer Enterprise and Cloud/)).toBeNull();
   });

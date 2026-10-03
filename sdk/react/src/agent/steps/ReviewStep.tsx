@@ -5,6 +5,7 @@ import { cn } from "@stigmer/theme";
 import { buildAgentProto, getUserMessage, serializeManifest } from "@stigmer/sdk";
 import type { AgentInput } from "@stigmer/sdk";
 import type { AgentWizardData } from "./types.js";
+import { useOrgSlugForId } from "../../organization/useOrgRefs.js";
 
 /** Props for {@link ReviewStep}. */
 export interface ReviewStepProps {
@@ -27,6 +28,7 @@ export function ReviewStep({
   isCreating,
   error,
 }: ReviewStepProps) {
+  const slugForOrg = useOrgSlugForId();
   const agentInput = useMemo(() => buildAgentInput(org, data), [org, data]);
   const yamlPreview = useMemo(
     () => serializeManifest(buildAgentProto(agentInput)),
@@ -49,7 +51,7 @@ export function ReviewStep({
         <dl className="stg:grid stg:gap-x-6 stg:gap-y-3 stg:text-sm stg:sm:grid-cols-2">
           <SummaryItem label="Name" value={data.name} />
           <SummaryItem label="Slug" value={data.slug} mono />
-          <SummaryItem label="Organization" value={org} mono />
+          <SummaryItem label="Organization" value={slugForOrg(org)} mono />
           {data.description && (
             <SummaryItem
               label="Description"

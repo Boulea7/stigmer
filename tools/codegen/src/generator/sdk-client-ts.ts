@@ -582,8 +582,8 @@ function generateTSInputTypes(
   buf.push("  slug?: string;\n");
   if (cfg.isOrgless) {
     buf.push("  /**\n");
-    buf.push(`   * Always empty: a ${cfg.protoResType} belongs to the platform, not to an\n`);
-    buf.push("   * organization, so `metadata.org` stays unset. Omit it.\n");
+    buf.push(`   * Always empty: a ${cfg.protoResType} belongs to no organization, so\n`);
+    buf.push("   * `metadata.org` stays unset. Omit it.\n");
     buf.push("   */\n");
     buf.push("  org?: \"\";\n");
   } else {

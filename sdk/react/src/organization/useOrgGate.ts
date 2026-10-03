@@ -65,8 +65,8 @@ export interface UseOrgGateReturn {
   readonly state: OrgGateState;
   /** Re-attempt the organization fetch after a failure. */
   readonly retry: () => void;
-  /** Refetch orgs (e.g. after creating one). Optionally auto-select by slug. */
-  readonly refresh: (targetSlug?: string) => void;
+  /** Refetch orgs (e.g. after creating one). Optionally auto-select one by id or slug. */
+  readonly refresh: (target?: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ export interface UseOrgGateReturn {
  *   case "error":
  *     return <ErrorScreen message={state.message} onRetry={retry} />;
  *   case "no-orgs":
- *     return <OnboardingForm onCreated={(org) => refresh(org.slug)} />;
+ *     return <OnboardingForm onCreated={(org) => refresh(org.metadata?.id)} />;
  * }
  * ```
  */

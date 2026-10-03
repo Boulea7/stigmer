@@ -1,0 +1,100 @@
+/**
+ * useCanonicalOrgSlug answers the slug a URL's org segment should read: none
+ * for a current slug, the slug for one of the person's org ids without a
+ * request, and the server's answer for anything else (an old slug after a
+ * rename), never a previous segment's answer.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderHook, waitFor, cleanup } from "@testing-library/react";
+import type { ReactNode } from "react";
+import type { Organization } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
+import { StigmerContext } from "../../context";
+import { OrgProvider, useOrg } from "../OrgProvider";
+import { useCanonicalOrgSlug } from "../useCanonicalOrgSlug";
+
+afterEach(cleanup);
+
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+const GLOBEX_ID = "org_01jbbbbbbbbbbbbbbbbbbbbbbb";
+
+const orgs = [
+  { metadata: { id: ACME_ID, slug: "acme-labs", name: "Acme" } },
+] as Organization[];
+
+function setup(get: (id: string) => Promise<Organization>) {
+  const client = {
+    organization: {
+      findMyOrganizations: vi.fn().mockResolvedValue({ entries: orgs }),
+      get: vi.fn(get),
+    },
+  };
+  function wrapper({ children }: { children: ReactNode }) {
+    return (
+      <StigmerContext.Provider value={client as never}>
+        <OrgProvider>{children}</OrgProvider>
+      </StigmerContext.Provider>
+    );
+  }
+  return {
+    get: client.organization.get,
+    render: (segment: string) =>
+      renderHook(
+        ({ seg }: { seg: string }) => ({
+          loaded: !useOrg().isLoading,
+          canonical: useCanonicalOrgSlug(seg),
+        }),
+        { wrapper, initialProps: { seg: segment } },
+      ),
+  };
+}
+
+describe("useCanonicalOrgSlug", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("answers nothing for a current slug, and asks nobody", async () => {
+    const { render, get } = setup(async () => orgs[0]!);
+    const { result } = render("acme-labs");
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.canonical).toBeNull();
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("answers the slug for one of the person's org ids, and asks nobody", async () => {
+    const { render, get } = setup(async () => orgs[0]!);
+    const { result } = render(ACME_ID);
+    await waitFor(() => expect(result.current.canonical).toBe("acme-labs"));
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("answers the current slug for an old one, as the server resolves it", async () => {
+    const { render, get } = setup(async () => orgs[0]!);
+    const { result } = render("acme");
+    await waitFor(() => expect(result.current.canonical).toBe("acme-labs"));
+    expect(get).toHaveBeenCalledWith("acme");
+  });
+
+  it("answers nothing when the server refuses the lookup", async () => {
+    const { render, get } = setup(async () => {
+      throw new Error("permission denied");
+    });
+    const { result } = render("initech");
+    await waitFor(() => expect(get).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(result.current.canonical).toBeNull();
+  });
+
+  it("never reads a previous segment's answer as the next one's", async () => {
+    const answers: Record<string, Organization> = {
+      [GLOBEX_ID]: { metadata: { id: GLOBEX_ID, slug: "globex" } } as Organization,
+      initech: { metadata: { id: "initech", slug: "initech" } } as Organization,
+    };
+    const { render } = setup(async (id) => answers[id]!);
+    const { result, rerender } = render(GLOBEX_ID);
+    await waitFor(() => expect(result.current.canonical).toBe("globex"));
+
+    rerender({ seg: "initech" });
+    expect(result.current.canonical).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(result.current.canonical).toBeNull();
+  });
+});

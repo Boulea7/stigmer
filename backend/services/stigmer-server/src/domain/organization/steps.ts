@@ -1,20 +1,19 @@
 /**
  * Organization domain steps — port
- * pkg/domain/organization/controller/steps.go.
+ * pkg/domain/organization/controller/steps.go, reshaped for minted ids.
  *
- * Organization is the single resource whose id equals its slug. Every
- * other kind mints a prefixed ULID (agt_…, wfl_…) in the shared
- * BuildNewState; Organization deliberately deviates because it is the
- * immutable, globally unique tenancy root every child resource references
- * by slug (metadata.org). These two steps implement that deviation and its
- * uniqueness guarantee, mirroring cloud's OrganizationCreateHandler
- * (CheckDuplicate + CopySlugToId) step-for-step.
+ * An organization is filed under the id BuildNewState mints (org_<ulid>),
+ * like every other kind, and its slug is a name in the resource-name table
+ * (names.ts), unique across the server and changeable through rename. So
+ * the steps here differ from the shared ones only where a slug is global
+ * rather than org-scoped: the duplicate check and the two loaders read the
+ * name table, which also answers for a renamed organization's previous
+ * name. An organization belongs to no organization, so its own
+ * metadata.org must be empty.
  *
- * The same deviation shapes the delete. A slug is never taken twice
- * (slug-ledger.ts), and newRevokeOrganizationPoliciesStep still revokes
- * the organization's policy rows BEFORE its row is deleted, and fails the
- * delete when it cannot, so nothing that grants on the organization
- * outlives it.
+ * The delete revokes the organization's policy rows BEFORE its row is
+ * deleted, and fails the delete when it cannot, so nothing that grants on
+ * the organization outlives it.
  *
  * Proven by organization.conformance.test.ts (CONFORMANCE_TARGET=local),
  * __tests__/organization.test.ts and __tests__/organization-delete.test.ts.
@@ -24,13 +23,21 @@ import type { DescMessage } from "@bufbuild/protobuf";
 
 import { ResourceNotFoundError } from "../../store/interface.js";
 import type { Store } from "../../store/interface.js";
-import { alreadyExistsError, internalError } from "../../pipeline/errors.js";
+import {
+  internalError,
+  invalidArgumentError,
+  notFoundError,
+} from "../../pipeline/errors.js";
 import type { PipelineStep } from "../../pipeline/pipeline.js";
 import type { RequestContext } from "../../pipeline/request-context.js";
 import { EXISTING_RESOURCE_KEY } from "../../pipeline/steps/load-existing.js";
+import {
+  EXISTS_IN_DATABASE_KEY,
+  SHOULD_CREATE_KEY,
+} from "../../pipeline/steps/load-for-apply.js";
 import { metadataOf } from "../../pipeline/steps/shapes.js";
 import type { IamPolicyGrantPath } from "../iampolicy/grant-path.js";
-import { refusalForHeldSlug } from "./slug-ledger.js";
+import { liveOrganizationName, refusalForHeldName } from "./names.js";
 
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { ApiResourceRefSchema } from "@stigmer/protos/ai/stigmer/iam/iampolicy/v1/spec_pb";
@@ -38,36 +45,18 @@ import type { Organization } from "@stigmer/protos/ai/stigmer/tenancy/organizati
 import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 
 /**
- * Rejects a create when an organization already exists with the same slug,
- * checked GLOBALLY by id.
+ * Rejects a create whose slug a live organization answers to, as its
+ * current name or as a recent previous one: the early refusal, before any
+ * gate. The atomic guarantee is ClaimOrganizationSlug's, immediately before
+ * Persist (names.ts). A name whose organization is gone does not count.
  *
- * Organizations use their slug as their id (see newCopySlugToIdStep), so
- * slug uniqueness must be global — not org-scoped like every other
- * resource. The generic CheckDuplicate scopes its lookup by metadata.org,
- * which is only safe for organizations because callers leave it empty; a
- * direct API caller that set a non-empty metadata.org could otherwise slip
- * a colliding slug past the scoped check and, because the store persists
- * by id with upsert semantics, silently overwrite the existing
- * organization. Checking existence by id (== the resolved slug) closes
- * that hole and mirrors cloud's OrganizationCreateHandler.CheckDuplicate.
- *
- * A slug is taken for good (slug-ledger.ts), so the slug ledger is read
- * first: a retired slug is refused with the reserved reason, a held one
- * with the duplicate copy. The row is read after it for an organization no
- * ledger entry records yet, one an older binary created during a rolling
- * upgrade. This read is the early refusal, before any gate; the atomic
- * guarantee is ClaimOrganizationSlug's, immediately before Persist.
- *
- * Runs after ResolveSlug (slug is set) and before BuildNewState/
- * CopySlugToId (the id is not yet minted), so it keys on the slug value
- * that will become the id.
+ * Keeps the shared vocabulary name: the inventory row reads straight onto
+ * the chain even though the semantics are organization-specific.
  */
 export function newCheckOrgDuplicateStep(
   store: Store,
 ): PipelineStep<typeof OrganizationSchema> {
   return {
-    // The shared vocabulary name — the inventory row reads straight onto
-    // the chain even though the semantics are organization-specific.
     name: "CheckDuplicate",
     async execute(ctx: RequestContext<typeof OrganizationSchema>): Promise<void> {
       const metadata = metadataOf(ctx.newState);
@@ -79,54 +68,126 @@ export function newCheckOrgDuplicateStep(
       if (metadata.slug === "") {
         throw internalError(new Error("organization slug is empty"), "duplicate check");
       }
-
       let entry;
       try {
-        entry = await store.organizationSlugs.find(metadata.slug);
+        entry = await liveOrganizationName(store, metadata.slug, new Date());
       } catch (error) {
         throw internalError(error, "failed to check for duplicate organization");
       }
       if (entry !== undefined) {
-        throw refusalForHeldSlug(entry);
+        throw refusalForHeldName(entry);
       }
-
-      try {
-        await store.getResource(
-          ctx.apiResourceKind,
-          metadata.slug,
-          OrganizationSchema,
-        );
-      } catch (error) {
-        if (error instanceof ResourceNotFoundError) {
-          return; // no holder — the create may proceed
-        }
-        throw internalError(error, "failed to check for duplicate organization");
-      }
-      throw alreadyExistsError("Organization", `slug '${metadata.slug}'`);
     },
   };
 }
 
 /**
- * Sets metadata.id to metadata.slug — the deliberate id == slug exception
- * for the tenancy root. Runs after BuildNewState (which mints a throwaway
- * org_<ulid>) and overwrites that id with the slug, exactly mirroring
- * cloud's OrganizationCreateHandler.CopySlugToId.
+ * Refuses an organization that names an organization of its own: an
+ * organization belongs to none, so its metadata.org is always empty.
  */
-export function newCopySlugToIdStep(): PipelineStep<typeof OrganizationSchema> {
+export function newRefuseOrganizationOrgStep(): PipelineStep<
+  typeof OrganizationSchema
+> {
   return {
-    name: "CopySlugToId",
+    name: "RefuseOrganizationOrg",
     execute(ctx: RequestContext<typeof OrganizationSchema>): void {
+      if ((metadataOf(ctx.newState)?.org ?? "") !== "") {
+        throw invalidArgumentError(
+          "an organization belongs to no organization: metadata.org must be empty",
+        );
+      }
+    },
+  };
+}
+
+/**
+ * The organization a request names by id or slug, or undefined. The id is
+ * read first; a slug resolves through the name table, so a renamed
+ * organization's previous name still finds it.
+ */
+async function findOrganization(
+  store: Store,
+  id: string,
+  slug: string,
+): Promise<Organization | undefined> {
+  const byId = id !== "" ? id : (await liveOrganizationName(store, slug, new Date()))?.id;
+  if (byId === undefined || byId === "") {
+    return undefined;
+  }
+  try {
+    return await store.getResource(
+      ApiResourceKind.organization,
+      byId,
+      OrganizationSchema,
+    );
+  } catch (error) {
+    if (error instanceof ResourceNotFoundError) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Apply's existence probe for an organization (the shared LoadForApply's
+ * flags and name): by id when the manifest carries one, else by slug
+ * through the name table. So a manifest that names an old slug, or that
+ * carries the id beside a changed slug, updates its organization instead of
+ * making a second one; the slug itself changes only through rename.
+ */
+export function newLoadOrganizationForApplyStep(
+  store: Store,
+): PipelineStep<typeof OrganizationSchema> {
+  return {
+    name: "LoadForApply",
+    async execute(ctx: RequestContext<typeof OrganizationSchema>): Promise<void> {
+      const metadata = metadataOf(ctx.newState);
+      const existing =
+        metadata === undefined
+          ? undefined
+          : await findOrganization(store, metadata.id, metadata.slug);
+      if (existing === undefined) {
+        ctx.set(EXISTS_IN_DATABASE_KEY, false);
+        ctx.set(SHOULD_CREATE_KEY, true);
+        return;
+      }
+      ctx.set(EXISTING_RESOURCE_KEY, existing);
+      ctx.set(EXISTS_IN_DATABASE_KEY, true);
+      ctx.set(SHOULD_CREATE_KEY, false);
+      if (metadata !== undefined) {
+        metadata.id = existing.metadata?.id ?? "";
+      }
+    },
+  };
+}
+
+/**
+ * Update's loader for an organization (the shared LoadExisting's name and
+ * failure): by id, else by slug through the name table. NotFound fails the
+ * update.
+ */
+export function newLoadExistingOrganizationStep(
+  store: Store,
+): PipelineStep<typeof OrganizationSchema> {
+  return {
+    name: "LoadExisting",
+    async execute(ctx: RequestContext<typeof OrganizationSchema>): Promise<void> {
       const metadata = metadataOf(ctx.newState);
       if (metadata === undefined) {
-        throw internalError(new Error("organization metadata is nil"), "copy slug to id");
+        throw internalError(new Error("resource metadata is nil"), "load existing");
       }
-      // ResolveSlug guarantees a non-empty slug upstream; an empty slug
-      // here is a pipeline-ordering bug, not bad client input.
-      if (metadata.slug === "") {
-        throw internalError(new Error("organization slug is empty"), "copy slug to id");
+      if (metadata.id === "" && metadata.slug === "") {
+        throw invalidArgumentError("resource id or slug is required for update");
       }
-      metadata.id = metadata.slug;
+      const existing = await findOrganization(store, metadata.id, metadata.slug);
+      if (existing === undefined) {
+        throw notFoundError(
+          "Organization",
+          metadata.id !== "" ? metadata.id : metadata.slug,
+        );
+      }
+      metadata.id = existing.metadata?.id ?? "";
+      ctx.set(EXISTING_RESOURCE_KEY, existing);
     },
   };
 }
@@ -141,9 +202,9 @@ export function newCopySlugToIdStep(): PipelineStep<typeof OrganizationSchema> {
  * The generic delete chains clean up after the row and log a fault,
  * because a deleted resource's rows grant nothing once it is gone. An
  * organization is the exception: its rows are the grants on the tenancy
- * root itself, and the scope link of every resource under it. The slug is
- * never taken again (slug-ledger.ts), so they cannot pass to a new holder,
- * but a row left behind would still be a grant nobody administers. So this
+ * root itself, and the scope link of every resource under it. They name the
+ * organization's id, which no later organization can carry, but a row left
+ * behind would still be a grant nobody administers. So this
  * step does not catch. A fault fails the delete with the
  * organization in place, and a retry resumes where the revocation stopped
  * (the grant path revokes the organization's owners last, so the owner

@@ -5,8 +5,9 @@ import {
   CreationPicker,
   ApplyManifestDialog,
   AGENT_TEMPLATES,
-  useActiveOrgSlug,
   useBreadcrumbOverride,
+  useActiveOrgId,
+  useOrgSlugForId,
 } from "@stigmer/react";
 import type { CreationPath, AgentWizardData } from "@stigmer/react";
 
@@ -29,7 +30,8 @@ type PageState =
     };
 
 export default function AgentNewPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { setLabel } = useBreadcrumbOverride();
@@ -64,9 +66,9 @@ export default function AgentNewPage() {
 
   const handleWizardComplete = useCallback(
     (result: { org: string; slug: string }) => {
-      navigate(`/library/agents/${result.org}/${result.slug}`);
+      navigate(`/library/agents/${slugForOrg(result.org)}/${result.slug}`);
     },
-    [navigate],
+    [navigate, slugForOrg],
   );
 
   const handleCancel = useCallback(() => {

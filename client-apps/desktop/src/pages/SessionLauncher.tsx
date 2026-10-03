@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import {
   NewSessionViewer,
   useAccountExecutionDefaults,
-  useActiveOrgSlug,
   useWorkspaceSources,
+  useActiveOrgId,
 } from "@stigmer/react";
 import type { ResourceRef } from "@stigmer/sdk";
 import { useNativeFolderPicker } from "../hooks/useNativeFolderPicker";
@@ -22,7 +22,7 @@ import { useNativeWorkspaceContentSearcher } from "../hooks/useNativeWorkspaceCo
 export function SessionLauncher() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   // The account's saved execution defaults seed the launcher (parity
   // with web). Every edition serves the account: a local desktop reads the
   // operator account its embedded server creates at boot.

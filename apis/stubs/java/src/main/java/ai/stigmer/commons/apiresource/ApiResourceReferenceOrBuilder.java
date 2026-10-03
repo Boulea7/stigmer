@@ -12,14 +12,16 @@ public interface ApiResourceReferenceOrBuilder extends
 
   /**
    * <pre>
-   * Organization that owns the referenced resource.
+   * Organization that owns the referenced resource, by slug or id.
    *
-   * When non-empty: must be a valid org slug (lowercase alphanumeric with hyphens,
-   * starts with a letter, 1-63 characters). Example: "stigmer", "acme-corp".
+   * When non-empty: an organization slug (lowercase alphanumeric with hyphens,
+   * starts with a letter, 2-63 characters; e.g. "stigmer", "acme-corp") or an
+   * organization id (org_&lt;ulid&gt;). The server stores the id, so a stored
+   * reference keeps pointing at its organization across a rename.
    *
    * When empty: the reference is relative — the server resolves it to the parent
    * resource's organization at write time. All stored and returned references
-   * always have org populated (absolute form).
+   * always have org populated (absolute form, the id).
    *
    * Use empty org for same-org references (the common case).
    * An explicit other org is accepted only when that organization is a
@@ -32,14 +34,16 @@ public interface ApiResourceReferenceOrBuilder extends
   java.lang.String getOrg();
   /**
    * <pre>
-   * Organization that owns the referenced resource.
+   * Organization that owns the referenced resource, by slug or id.
    *
-   * When non-empty: must be a valid org slug (lowercase alphanumeric with hyphens,
-   * starts with a letter, 1-63 characters). Example: "stigmer", "acme-corp".
+   * When non-empty: an organization slug (lowercase alphanumeric with hyphens,
+   * starts with a letter, 2-63 characters; e.g. "stigmer", "acme-corp") or an
+   * organization id (org_&lt;ulid&gt;). The server stores the id, so a stored
+   * reference keeps pointing at its organization across a rename.
    *
    * When empty: the reference is relative — the server resolves it to the parent
    * resource's organization at write time. All stored and returned references
-   * always have org populated (absolute form).
+   * always have org populated (absolute form, the id).
    *
    * Use empty org for same-org references (the common case).
    * An explicit other org is accepted only when that organization is a

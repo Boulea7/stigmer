@@ -46,7 +46,6 @@ export function TeamsSection() {
   const headingId = useId();
   const { activeOrg } = useOrg();
   const teamsServed = useResourceAvailable(ApiResourceKind.team);
-  const orgSlug = activeOrg?.metadata?.slug ?? "";
   const orgId = activeOrg?.metadata?.id ?? "";
 
   const onCloud = useDeploymentMode() === "cloud";
@@ -54,7 +53,7 @@ export function TeamsSection() {
   const planLacksTeams = plan.allows(Feature.teams) === false;
   const catalog = usePlans({ enabled: planLacksTeams });
   const unlockingPlanName = lowestPlanWith(catalog.plans ?? [], Feature.teams)?.metadata?.name;
-  const list = useTeamList(teamsServed && orgSlug ? orgSlug : null);
+  const list = useTeamList(teamsServed && orgId ? orgId : null);
   const { refetch } = list;
   const [flow, setFlow] = useState<FlowState>({ phase: "idle" });
 
@@ -111,14 +110,14 @@ export function TeamsSection() {
           Teams are available in Stigmer Enterprise and Cloud. This edition
           shares resources with people and with the whole organization.
         </CloudFeatureNotice>
-      ) : !orgSlug ? (
+      ) : !orgId ? (
         <p className="stg:text-muted-foreground stg:py-4 stg:text-center stg:text-xs">
           Select an organization to manage teams.
         </p>
       ) : flow.phase === "creating" ? (
         <div className="stg:border-border stg:bg-card stg:rounded-lg stg:border stg:p-4">
           <CreateTeamForm
-            org={orgSlug}
+            org={orgId}
             onCreated={handleCreated}
             onCancel={() => setFlow({ phase: "idle" })}
           />

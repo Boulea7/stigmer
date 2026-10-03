@@ -11,7 +11,7 @@ import {
 
 export default function DashboardPage() {
   const { activeOrg } = useOrg();
-  const org = activeOrg?.metadata?.slug ?? "";
+  const org = activeOrg?.metadata?.id ?? "";
   const navigate = useNavigate();
 
   const { summary: workflowSummary, isLoading: workflowSummaryLoading } =

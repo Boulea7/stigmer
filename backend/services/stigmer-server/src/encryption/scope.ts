@@ -10,11 +10,17 @@
  * tenant-name derivation lives in exactly one place.
  *
  * The tenant segment — one discriminator for keys and paths:
- * `tenantSegment` is `org-<slug>` for organization-scoped resources and
- * the literal `platform` for platform-scoped ones. The same string is the
+ * `tenantSegment` is `org-<id>` for organization-scoped resources (the
+ * organization's permanent id, so a rename never touches a key) and the
+ * literal `platform` for platform-scoped ones. The same string is the
  * Transit key name (kekKeyName) and the KV path root, deliberately: the
- * `org-` prefix makes an organization literally named "platform"
- * collision-free in both namespaces at once.
+ * `org-` prefix keeps every organization collision-free with "platform" in
+ * both namespaces at once, an organization made before ids were minted
+ * included, whose id is its first slug and could be "platform".
+ *
+ * Only an encrypt derives the segment. A stored value names the key that
+ * wrapped it, and a decrypt reads it from there, so changing how a segment
+ * is derived never strands a stored secret.
  *
  * Located scopes (v3 writes): the vault-backed enc:v3: codec derives a KV
  * path `{tenant}/{kind}/{id}/{key}`, so v3 writes need a scope carrying kind
@@ -25,14 +31,14 @@
  * them). keyName names the secret for SINGULAR encrypts (withKeyName);
  * batch encrypts take key names from their map keys instead.
  *
- * Validation: org slugs must match the org-slug contract from
- * ai.stigmer.commons.apiresource metadata.proto
- * (^[a-z][a-z0-9-]*[a-z0-9]$, min 2 chars). That charset is safe as a
- * Transit key name and as a KV path segment, so passing validation here
- * guarantees the derived names need no escaping. The check matters even
- * though callers read the org from server state, not client input: a
- * malformed slug reaching a crypto key name would otherwise fail deep
- * inside the vault with a routing error naming nothing.
+ * Validation: the organization must be named by its id: a minted
+ * `org_<ulid>`, or the slug-shaped id of an organization made before ids
+ * were minted (^[a-z][a-z0-9-]*[a-z0-9]$, min 2 chars). Both charsets are
+ * safe as a Transit key name and as a KV path segment, so passing
+ * validation here guarantees the derived names need no escaping. The check
+ * matters even though callers read the org from server state, not client
+ * input: a malformed id reaching a crypto key name would otherwise fail
+ * deep inside the vault with a routing error naming nothing.
  */
 
 /** The reserved tenant segment for platform-scoped resources. */
@@ -42,18 +48,18 @@ export const PLATFORM_TENANT = "platform";
 const ORG_TENANT_PREFIX = "org-";
 
 /**
- * The org-slug contract from metadata.proto, verbatim. Kept in lockstep
- * with the proto: a value that passes resource validation always passes
- * here.
+ * An organization id: a minted `org_<ulid>`, or the slug-shaped id of an
+ * organization made before ids were minted (metadata.proto's slug pattern,
+ * verbatim).
  */
-const ORG_SLUG = /^[a-z][a-z0-9-]*[a-z0-9]$/;
+const ORG_ID = /^(?:org_[0-9a-z]{26}|[a-z][a-z0-9-]*[a-z0-9])$/;
 
 /** Resource kinds are server-side constants: lowercase, no separators. */
 const KIND = /^[a-z][a-z0-9]*$/;
 
 export class EncryptionScope {
   private constructor(
-    /** `org-<slug>` or `platform` — the Transit key name and KV path root. */
+    /** `org-<id>` or `platform` — the Transit key name and KV path root. */
     readonly tenantSegment: string,
     /** The resource kind, lowercase (undefined when not located). */
     readonly kind: string | undefined,
@@ -67,9 +73,9 @@ export class EncryptionScope {
    * A tenancy-only scope — all a v1/v2 write needs. The long-standing
    * factory; every pre-v3 call site uses exactly this.
    */
-  static forOrganization(orgSlug: string): EncryptionScope {
+  static forOrganization(org: string): EncryptionScope {
     return new EncryptionScope(
-      orgSegment(orgSlug),
+      orgSegment(org),
       undefined,
       undefined,
       undefined,
@@ -78,15 +84,15 @@ export class EncryptionScope {
 
   /**
    * A located org-scoped scope, as v3 batch writes need: the KV path root
-   * is `org-<slug>/<kind>/<id>`, key names come from the batch map keys.
+   * is `org-<org id>/<kind>/<id>`, key names come from the batch map keys.
    */
   static forOrganizationResource(
-    orgSlug: string,
+    org: string,
     kind: string,
     id: string,
   ): EncryptionScope {
     validateLocation(kind, id);
-    return new EncryptionScope(orgSegment(orgSlug), kind, id, undefined);
+    return new EncryptionScope(orgSegment(org), kind, id, undefined);
   }
 
   /**
@@ -130,13 +136,13 @@ export class EncryptionScope {
   }
 }
 
-function orgSegment(orgSlug: string): string {
-  if (!ORG_SLUG.test(orgSlug)) {
+function orgSegment(org: string): string {
+  if (!ORG_ID.test(org)) {
     throw new Error(
-      `encryption scope requires a valid org slug (pattern ${ORG_SLUG.source}), got: '${orgSlug}'`,
+      `encryption scope requires an organization id (pattern ${ORG_ID.source}), got: '${org}'`,
     );
   }
-  return ORG_TENANT_PREFIX + orgSlug;
+  return ORG_TENANT_PREFIX + org;
 }
 
 function validateLocation(kind: string, id: string): void {

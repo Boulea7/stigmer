@@ -10,7 +10,7 @@ import {
   useGitHubTreeLister,
   useGitHubFileReader,
   useWorkspaceSources,
-  useActiveOrgSlug,
+  useActiveOrgId,
 } from "@stigmer/react";
 import type { ResourceRef } from "@stigmer/sdk";
 import { useSessionNavigation } from "@/domain/session/session-navigation";
@@ -23,7 +23,7 @@ import { useSessionNavigation } from "@/domain/session/session-navigation";
  */
 export function SessionLauncher() {
   const rawSearchParams = useSearchParams();
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const accountDefaults = useAccountExecutionDefaults();
   const gitHubConnection = useGitHubConnection(org);
   const { enableGitHub, enableLocal } = useWorkspaceSources();

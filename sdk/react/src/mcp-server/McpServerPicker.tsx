@@ -23,6 +23,7 @@ import { McpServerConfigPanel } from "./McpServerConfigPanel.js";
 import type { McpServerSetupEntry } from "./mcpServerSetupReducer.js";
 import { useMcpServerConnect } from "./useMcpServerConnect.js";
 import { useMcpServerOAuthConnect } from "./useMcpServerOAuthConnect.js";
+import { OrgSlugText } from "../organization/OrgSlugText.js";
 // ---------------------------------------------------------------------------
 // Setup integration props
 // ---------------------------------------------------------------------------
@@ -698,7 +699,7 @@ export function McpServerPicker({
                     <HighlightMatch text={result.name} query={query} />
                   </span>
                   <span className="stg:ml-auto stg:shrink-0 stg:text-[0.6rem] stg:text-muted-foreground">
-                    {result.org}
+                    <OrgSlugText orgId={result.org} />
                   </span>
                 </span>
                 {result.description && (

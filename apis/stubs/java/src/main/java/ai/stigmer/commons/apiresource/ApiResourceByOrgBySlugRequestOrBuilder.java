@@ -12,7 +12,7 @@ public interface ApiResourceByOrgBySlugRequestOrBuilder extends
 
   /**
    * <pre>
-   * ID of the organization
+   * The organization, by id or slug
    * </pre>
    *
    * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>
@@ -21,7 +21,7 @@ public interface ApiResourceByOrgBySlugRequestOrBuilder extends
   java.lang.String getOrg();
   /**
    * <pre>
-   * ID of the organization
+   * The organization, by id or slug
    * </pre>
    *
    * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>

@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   WorkflowExecutionViewer,
   useResolveAgentExecutionSession,
-  useActiveOrgSlug,
   useActiveOrgId,
+  useOrgSlugForId,
   ManageAccessButton,
 } from "@stigmer/react";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
@@ -35,9 +35,9 @@ export function WorkflowExecutionDetailPage({
   org: orgProp,
 }: WorkflowExecutionDetailPageProps) {
   const { navigateToSession } = useSessionNavigation();
-  const activeOrg = useActiveOrgSlug();
-  const org = orgProp ?? activeOrg;
   const orgId = useActiveOrgId();
+  const org = orgProp ?? orgId;
+  const slugForOrg = useOrgSlugForId();
 
   const [pendingAgentExecutionId, setPendingAgentExecutionId] = useState<string | null>(null);
 
@@ -58,13 +58,13 @@ export function WorkflowExecutionDetailPage({
 
   const handleNavigateToWorkflowEditor = useCallback(
     (_yaml: string, workflowSlug: string) => {
-      const targetOrg = org ?? "";
+      const targetOrg = slugForOrg(org ?? "");
       // Hard load: the library detail route is dynamic, and in static
       // export the router cannot soft-navigate across zones to a
       // non-pre-rendered dynamic route (see library-navigation.tsx).
       window.location.href = `/library/workflows/${targetOrg}/${workflowSlug}`;
     },
-    [org],
+    [org, slugForOrg],
   );
 
   return (

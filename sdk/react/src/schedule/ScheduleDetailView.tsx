@@ -79,6 +79,7 @@ import { useTriggerSchedule } from "./useTriggerSchedule.js";
 import { useUpdateScheduleSpec } from "./useUpdateScheduleSpec.js";
 import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 import { LoadingRegion } from "../internal/LoadingRegion.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Props for {@link ScheduleDetailView}. */
 export interface ScheduleDetailViewProps {
@@ -179,6 +180,7 @@ export function ScheduleDetailView({
   now,
   className,
 }: ScheduleDetailViewProps) {
+  const slugForOrg = useOrgSlugForId();
   const { schedule, isLoading, error, refetch } = useSchedule(org, slug);
 
   // The recent-runs fetch stays mounted regardless of the active tab:
@@ -523,7 +525,7 @@ export function ScheduleDetailView({
           <DetailRow label="Target agent">
             {target?.agentRef ? (
               <ReferenceLink
-                label={`${target.agentRef.org}/${target.agentRef.slug}`}
+                label={`${slugForOrg(target.agentRef.org)}/${target.agentRef.slug}`}
                 onNavigate={
                   onNavigateToAgent
                     ? () =>
@@ -1376,6 +1378,7 @@ function EnvironmentRefList({
 }: {
   readonly refs: readonly { org: string; slug: string }[];
 }) {
+  const slugForOrg = useOrgSlugForId();
   if (refs.length === 0) {
     return <span className="stg:text-sm stg:text-muted-foreground">—</span>;
   }
@@ -1386,7 +1389,7 @@ function EnvironmentRefList({
           key={`${ref.org}/${ref.slug}-${i}`}
           className="stg:font-mono stg:text-xs stg:text-foreground"
         >
-          {ref.org ? `${ref.org}/${ref.slug}` : ref.slug}
+          {ref.org ? `${slugForOrg(ref.org)}/${ref.slug}` : ref.slug}
         </li>
       ))}
     </ul>

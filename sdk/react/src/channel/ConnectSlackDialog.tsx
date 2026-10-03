@@ -23,6 +23,7 @@ import { useConnectSlackChannel, type SlackConnectPhase } from "./useConnectSlac
 import { useCreateAgentChannel } from "./useCreateAgentChannel.js";
 import { useOrgAgentChannelList } from "./useOrgAgentChannelList.js";
 import { SlackMarkIcon } from "./SlackMarkIcon.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Props for {@link ConnectSlackDialog}. */
 export interface ConnectSlackDialogProps {
@@ -147,6 +148,7 @@ function ConnectSlackDialogBody({
   channelAppsHref,
   titleId,
 }: ConnectSlackDialogBodyProps) {
+  const slugForOrg = useOrgSlugForId();
   const deploymentMode = useDeploymentMode();
   const agentName = agent.metadata?.name || agent.metadata?.slug || "this agent";
   const org = agent.metadata?.org ?? "";
@@ -382,7 +384,7 @@ function ConnectSlackDialogBody({
             </p>
             <p className="stg:text-xs stg:text-muted-foreground">
               Conversations from Slack are billed to{" "}
-              <span className="stg:font-medium">{org}</span>. A workspace can
+              <span className="stg:font-medium">{slugForOrg(org)}</span>. A workspace can
               host one agent per Slack app.
             </p>
 

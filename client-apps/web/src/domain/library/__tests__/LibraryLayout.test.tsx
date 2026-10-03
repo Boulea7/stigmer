@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 
 import LibraryLayout from "../LibraryLayout";
 import {
@@ -56,6 +56,24 @@ vi.mock("@/domain/library/schedules/ScheduleDetailPage", () => ({
   ScheduleDetailPageInner: () => <div data-testid="schedule-detail" />,
 }));
 
+// The organizations the person belongs to, as the SDK's OrgProvider would
+// answer for them: an id reads its slug in a URL, and a segment that is not
+// a current slug (an id, or a slug the org was renamed away from) answers
+// the slug to replace it with.
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+const slugById = new Map([[ACME_ID, "acme"]]);
+const canonicalBySegment = new Map([
+  [ACME_ID, "acme"],
+  ["acme-old", "acme"],
+]);
+
+vi.mock("@stigmer/react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@stigmer/react")>()),
+  useOrgSlugForId: () => (id: string) => slugById.get(id) ?? id,
+  useCanonicalOrgSlug: (segment: string | null) =>
+    canonicalBySegment.get(segment ?? "") ?? null,
+}));
+
 vi.mock("@/domain/library/LibraryBreadcrumb", () => ({
   LibraryBreadcrumb: () => <nav data-testid="breadcrumb" />,
 }));
@@ -76,10 +94,10 @@ function YieldingDetailRouteChild() {
   return <div data-testid="route-detail-copy" />;
 }
 
-function NavigateToAgentButton() {
+function NavigateToAgentButton({ org = "acme" }: { org?: string }) {
   const { navigateToDetail } = useLibraryNavigation();
   return (
-    <button onClick={() => navigateToDetail("agents", "acme", "support-bot")}>
+    <button onClick={() => navigateToDetail("agents", org, "support-bot")}>
       open detail
     </button>
   );
@@ -155,5 +173,63 @@ describe("LibraryLayout route-children mounting", () => {
     // isFullViewport drives the breadcrumb away; the (yielding) route
     // copy must not disturb the overlay's request on the shared flag.
     expect(screen.queryByTestId("breadcrumb")).toBeNull();
+  });
+});
+
+describe("LibraryLayout org segment", () => {
+  it("puts the org's slug in the URL when navigating with its id", () => {
+    render(
+      <LibraryLayout>
+        <NavigateToAgentButton org={ACME_ID} />
+      </LibraryLayout>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "open detail" }));
+
+    expect(window.location.pathname).toBe("/library/agents/acme/support-bot");
+  });
+
+  it("replaces an id in a deep-loaded URL with the org's slug, adding no history entry", async () => {
+    setRoute(`/library/agents/${ACME_ID}/support-bot?tab=channels`);
+    const entries = window.history.length;
+
+    render(
+      <LibraryLayout>
+        <YieldingDetailRouteChild />
+      </LibraryLayout>,
+    );
+
+    await waitFor(() =>
+      expect(window.location.pathname).toBe("/library/agents/acme/support-bot"),
+    );
+    expect(window.location.search).toBe("?tab=channels");
+    expect(window.history.length).toBe(entries);
+    expect(screen.getAllByTestId("agent-detail")).toHaveLength(1);
+  });
+
+  it("replaces a slug the org was renamed away from", async () => {
+    setRoute("/library/agents/acme-old/support-bot");
+
+    render(
+      <LibraryLayout>
+        <YieldingDetailRouteChild />
+      </LibraryLayout>,
+    );
+
+    await waitFor(() =>
+      expect(window.location.pathname).toBe("/library/agents/acme/support-bot"),
+    );
+  });
+
+  it("leaves a current slug alone", () => {
+    setRoute("/library/agents/acme/support-bot");
+
+    render(
+      <LibraryLayout>
+        <YieldingDetailRouteChild />
+      </LibraryLayout>,
+    );
+
+    expect(window.location.pathname).toBe("/library/agents/acme/support-bot");
   });
 });

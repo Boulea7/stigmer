@@ -28,6 +28,7 @@ import { EmptyState } from "../../empty-state/index.js";
 import { ResourceAvatar } from "./ResourceAvatar.js";
 import { useSingleOrg } from "../../server-info.js";
 import { ORG_COLUMN_ID } from "../types.js";
+import { OrgSlugText } from "../../organization/OrgSlugText.js";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -519,7 +520,7 @@ function DefaultCardContent({ item }: { readonly item: SearchResult }) {
           {item.name || item.slug}
         </span>
         {item.org && (
-          <p className="stg:text-xs stg:text-muted-foreground">{item.org}</p>
+          <OrgSlugText orgId={item.org} className="stg:block stg:text-xs stg:text-muted-foreground" />
         )}
         {item.description && (
           <p className="stg:mt-0.5 stg:line-clamp-2 stg:text-xs stg:text-muted-foreground">
@@ -546,7 +547,7 @@ function DefaultRowContent({ item }: { readonly item: SearchResult }) {
         {item.name || item.slug}
       </span>
       {item.org && (
-        <span className="stg:text-xs stg:text-muted-foreground">{item.org}</span>
+        <OrgSlugText orgId={item.org} className="stg:text-xs stg:text-muted-foreground" />
       )}
       {item.description && (
         <>

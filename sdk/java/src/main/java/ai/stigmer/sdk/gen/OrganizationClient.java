@@ -3,6 +3,7 @@
 package ai.stigmer.sdk.gen;
 
 import ai.stigmer.commons.apiresource.FindApiResourcesRequest;
+import ai.stigmer.commons.apiresource.RenameInput;
 import ai.stigmer.tenancy.organization.v1.Organization;
 import ai.stigmer.tenancy.organization.v1.OrganizationCommandControllerGrpc;
 import ai.stigmer.tenancy.organization.v1.OrganizationExternalLookup;
@@ -39,6 +40,12 @@ public final class OrganizationClient {
     public Organization update(OrganizationInput input) {
         try {
             return command.update(input.toProto());
+        } catch (StatusRuntimeException e) { throw StigmerException.wrap(e); }
+    }
+
+    public Organization rename(RenameInput input) {
+        try {
+            return command.rename(input);
         } catch (StatusRuntimeException e) { throw StigmerException.wrap(e); }
     }
 

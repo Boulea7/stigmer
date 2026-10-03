@@ -56,7 +56,7 @@ class PlanInput:
     name: str
     instrument: int
     entitlements: EntitlementsInput | None
-    # Always empty: a Plan belongs to the platform, not to an organization.
+    # Always empty: a Plan belongs to no organization.
     org: str = ""
     id: str | None = None
     slug: str | None = None

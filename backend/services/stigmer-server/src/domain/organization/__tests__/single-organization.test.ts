@@ -56,6 +56,7 @@ import {
   ORGANIZATION_LIMIT_REACHED,
   SINGLE_ORG_KEY,
 } from "../limit.js";
+import { organizationNameKey } from "../names.js";
 
 const OPERATOR_EMAIL = "operator@example.com";
 
@@ -204,7 +205,12 @@ describe("the open-source edition's one organization (composed as main.ts compos
     expect(
       await server.store.listResources(ApiResourceKind.organization),
     ).toHaveLength(1);
-    expect(await server.store.organizationSlugs.find("second")).toBeUndefined();
+    expect(
+      await server.store.resourceNames.resolve(
+        organizationNameKey("second"),
+        new Date().toISOString(),
+      ),
+    ).toBeUndefined();
 
     const duplicate = await grpcError(() =>
       organizations.create(organizationInput("stigmer")),
@@ -212,7 +218,7 @@ describe("the open-source edition's one organization (composed as main.ts compos
     expect(duplicate.code).toBe(Code.AlreadyExists);
   });
 
-  it("deleting the one is refused before any write: the organization stays and its slug is not retired", async () => {
+  it("deleting the one is refused before any write: the organization stays and keeps its name", async () => {
     const refusal = await grpcError(() =>
       organizations.delete({ value: "stigmer" }),
     );
@@ -227,8 +233,13 @@ describe("the open-source edition's one organization (composed as main.ts compos
       (await organizationQuery.findMyOrganizations({})).entries,
     ).toHaveLength(1);
     expect(
-      (await server.store.organizationSlugs.find("stigmer"))?.retiredAt,
-    ).toBe("");
+      (
+        await server.store.resourceNames.resolve(
+          organizationNameKey("stigmer"),
+          new Date().toISOString(),
+        )
+      )?.state,
+    ).toBe("current");
     expect(ownersOf("stigmer")).toHaveLength(1);
   });
 

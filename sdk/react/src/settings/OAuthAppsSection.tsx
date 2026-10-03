@@ -9,7 +9,7 @@ import { OAUTH_APPS_MANAGED_BY_ADMINS } from "../oauth-app/copy.js";
 import { useResourceAvailable, ApiResourceKind } from "../deployment-mode.js";
 import { useCheckPermission } from "../iam-policy/useCheckPermission.js";
 import { CloudFeatureNotice } from "../internal/CloudFeatureNotice.js";
-import { useActiveOrgId, useActiveOrgSlug } from "../organization/OrgProvider.js";
+import { useActiveOrgId } from "../organization/OrgProvider.js";
 
 type FlowState =
   | { phase: "idle" }
@@ -27,11 +27,10 @@ type FlowState =
  */
 export function OAuthAppsSection() {
   const headingId = useId();
-  const org = useActiveOrgSlug();
-  const orgId = useActiveOrgId();
+  const org = useActiveOrgId();
   const oauthAppsAvailable = useResourceAvailable(ApiResourceKind.oauth_app);
   const createCheck = useCheckPermission(
-    oauthAppsAvailable && orgId ? { kind: "organization", id: orgId } : null,
+    oauthAppsAvailable && org ? { kind: "organization", id: org } : null,
     "can_create_oauth_app",
   );
   const canCreate = !createCheck.isLoading && createCheck.allowed;

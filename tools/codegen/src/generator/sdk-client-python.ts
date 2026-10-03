@@ -753,7 +753,7 @@ function generatePythonInputAndProto(
   if (cfg.isOrgless) {
     // An org-less kind's org defaults to empty; a value is sent as given, so
     // the server's refusal names the mistake.
-    buf.push(`    # Always empty: a ${cfg.protoResType} belongs to the platform, not to an organization.\n`);
+    buf.push(`    # Always empty: a ${cfg.protoResType} belongs to no organization.\n`);
     buf.push('    org: str = ""\n');
   }
   // id: exact update addressing for platform-scoped (org-less) kinds.

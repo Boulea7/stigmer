@@ -38,6 +38,7 @@ import {
   SCHEMA_VERSION_1,
   SCHEMA_VERSION_5,
   SCHEMA_VERSION_7,
+  SCHEMA_VERSION_8,
   runMigrations,
 } from "../migrations.js";
 import { PostgresStore } from "../store.js";
@@ -96,10 +97,10 @@ describe.skipIf(testDatabaseAdminUrl() === undefined)(
         expect(names).toEqual([
           "bootstrap_state",
           "oauth_grant",
-          "organization_slugs",
           "pending_oauth_state",
           "resource_audit",
           "resource_list_keys",
+          "resource_names",
           "resources",
           "schedule_runs",
           "schema_version",
@@ -449,8 +450,8 @@ describe.skipIf(testDatabaseAdminUrl() === undefined)(
             ],
           );
 
-          const reopened = await PostgresStore.open(db.databaseUrl);
-          await reopened.close();
+          // To v7 alone: v8 replaces the ledger this step makes.
+          await migrateTo(db.databaseUrl, SCHEMA_VERSION_7);
 
           expect(await ledger(client)).toEqual([
             { slug: "acme", retired: false },
@@ -481,8 +482,8 @@ describe.skipIf(testDatabaseAdminUrl() === undefined)(
           }
           await client.query("COMMIT");
 
-          const reopened = await PostgresStore.open(db.databaseUrl);
-          await reopened.close();
+          // To v7 alone: v8 replaces the ledger this step makes.
+          await migrateTo(db.databaseUrl, SCHEMA_VERSION_7);
 
           expect(await ledger(client)).toEqual([
             { slug: "on-the-page", retired: true },
@@ -514,6 +515,47 @@ describe.skipIf(testDatabaseAdminUrl() === undefined)(
             `SELECT to_regclass('organization_slugs') AS name`,
           );
           expect((table.rows[0] as { name: string | null }).name).toBeNull();
+        } finally {
+          await client.end();
+        }
+      });
+    });
+
+    describe("v8: the resource-name table replaces the organization-slug ledger", () => {
+      it("records every live organization's slug as its current name, drops the ledger, and carries no retired slug", async () => {
+        await migrateTo(db.databaseUrl, SCHEMA_VERSION_8 - 1);
+        const client = new pg.Client({ connectionString: db.databaseUrl });
+        await client.connect();
+        try {
+          // Before minted ids an organization's id was its slug.
+          await client.query(
+            `INSERT INTO resources (kind, id, data) VALUES ('organization', 'acme', '\\x00')`,
+          );
+          await client.query(
+            `INSERT INTO organization_slugs (slug, claimed_at, retired_at)
+             VALUES ('deleted-one', '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z')`,
+          );
+
+          const reopened = await PostgresStore.open(db.databaseUrl);
+          await reopened.close();
+
+          const table = await client.query(
+            `SELECT to_regclass('organization_slugs') AS name`,
+          );
+          expect((table.rows[0] as { name: string | null }).name).toBeNull();
+          const names = await client.query(
+            `SELECT kind, org, name, id, state, expires_at FROM resource_names ORDER BY name`,
+          );
+          expect(names.rows).toEqual([
+            {
+              kind: "organization",
+              org: "",
+              name: "acme",
+              id: "acme",
+              state: "current",
+              expires_at: "",
+            },
+          ]);
         } finally {
           await client.end();
         }
