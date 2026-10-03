@@ -52,3 +52,32 @@ export function useServerInfo(): UseServerInfoReturn {
   );
   return { serverInfo, isLoading, error };
 }
+
+/**
+ * Whether the connected server holds one organization and fills it into
+ * every call that names none (`serverInfo.singleOrg`, the open-source
+ * edition). A surface that names organizations — the switcher, the
+ * "Organization" settings group, the workbench's organization column —
+ * hides on `true`. The create-an-organization onboarding does not read it:
+ * on such a server every person who signs in holds a role on its
+ * organization, so the onboarding shows only to someone whose role was
+ * removed, or on a server whose organization could not be made.
+ *
+ * `undefined` while the answer is loading, so a surface waits rather than
+ * flashing an organization it will hide; `false` once the server answered
+ * otherwise, failed to answer, or predates the field, so organizations
+ * show as they always have.
+ *
+ * @example
+ * ```tsx
+ * const singleOrg = useSingleOrg();
+ * return singleOrg === false ? <OrgSwitcher /> : null;
+ * ```
+ */
+export function useSingleOrg(): boolean | undefined {
+  const { serverInfo, isLoading } = useServerInfo();
+  if (isLoading) {
+    return undefined;
+  }
+  return serverInfo?.singleOrg === true;
+}

@@ -6,13 +6,14 @@
 // only when it is actually going to push. `--dry-run` discovers locally and must
 // stay usable with no org configured.
 //
-// Local mode always resolves an org (the single-tenant DEFAULT_LOCAL_ORG
-// fallback in resolveOrganization), so the guard can only fire in cloud mode
-// with no org selected. The guard test injects that shape by overriding
-// `load()`; everything else stays real. The guard runs before any network
-// call, so both cases are fully deterministic and offline.
+// The guard fires only when no org is named AND the server holds several: a
+// server that holds one organization fills it (client/single-org.ts). The
+// test injects a config with no org by overriding `load()`, and the server's
+// answer through a stand-in client the real guard asks; everything else stays real. The
+// guard runs before the push, so every case is deterministic and offline.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Stigmer } from "@stigmer/sdk";
 import type { Config } from "../../config/index.js";
 import { classify, ExitCode } from "../../errors/index.js";
 import { buildProgram } from "../../program.js";
@@ -20,6 +21,37 @@ import { buildProgram } from "../../program.js";
 // When set, `load()` returns this config instead of reading disk/defaults.
 // Reset in beforeEach so each test opts in explicitly.
 let configOverride: Config | undefined;
+
+// The server's answer to "do you hold one organization?".
+let singleOrg = false;
+
+vi.mock("../../client/single-org.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../client/single-org.js")>();
+  // A fresh stand-in client per call, whose server answers `singleOrg`; the
+  // real guard runs over it.
+  const answering = () =>
+    ({
+      platform: { getServerInfo: async () => ({ singleOrg }) },
+    }) as unknown as Stigmer;
+  return {
+    ...actual,
+    holdsOneOrganization: () => actual.holdsOneOrganization(answering()),
+    omitsOrganization: () => actual.omitsOrganization(answering()),
+    requireOrganization: (_stigmer: Stigmer, org: string, setItWith: readonly string[]) =>
+      actual.requireOrganization(answering(), org, setItWith),
+  };
+});
+
+// A connect that settles, so the success rendering runs: the server's name and
+// its organization as the backend returned them.
+vi.mock("../../resources/connect/connect.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../resources/connect/connect.js")>();
+  const server = { metadata: { name: "orders", org: "stigmer" }, spec: {} };
+  return {
+    ...actual,
+    connectMcpServer: async () => ({ server, capabilities: undefined, updated: server }),
+  };
+});
 
 vi.mock("../../config/index.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../config/index.js")>();
@@ -41,6 +73,7 @@ function cloudConfigWithoutOrg(): Config {
 interface RunOutcome {
   readonly exitCode: number;
   readonly message: string;
+  readonly stdout: string;
 }
 
 // Runs `connect mcp-server <ref> [flags]` in standalone mode with output
@@ -53,7 +86,11 @@ async function runConnect(
 ): Promise<RunOutcome> {
   const program = buildProgram();
   program.exitOverride();
-  const outSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+  const written: string[] = [];
+  const outSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    written.push(String(chunk));
+    return true;
+  });
   const errSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
   try {
     await program.parseAsync([
@@ -65,11 +102,12 @@ async function runConnect(
       ref,
       ...flags,
     ]);
-    return { exitCode: ExitCode.Success, message: "" };
+    return { exitCode: ExitCode.Success, message: "", stdout: written.join("") };
   } catch (err) {
     return {
       exitCode: classify(err)?.exitCode ?? -1,
       message: err instanceof Error ? err.message : String(err),
+      stdout: written.join(""),
     };
   } finally {
     outSpy.mockRestore();
@@ -82,6 +120,7 @@ let savedApiKey: string | undefined;
 
 beforeEach(() => {
   configOverride = undefined;
+  singleOrg = false;
   savedOrg = process.env.STIGMER_ORG;
   savedApiKey = process.env.STIGMER_API_KEY;
   delete process.env.STIGMER_ORG;
@@ -101,6 +140,22 @@ describe("connect mcp-server org guard", () => {
     const outcome = await runConnect("mcp_test");
     expect(outcome.message).toContain("organization not set");
     expect(outcome.exitCode).toBe(ExitCode.Usage);
+  });
+
+  it("does not fire on a server that holds one organization: the server fills it, and the result names no organization", async () => {
+    configOverride = cloudConfigWithoutOrg();
+    singleOrg = true;
+    const outcome = await runConnect("mcp_test");
+    expect(outcome.message).not.toContain("organization not set");
+    expect(outcome.stdout).toContain("MCP Server: orders");
+    expect(outcome.stdout).not.toContain("stigmer/orders");
+  });
+
+  it("names the server with its organization on a server that holds several", async () => {
+    configOverride = cloudConfigWithoutOrg();
+    process.env.STIGMER_ORG = "stigmer";
+    const outcome = await runConnect("mcp_test");
+    expect(outcome.stdout).toContain("MCP Server: stigmer/orders");
   });
 
   it("does not apply the org guard in dry-run mode (offline dry-run stays usable)", async () => {

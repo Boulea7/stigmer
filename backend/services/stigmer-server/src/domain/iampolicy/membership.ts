@@ -6,8 +6,8 @@
  * no unit registered an Authorizer); a composition with its own
  * Authorizer has its own onboarding and never constructs this.
  *
- * Three moments, one set of arms (`roleFor`, the pure function the first
- * and third share):
+ * Four moments, one set of arms (`roleFor`, the pure function the first,
+ * third and fourth share):
  *
  *   onAccountCreated(account, caller) — a person's FIRST provisioning, and
  *   only that (the identity-account domain's AccountCreatedHook, run by
@@ -33,7 +33,24 @@
  *                   over either;
  *     5. `member` — everyone else.
  *   Arms 3 and 4 both answer `admin`; 3 is checked first because it is a
- *   string compare and 4 reads the organization's rows. `user`-class
+ *   string compare and 4 reads the organization's rows. On the server's
+ *   organization, the one a one-organization server holds (the id recorded
+ *   under SINGLE_ORG_KEY, domain/organization/limit.ts, at every start
+ *   that fills it, whoever made it: the server itself, as nobody under
+ *   sign-in, or an older release's console or CLI before the server held
+ *   one), the person who set the server up owns it, as they would had they
+ *   created it in the console: arm 3 answers `owner`, and arm 4 answers
+ *   `owner` when no operator email is configured. With one configured, arm
+ *   4 keeps `admin` there, so a stranger who signs in before the operator
+ *   never owns it. On that organization the laptop's operator account (the
+ *   trusted-local principal, idp id `local|…`,
+ *   domain/identityaccount/operator.ts) is nobody to these arms: neither
+ *   its creator stamps (its account id, its email) nor its role rows count
+ *   as another person or as rows. A laptop that held the organization and
+ *   later turns sign-in on is then a fresh sign-in install, as the
+ *   self-hosting guides promise: the operator email owns it, or, with none
+ *   configured, the first person to sign in does; the laptop account can no
+ *   longer sign in to hold it. `user`-class
  *   callers only: a runner, a machine or the in-process class
  *   never earns a role. Nothing on an organization the account already
  *   holds a row on, so a run that faulted midway converges on the next.
@@ -73,6 +90,24 @@
  *   Store as the organizations and blueprints are — the account
  *   port carries no enumeration, by its own rule that a port does not
  *   carry a method only one edition calls, and this act is open source's.
+ *
+ *   ensureRolesOnServerOrganization() — the same pass, over the server's
+ *   organization, ONCE per database (SERVER_ORGANIZATION_ROLES_KEY), and
+ *   only when the server made that organization on an empty store (the boot
+ *   step marks the pass SERVER_ORGANIZATION_ROLES_OWED before the create).
+ *   The server makes it in `start()`, after the reconciliation above has
+ *   run, so a store upgraded with people
+ *   but no organization (someone signed in and never made one) would hold
+ *   an organization no account holds a role on, with the limit refusing a
+ *   second and the delete refusing this one. The arms run for every person
+ *   account on that organization only, as each account, in creation order,
+ *   and the marker is written after the last; a fault leaves it unset and
+ *   the next boot converges. Nothing while the server holds none: the
+ *   marker waits for the organization. A store that already held its
+ *   organization owes nothing: the marker is written and no role granted,
+ *   so a member an admin removed there is not handed back. On a fresh install there is nobody
+ *   yet, the marker is written, and every later person gets their role at
+ *   their first sign-in.
  *
  * What a creator stamp is. The rules read `status.audit.spec_audit
  * .created_by.id` off organizations and blueprints. That stamp is the
@@ -121,6 +156,7 @@ import { IdentityAccountProvisioningMode } from "@stigmer/protos/ai/stigmer/iam/
 import { IamRole } from "@stigmer/protos/ai/stigmer/iam/v1/enum_pb";
 import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 
+import { SINGLE_ORG_KEY } from "../organization/limit.js";
 import type { CallerIdentity } from "../../extensions/identity.js";
 import { kindEnumName } from "../../pipeline/apiresource-meta.js";
 import { SYSTEM_OPERATOR_IDENTITY_ID } from "../../pipeline/interceptors/auth.js";
@@ -129,9 +165,15 @@ import { metadataOf } from "../../pipeline/steps/shapes.js";
 import type { Store } from "../../store/interface.js";
 import { rfc3339Seconds } from "../../store/rfc3339.js";
 import { accountAsCaller } from "../identityaccount/actor.js";
+import { LOCAL_IDP_ID_PREFIX } from "../identityaccount/constants.js";
 import type { AccountCreatedHook } from "../identityaccount/provisioning.js";
 import type { PolicyChangeCause } from "./change.js";
-import { BLUEPRINT_KINDS, ROLES_RECONCILED_KEY } from "./constants.js";
+import {
+  BLUEPRINT_KINDS,
+  ROLES_RECONCILED_KEY,
+  SERVER_ORGANIZATION_ROLES_KEY,
+  SERVER_ORGANIZATION_ROLES_OWED,
+} from "./constants.js";
 import type { IamPolicyGrantPath } from "./grant-path.js";
 import { organizationRole, relationOf } from "./specs.js";
 import type { IamPolicyStore } from "./store.js";
@@ -150,6 +192,8 @@ export interface MembershipRules extends AccountCreatedHook {
   ensureOperatorOwnership(operator: IdentityAccount): Promise<void>;
   /** The built-in posture's boot reconciliation: the arms for every person provisioned before the rules existed, once per database. */
   ensureRolesForExistingAccounts(): Promise<void>;
+  /** The same arms for every person account on the server's organization (SINGLE_ORG_KEY), once per database. */
+  ensureRolesOnServerOrganization(): Promise<void>;
 }
 
 /**
@@ -232,6 +276,10 @@ export interface RoleQuestion {
   readonly blueprintsInOrganization: ReadonlyArray<ScannedResource>;
   /** Whether ANY role row exists on the organization — arm 4's "zero rows", read by the caller through the port. */
   readonly organizationHasRows: boolean;
+  /** Whether this is the server's organization (SINGLE_ORG_KEY), where arms 3 and 4 may answer `owner`. */
+  readonly serverOrganization: boolean;
+  /** The laptop operator accounts' creator stamps (account ids and emails): on the server's organization, nobody's. */
+  readonly laptopOperatorStamps: ReadonlySet<string>;
 }
 
 /**
@@ -250,6 +298,8 @@ export function roleFor(question: RoleQuestion): IamRole {
     organization,
     blueprintsInOrganization,
     organizationHasRows,
+    serverOrganization,
+    laptopOperatorStamps,
   } = question;
   const isMine = (stamp: string): boolean =>
     stamp !== "" && (stamp === subject || stamp === accountId);
@@ -260,14 +310,21 @@ export function roleFor(question: RoleQuestion): IamRole {
     return IamRole.admin;
   }
   if (operatorEmail !== "" && email === operatorEmail) {
-    return IamRole.admin;
+    return serverOrganization ? IamRole.owner : IamRole.admin;
   }
   const anotherPersonStamped = [
     organization.createdBy,
     ...blueprintsInOrganization.map((b) => b.createdBy),
-  ].some((stamp) => isPersonStamp(stamp) && !isMine(stamp));
+  ].some(
+    (stamp) =>
+      isPersonStamp(stamp) &&
+      !isMine(stamp) &&
+      !(serverOrganization && laptopOperatorStamps.has(stamp)),
+  );
   if (!anotherPersonStamped && !organizationHasRows) {
-    return IamRole.admin;
+    return serverOrganization && operatorEmail === ""
+      ? IamRole.owner
+      : IamRole.admin;
   }
   return IamRole.member;
 }
@@ -276,6 +333,15 @@ export function roleFor(question: RoleQuestion): IamRole {
 interface ScannedWorld {
   readonly organizations: ReadonlyArray<ScannedResource>;
   readonly blueprints: ReadonlyArray<ScannedResource>;
+  /** The id under SINGLE_ORG_KEY, "" when the server holds no organization as its one. */
+  readonly serverOrganization: string;
+  readonly laptopOperators: LaptopOperators;
+}
+
+/** The trusted-local operator accounts the store holds (idp id `local|…`): their ids, and every stamp that names them. */
+interface LaptopOperators {
+  readonly accountIds: ReadonlySet<string>;
+  readonly stamps: ReadonlySet<string>;
 }
 
 /** `spec_audit.created_at` in epoch milliseconds; a row with no stamp sorts first (it is the oldest thing we know nothing about). */
@@ -329,11 +395,37 @@ export function newMembershipRules(deps: MembershipRulesDeps): MembershipRules {
     );
   }
 
+  /** The trusted-local operator accounts: the laptop's one principal, which nobody signs in as. */
+  async function scanLaptopOperators(): Promise<LaptopOperators> {
+    const accountIds = new Set<string>();
+    const stamps = new Set<string>();
+    for (const bytes of await store.listResources(
+      ApiResourceKind.identity_account,
+    )) {
+      const account = fromBinary(IdentityAccountSchema, bytes);
+      if (!(account.spec?.idpId ?? "").startsWith(LOCAL_IDP_ID_PREFIX)) {
+        continue;
+      }
+      for (const stamp of [
+        account.metadata?.id ?? "",
+        account.spec?.email ?? "",
+      ]) {
+        if (stamp !== "") {
+          stamps.add(stamp);
+        }
+      }
+      accountIds.add(account.metadata?.id ?? "");
+    }
+    return { accountIds, stamps };
+  }
+
   /** The whole world one pass reads, scanned once: every organization and every blueprint. */
   async function scanWorld(): Promise<ScannedWorld> {
     return {
       organizations: await scan(ApiResourceKind.organization),
       blueprints: await scanBlueprints(),
+      serverOrganization: await store.bootstrapState.get(SINGLE_ORG_KEY),
+      laptopOperators: await scanLaptopOperators(),
     };
   }
 
@@ -364,6 +456,10 @@ export function newMembershipRules(deps: MembershipRulesDeps): MembershipRules {
       const blueprintsInOrganization = world.blueprints.filter(
         (blueprint) => blueprint.org === organization.id,
       );
+      const serverOrganization =
+        world.serverOrganization !== "" &&
+        organization.id === world.serverOrganization;
+      const rows = await policies.findByResource(ORGANIZATION, organization.id);
       const role = roleFor({
         accountId,
         subject,
@@ -371,9 +467,19 @@ export function newMembershipRules(deps: MembershipRulesDeps): MembershipRules {
         operatorEmail,
         organization,
         blueprintsInOrganization,
-        organizationHasRows:
-          (await policies.findByResource(ORGANIZATION, organization.id))
-            .length > 0,
+        // On the server's organization the laptop operator's rows are
+        // nobody's (the header), so they are not "rows" to arm 4.
+        organizationHasRows: rows.some(
+          (row) =>
+            !(
+              serverOrganization &&
+              world.laptopOperators.accountIds.has(
+                row.spec?.principal?.id ?? "",
+              )
+            ),
+        ),
+        serverOrganization,
+        laptopOperatorStamps: world.laptopOperators.stamps,
       });
       await grantPath.grant(
         organizationRole(accountId, role, organization.id),
@@ -415,7 +521,12 @@ export function newMembershipRules(deps: MembershipRulesDeps): MembershipRules {
       await applyRulesTo(
         account,
         caller,
-        { organizations, blueprints: await scanBlueprints() },
+        {
+          organizations,
+          blueprints: await scanBlueprints(),
+          serverOrganization: await store.bootstrapState.get(SINGLE_ORG_KEY),
+          laptopOperators: await scanLaptopOperators(),
+        },
         "first_sign_in",
       );
     },
@@ -444,6 +555,47 @@ export function newMembershipRules(deps: MembershipRulesDeps): MembershipRules {
       // idempotent; an organization already held is skipped).
       await store.bootstrapState.set(
         ROLES_RECONCILED_KEY,
+        rfc3339Seconds(new Date()),
+      );
+    },
+
+    async ensureRolesOnServerOrganization(): Promise<void> {
+      const marker = await store.bootstrapState.get(
+        SERVER_ORGANIZATION_ROLES_KEY,
+      );
+      if (marker !== "" && marker !== SERVER_ORGANIZATION_ROLES_OWED) {
+        return;
+      }
+      const serverOrganization = await store.bootstrapState.get(SINGLE_ORG_KEY);
+      if (serverOrganization === "") {
+        return;
+      }
+      const organizations = (await scan(ApiResourceKind.organization)).filter(
+        (organization) => organization.id === serverOrganization,
+      );
+      const accounts =
+        marker === SERVER_ORGANIZATION_ROLES_OWED
+          ? await scanPersonAccounts()
+          : [];
+      if (organizations.length > 0 && accounts.length > 0) {
+        const world: ScannedWorld = {
+          organizations,
+          blueprints: await scanBlueprints(),
+          serverOrganization,
+          laptopOperators: await scanLaptopOperators(),
+        };
+        for (const account of accounts) {
+          await applyRulesTo(
+            account,
+            accountAsCaller(account),
+            world,
+            "role_reconciliation",
+          );
+        }
+      }
+      // After the last account, as the reconciliation above writes its own.
+      await store.bootstrapState.set(
+        SERVER_ORGANIZATION_ROLES_KEY,
         rfc3339Seconds(new Date()),
       );
     },

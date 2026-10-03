@@ -10,29 +10,33 @@
  *                       image tags on native amd64 AND arm64 runners
  *                       before `latest` moves and the compose pin bumps
  *
- * What one pass proves, in order: 1. `docker compose up` from this clean
- * tree reaches a healthy server (the image HEALTHCHECK via compose
- * depends_on, then the real health service answering SERVING over Connect
- * JSON); 2. the console is served on the unified port (/config.json contract
- * + / answers HTML) — the one-origin console must survive the compose
- * topology; 3. the artifact file server is published and answering on 7235
- * (the 0.0.0.0 bind + port publish — a 404 from it IS the proof of life); 4.
- * the env file's STIGMER_PUBLIC_URL reached the server through the compose
- * file: its boot line derives the MCP OAuth callback from that address (from
- * "public-origin"), not from the file's default (#1486); 5. an organization
- * nobody created is refused by name: compose runs no bootstrap, so an agent
- * create naming `stigmer` (what a bare `stigmer apply` sends) answers
- * "Organization not found: stigmer" instead of storing it (#1484); 6. one
- * END-TO-END RUN: a deterministic `set_vars` workflow execution travels
- * server → Temporal → runner → COMPLETED, with zero LLM keys (the
- * ci.conformance-execution precedent). This is the line that matters: the
- * runner container polled the queue and executed real work; 7. one AGENT RUN
- * answered by a model: the stack is configured the way the guide tells a
- * user to (ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL in the env file),
- * pointed at a fake Anthropic API on this host
- * (test/install/lib/fake-model.mjs), and the run must complete with the
- * fake's reply as its last message; 8. clean teardown (`docker compose down
- * --volumes`).
+ * What one pass proves, in order:
+ *   1. `docker compose up` from this clean tree reaches a healthy server
+ *      (the image HEALTHCHECK via compose depends_on, then the real
+ *      health service answering SERVING over Connect JSON);
+ *   2. the console is served on the unified port (/config.json contract +
+ *      / answers HTML) — the one-origin console must survive the compose
+ *      topology;
+ *   3. the artifact file server is published and answering on 7235 (the
+ *      0.0.0.0 bind + port publish — a 404 from it IS the proof of life);
+ *   4. the env file's STIGMER_PUBLIC_URL reached the server through the
+ *      compose file: its boot line derives the MCP OAuth callback from that
+ *      address (from "public-origin"), not from the file's default (#1486);
+ *   5. the server made its one organization, `stigmer`, at its first start
+ *      and says it fills it; and an organization nobody made is refused by
+ *      name: an agent create naming one answers "Organization not found"
+ *      instead of storing it (#1484);
+ *   6. one END-TO-END RUN: a deterministic `set_vars` workflow execution
+ *      travels server → Temporal → runner → COMPLETED, with zero LLM
+ *      keys (the ci.conformance-execution precedent). This is the line
+ *      that matters: the runner container polled the queue and executed
+ *      real work;
+ *   7. one AGENT RUN answered by a model: the stack is configured the way
+ *      the guide tells a user to (ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL
+ *      in the env file), pointed at a fake Anthropic API on this host
+ *      (test/install/lib/fake-model.mjs), and the run must complete with the
+ *      fake's reply as its last message;
+ *   8. clean teardown (`docker compose down --volumes`).
  *
  * Usage:
  *   node test/install/smoke-compose.mjs --build
@@ -66,6 +70,7 @@ import {
   assertArtifactLane,
   assertConsoleServed,
   assertMissingOrganizationRefused,
+  readSingleOrganization,
   assertOAuthCallbackFromPublicOrigin,
   assertPortFree,
   runAgentToReply,
@@ -154,7 +159,10 @@ async function main() {
     const callback = assertOAuthCallbackFromPublicOrigin(stack.logs("stigmer-server"), COMPOSE_PUBLIC_URL);
     log(`public address: the server derived its OAuth callback ${callback.redirectUri} from ${callback.from}`);
 
-    // 5. Nothing has created an organization yet, and nothing may be stored under one.
+    // 5. The server made its one organization, and nothing may be stored under
+    // one nobody made.
+    const orgId = await readSingleOrganization(baseUrl);
+    log(`organization 'stigmer' made by the server at its first start (${orgId})`);
     const refusal = await assertMissingOrganizationRefused(baseUrl);
     log(`missing organization: refused (HTTP ${refusal.status} ${refusal.code}: ${refusal.message})`);
 

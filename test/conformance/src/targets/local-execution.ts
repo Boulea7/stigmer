@@ -30,7 +30,7 @@ import {
   type RunningServer,
 } from "@stigmer/test-support/server-process";
 import { spawnTemporal, type RunningTemporal } from "@stigmer/test-support/temporal";
-import { ensureTsServerEntry } from "@stigmer/test-support/ts-build";
+import { ensureLibraryServerEntry } from "@stigmer/test-support/ts-build";
 import { createUniqueOrganization } from "../support/organizations";
 import type {
   CapabilityFlags,
@@ -54,6 +54,8 @@ export class LocalExecutionTarget implements TargetProfile {
   // (stigmer#1804); the execution class runs no suite that reads it.
   readonly capabilities: CapabilityFlags = {
     multiTenant: false,
+    // Many organizations: this target spawns the library entry.
+    singleOrganization: false,
     // Trusted-local primary, as `local`; the enforcing lane is an OIDC
     // sibling this target boots WITH an engine and a runner
     // (enforcingLane below).
@@ -126,7 +128,7 @@ export class LocalExecutionTarget implements TargetProfile {
   private siblingLane: Promise<SiblingEnforcingLane> | undefined;
 
   async setup(): Promise<void> {
-    const entry = await ensureTsServerEntry();
+    const entry = await ensureLibraryServerEntry();
     const runnerEntry = await ensureRunnerBuilt();
 
     // 1. Temporal first: the TemporalManager's initial connect only flips the
@@ -197,7 +199,7 @@ export class LocalExecutionTarget implements TargetProfile {
   async spawnSibling(
     options: SpawnSiblingOptions,
   ): Promise<SiblingExecutionServer> {
-    const entry = await ensureTsServerEntry();
+    const entry = await ensureLibraryServerEntry();
     const temporal = await spawnTemporal();
     let storage: ProvisionedStorage;
     try {

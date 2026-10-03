@@ -74,7 +74,13 @@ import type { CallerIdentity } from "../../../extensions/identity.js";
 import { tempStore } from "../../../store/sqlite/__tests__/support.js";
 import type { Store } from "../../../store/interface.js";
 import { accountIdFor } from "../../identityaccount/constants.js";
-import { BLUEPRINT_KINDS, ROLES_RECONCILED_KEY } from "../constants.js";
+import { SINGLE_ORG_KEY } from "../../organization/limit.js";
+import {
+  BLUEPRINT_KINDS,
+  ROLES_RECONCILED_KEY,
+  SERVER_ORGANIZATION_ROLES_KEY,
+  SERVER_ORGANIZATION_ROLES_OWED,
+} from "../constants.js";
 import { newIamPolicyGrantPath } from "../grant-path.js";
 import type { IamPolicyGrantPath } from "../grant-path.js";
 import {
@@ -89,6 +95,8 @@ import { NO_STORED_RESOURCES, fakeIamPolicyStore } from "./support.js";
 import type { FakeIamPolicyStore } from "./support.js";
 
 const OPERATOR_EMAIL = "operator@example.com";
+/** No trusted-local operator account in the store. */
+const NO_LAPTOP_OPERATOR: ReadonlySet<string> = new Set();
 const silentLogger = { debug() {}, info() {}, warn() {}, error() {} };
 
 function userCaller(identityId: string, email?: string): CallerIdentity {
@@ -520,6 +528,61 @@ describe("membership rules", () => {
     });
   });
 
+  describe("the server's organization (SINGLE_ORG_KEY)", () => {
+    // A one-organization server under sign-in makes its organization as
+    // nobody: stamped "system", its id recorded under SINGLE_ORG_KEY.
+    beforeEach(async () => {
+      await seedOrg("stigmer", "system");
+      await store.bootstrapState.set(SINGLE_ORG_KEY, "stigmer");
+    });
+
+    it("with an operator email configured, a stranger who signs in first is admin, and the operator is owner", async () => {
+      const stranger = account("auth0|stranger", "stranger@example.com");
+      await rules.onAccountCreated(stranger, userCaller(stranger.metadata!.id));
+      const operator = account("auth0|operator", OPERATOR_EMAIL);
+      await rules.onAccountCreated(operator, userCaller(operator.metadata!.id));
+
+      expect(rolesOf(stranger.metadata!.id)).toEqual(["admin@stigmer"]);
+      expect(rolesOf(operator.metadata!.id)).toEqual(["owner@stigmer"]);
+    });
+
+    it("with no operator email configured, the first person to sign in owns it", async () => {
+      const unconfigured = rulesOver(policies, "");
+      const first = account("auth0|first", "first@example.com");
+      await unconfigured.onAccountCreated(
+        first,
+        userCaller(first.metadata!.id),
+      );
+      const second = account("auth0|second", "second@example.com");
+      await unconfigured.onAccountCreated(
+        second,
+        userCaller(second.metadata!.id),
+      );
+
+      expect(rolesOf(first.metadata!.id)).toEqual(["owner@stigmer"]);
+      expect(rolesOf(second.metadata!.id)).toEqual(["member@stigmer"]);
+    });
+
+    it("the reconciliation reads the key too: the operator's existing account becomes owner", async () => {
+      const operator = await seedAccount("auth0|operator", OPERATOR_EMAIL, 100);
+
+      await rules.ensureRolesForExistingAccounts();
+
+      expect(rolesOf(operator.metadata!.id)).toEqual(["owner@stigmer"]);
+    });
+
+    it("an organization the server did not make keeps today's answers", async () => {
+      await seedOrg("acme", "system");
+      const operator = account("auth0|operator", OPERATOR_EMAIL);
+      await rules.onAccountCreated(operator, userCaller(operator.metadata!.id));
+
+      expect(rolesOf(operator.metadata!.id)).toEqual([
+        "admin@acme",
+        "owner@stigmer",
+      ]);
+    });
+  });
+
   describe("roleFor — the five arms as one pure function", () => {
     const acme: ScannedResource = {
       id: "acme",
@@ -644,7 +707,149 @@ describe("membership rules", () => {
         IamRole.member,
       ],
     ])("%s", (_name, input, expected) => {
-      expect(roleFor(input)).toBe(expected);
+      expect(
+        roleFor({
+          serverOrganization: false,
+          laptopOperatorStamps: NO_LAPTOP_OPERATOR,
+          ...input,
+        }),
+      ).toBe(expected);
+    });
+
+    // The server's organization as a one-organization server makes it under sign-in:
+    // stamped "system" (no person made it) and recorded under SINGLE_ORG_KEY.
+    // The person who set the server up owns it.
+    const madeByServer: ScannedResource = {
+      id: "stigmer",
+      org: "",
+      createdBy: "system",
+    };
+    it.each([
+      [
+        "arm 3 on the server's organization: the configured operator owns it",
+        {
+          ...bob,
+          email: OPERATOR_EMAIL,
+          organization: madeByServer,
+          blueprintsInOrganization: [],
+          organizationHasRows: true,
+          operatorEmail: OPERATOR_EMAIL,
+        },
+        IamRole.owner,
+      ],
+      [
+        "arm 4 on the server's organization with no operator email: the first person owns it",
+        {
+          ...bob,
+          organization: madeByServer,
+          blueprintsInOrganization: [],
+          organizationHasRows: false,
+          operatorEmail: "",
+        },
+        IamRole.owner,
+      ],
+      [
+        "arm 4 on the server's organization with an operator email configured: a stranger first is admin, never owner",
+        {
+          ...bob,
+          organization: madeByServer,
+          blueprintsInOrganization: [],
+          organizationHasRows: false,
+          operatorEmail: OPERATOR_EMAIL,
+        },
+        IamRole.admin,
+      ],
+      [
+        "the server's organization whose owner was revoked: rows remain, so the next stranger is a member",
+        {
+          ...bob,
+          organization: madeByServer,
+          blueprintsInOrganization: [],
+          organizationHasRows: true,
+          operatorEmail: "",
+        },
+        IamRole.member,
+      ],
+    ])("%s", (_name, input, expected) => {
+      expect(
+        roleFor({
+          laptopOperatorStamps: NO_LAPTOP_OPERATOR,
+          ...input,
+          serverOrganization: true,
+        }),
+      ).toBe(expected);
+    });
+
+    // A laptop that made the organization under trusted-local and then
+    // turned sign-in on: the organization is stamped by the laptop operator's
+    // account, its blueprints by the operator's email, and that account
+    // holds the owner row (which the caller leaves out of "has rows").
+    const laptopStamps: ReadonlySet<string> = new Set([
+      "ida_laptop",
+      "laptop@example.com",
+    ]);
+    const madeOnTheLaptop: ScannedResource = {
+      id: "stigmer",
+      org: "",
+      createdBy: "ida_laptop",
+    };
+    it.each([
+      [
+        "with no operator email, the first person to sign in owns it",
+        { operatorEmail: "", serverOrganization: true },
+        IamRole.owner,
+      ],
+      [
+        "with an operator email configured, a stranger first is admin",
+        { operatorEmail: OPERATOR_EMAIL, serverOrganization: true },
+        IamRole.admin,
+      ],
+      [
+        "on an organization the server did not make, the laptop's stamps are a person's: member",
+        { operatorEmail: "", serverOrganization: false },
+        IamRole.member,
+      ],
+    ])(
+      "the laptop operator's stamps on the server's organization are nobody's: %s",
+      (_name, input, expected) => {
+        expect(
+          roleFor({
+            ...bob,
+            organization: madeOnTheLaptop,
+            blueprintsInOrganization: [
+              {
+                id: "agt_laptop",
+                org: "stigmer",
+                createdBy: "laptop@example.com",
+              },
+            ],
+            organizationHasRows: false,
+            laptopOperatorStamps: laptopStamps,
+            ...input,
+          }),
+        ).toBe(expected);
+      },
+    );
+
+    it("the same answers on an organization the server did not make stay admin", () => {
+      const question = {
+        ...bob,
+        organization: madeByServer,
+        blueprintsInOrganization: [],
+        organizationHasRows: false,
+        operatorEmail: "",
+        serverOrganization: false,
+        laptopOperatorStamps: NO_LAPTOP_OPERATOR,
+      };
+      expect(roleFor(question)).toBe(IamRole.admin);
+      expect(
+        roleFor({
+          ...question,
+          email: OPERATOR_EMAIL,
+          operatorEmail: OPERATOR_EMAIL,
+          organizationHasRows: true,
+        }),
+      ).toBe(IamRole.admin);
     });
   });
 
@@ -836,6 +1041,92 @@ describe("membership rules", () => {
       await rules.ensureRolesForExistingAccounts();
       expect(policies.rows.size).toBe(0);
       expect(await store.bootstrapState.get(ROLES_RECONCILED_KEY)).not.toBe("");
+    });
+  });
+
+  describe("ensureRolesOnServerOrganization", () => {
+    it("waits while the server has made none: no rows and no marker", async () => {
+      await seedOrg("acme", "system");
+      await seedAccount("auth0|operator", OPERATOR_EMAIL, 100);
+
+      await rules.ensureRolesOnServerOrganization();
+
+      expect(policies.rows.size).toBe(0);
+      expect(
+        await store.bootstrapState.get(SERVER_ORGANIZATION_ROLES_KEY),
+      ).toBe("");
+    });
+
+    it("owed (the server made it on this store), gives the people the store held their roles on that organization only, in sign-in order, and the marker", async () => {
+      await store.bootstrapState.set(
+        SERVER_ORGANIZATION_ROLES_KEY,
+        SERVER_ORGANIZATION_ROLES_OWED,
+      );
+      await seedOrg("stigmer", "system");
+      await seedOrg("acme", "system");
+      await store.bootstrapState.set(SINGLE_ORG_KEY, "stigmer");
+      const stranger = await seedAccount(
+        "auth0|stranger",
+        "stranger@example.com",
+        100,
+      );
+      const operator = await seedAccount("auth0|operator", OPERATOR_EMAIL, 200);
+
+      await rules.ensureRolesOnServerOrganization();
+
+      // An operator email is configured: the stranger, first, is admin
+      // (arm 4), and the operator owns it (arm 3).
+      expect(rolesOf(stranger.metadata!.id)).toEqual(["admin@stigmer"]);
+      expect(rolesOf(operator.metadata!.id)).toEqual(["owner@stigmer"]);
+      expect(actorsOf()).toEqual([
+        stranger.metadata!.id,
+        operator.metadata!.id,
+      ]);
+      expect(
+        await store.bootstrapState.get(SERVER_ORGANIZATION_ROLES_KEY),
+      ).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    });
+
+    it("a second call is a no-op: a role revoked after the marker is not handed back", async () => {
+      await store.bootstrapState.set(
+        SERVER_ORGANIZATION_ROLES_KEY,
+        SERVER_ORGANIZATION_ROLES_OWED,
+      );
+      await seedOrg("stigmer", "system");
+      await store.bootstrapState.set(SINGLE_ORG_KEY, "stigmer");
+      await seedAccount("auth0|operator", OPERATOR_EMAIL, 100);
+      await rules.ensureRolesOnServerOrganization();
+      policies.rows.clear();
+
+      await rules.ensureRolesOnServerOrganization();
+
+      expect(policies.rows.size).toBe(0);
+    });
+
+    it("a store that already held its organization owes nothing: no role granted, and the marker written", async () => {
+      await seedOrg("acme", "auth0|founder");
+      await store.bootstrapState.set(SINGLE_ORG_KEY, "acme");
+      await seedAccount("auth0|operator", OPERATOR_EMAIL, 100);
+      await seedAccount("auth0|removed", "removed@example.com", 200);
+
+      await rules.ensureRolesOnServerOrganization();
+
+      expect(policies.rows.size).toBe(0);
+      expect(
+        await store.bootstrapState.get(SERVER_ORGANIZATION_ROLES_KEY),
+      ).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    });
+
+    it("with nobody in the store, writes nothing and still sets the marker: later people get their roles at sign-in", async () => {
+      await seedOrg("stigmer", "system");
+      await store.bootstrapState.set(SINGLE_ORG_KEY, "stigmer");
+
+      await rules.ensureRolesOnServerOrganization();
+
+      expect(policies.rows.size).toBe(0);
+      expect(
+        await store.bootstrapState.get(SERVER_ORGANIZATION_ROLES_KEY),
+      ).not.toBe("");
     });
   });
 
