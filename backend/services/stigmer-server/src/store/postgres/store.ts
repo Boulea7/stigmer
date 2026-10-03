@@ -1599,14 +1599,19 @@ class PostgresResourceNameStore implements ResourceNameStore {
       if (row === undefined) {
         return { claimed: false, entry: await holderOf(client, to) };
       }
+      // Every other current name, not only `from`: a concurrent rename that
+      // moved `from` first leaves its own new name current, and this one
+      // demotes it too. A name equal to the id is never given an expiry.
       await client.query(
         `UPDATE resource_names
-         SET state = 'previous', claimed_at = $5, expires_at = $6
-         WHERE kind = $1 AND org = $2 AND name = $3 AND id = $4`,
+         SET state = 'previous', claimed_at = $5,
+             expires_at = CASE WHEN name = id THEN '' ELSE $6 END
+         WHERE kind = $1 AND org = $2 AND id = $4
+           AND state = 'current' AND name <> $3`,
         [
           rename.kind,
           rename.org,
-          rename.from,
+          rename.to,
           rename.id,
           rename.now,
           rename.fromExpiresAt,

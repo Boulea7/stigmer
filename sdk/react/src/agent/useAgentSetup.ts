@@ -12,7 +12,10 @@ import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/
 import { useStigmer } from "../hooks.js";
 import { toError } from "../internal/toError.js";
 import { usePersonalEnvironment } from "../environment/usePersonalEnvironment.js";
-import { buildPersonalInstanceInput } from "../agent-instance/buildPersonalInstanceInput.js";
+import {
+  buildPersonalInstanceInput,
+  personalInstanceAgentLabel,
+} from "../agent-instance/buildPersonalInstanceInput.js";
 import { diffEnv } from "../environment/diffEnv.js";
 import {
   agentSetupReducer,
@@ -377,7 +380,9 @@ export function useAgentSetup(
         }
 
         // Agent has env declarations — check for existing personal instance.
-        const agentLabel = `${ref.org}/${ref.slug}`;
+        // The label the create below gives it: the active organization's id
+        // and the agent's slug, never the reference's own (possibly a slug) org.
+        const agentLabel = personalInstanceAgentLabel(org, ref.slug);
         const instanceList = await stigmer.agentInstance.list(
           create(ListAgentInstancesRequestSchema, {
             org,
@@ -584,7 +589,7 @@ export function useAgentSetup(
           kind: ApiResourceKind.environment,
         };
 
-        const agentLabel = `${agentRef.org}/${agentRef.slug}`;
+        const agentLabel = personalInstanceAgentLabel(org, agentRef.slug);
         const instance = await findOrCreatePersonalInstance(stigmer, {
           org,
           agentId,

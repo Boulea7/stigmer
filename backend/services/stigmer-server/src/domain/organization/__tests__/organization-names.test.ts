@@ -44,6 +44,7 @@ import {
   vi,
 } from "vitest";
 
+import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { RenameInputSchema } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
 import type { Organization } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
@@ -354,6 +355,51 @@ describe("organization names (composed server, trusted-local posture)", () => {
     );
     expect(taken.code).toBe(Code.AlreadyExists);
     expect(reasonOf(taken)).toBe(ORGANIZATION_SLUG_RESERVED);
+  });
+
+  it("an organization from an earlier release keeps its old slug, its id, for good after a rename; a minted one's lapses", async () => {
+    // An earlier release filed the organization under its slug: id == slug,
+    // and the migration recorded that slug as its current name.
+    const seededAt = new Date().toISOString();
+    await server.store.saveResource(
+      ApiResourceKind.organization,
+      "wayne",
+      OrganizationSchema,
+      create(OrganizationSchema, {
+        apiVersion: "tenancy.stigmer.ai/v1",
+        kind: "Organization",
+        metadata: { id: "wayne", slug: "wayne", name: "Wayne" },
+      }),
+    );
+    expect(
+      (await server.store.resourceNames.claim(organizationNameKey("wayne"), "wayne", seededAt)).claimed,
+    ).toBe(true);
+    const minted = await organizations.create(organizationInput("stark"));
+
+    await organizations.rename(create(RenameInputSchema, { resourceId: "wayne", slug: "wayne-corp" }));
+    await organizations.rename(create(RenameInputSchema, { resourceId: "stark", slug: "stark-industries" }));
+
+    const kept = await resolve("wayne");
+    expect(kept).toMatchObject({ id: "wayne", state: "previous", expiresAt: "" });
+
+    // Past the hold, the old slug still names the earlier release's
+    // organization, so every row filed under it keeps resolving, and nobody
+    // else can take it; the minted organization's old slug is free.
+    const pastTheHold = new Date(Date.now() + RENAMED_SLUG_HOLD_MS + 86_400_000).toISOString();
+    expect(
+      (await server.store.resourceNames.resolve(organizationNameKey("wayne"), pastTheHold))?.id,
+    ).toBe("wayne");
+    const contested = await server.store.resourceNames.claim(
+      organizationNameKey("wayne"),
+      "org_01jzzzzzzzzzzzzzzzzzzzzzzz",
+      pastTheHold,
+    );
+    expect(contested.claimed).toBe(false);
+    expect(contested.entry.id).toBe("wayne");
+    expect(
+      await server.store.resourceNames.resolve(organizationNameKey("stark"), pastTheHold),
+    ).toBeUndefined();
+    expect(minted.metadata?.id).toMatch(MINTED_ID);
   });
 
   it("a rename takes back its own old slug, is refused another's slug, and changes nothing for its own", async () => {

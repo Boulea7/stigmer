@@ -1,0 +1,116 @@
+/**
+ * A personal instance is found by the label its create gave it. The create
+ * (buildPersonalInstanceInput) labels it with the active organization's id
+ * and the agent's slug; the lookup must ask for that same label, even when
+ * the reference it resolves names the organization by slug (a Start-session
+ * link's `?agent=acme/reviewer`). Pinned: the lookup's label equals the
+ * builder's, and an agent with a saved instance resolves to it instead of
+ * asking for its variables again.
+ */
+
+import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { create } from "@bufbuild/protobuf";
+import { createRouterTransport } from "@connectrpc/connect";
+import { Stigmer } from "@stigmer/sdk";
+import { AgentQueryController } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/query_pb";
+import { AgentInstanceQueryController } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/query_pb";
+import { AgentInstanceListSchema } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/io_pb";
+import { AgentInstanceSchema } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/api_pb";
+import { AgentSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb";
+import { AgentSpecSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/spec_pb";
+import { EnvVarDeclarationSchema } from "@stigmer/protos/ai/stigmer/agentic/environment/v1/spec_pb";
+import { EnvironmentQueryController } from "@stigmer/protos/ai/stigmer/agentic/environment/v1/query_pb";
+import { EnvironmentListSchema } from "@stigmer/protos/ai/stigmer/agentic/environment/v1/io_pb";
+import { ApiResourceMetadataSchema } from "@stigmer/protos/ai/stigmer/commons/apiresource/metadata_pb";
+import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
+
+import { StigmerContext } from "../../context";
+import { FetchCacheContext } from "../../internal/FetchCacheProvider";
+import {
+  buildPersonalInstanceInput,
+  personalInstanceAgentLabel,
+} from "../../agent-instance/buildPersonalInstanceInput";
+import { useAgentSetup } from "../useAgentSetup";
+
+afterEach(cleanup);
+
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+const FOR_AGENT = "stigmer.ai/for-agent";
+
+/** A client whose saved personal instance answers only the label the builder gives it. */
+function client(asked: Record<string, string>[]) {
+  const saved = buildPersonalInstanceInput({
+    org: ACME_ID,
+    agentId: "agt_1",
+    agentSlug: "reviewer",
+    environmentRef: { org: ACME_ID, slug: "personal", kind: ApiResourceKind.environment },
+  });
+  return new Stigmer({
+    baseUrl: "/",
+    getAccessToken: () => "t",
+    customTransport: createRouterTransport(({ service }) => {
+      service(AgentQueryController, {
+        getByReference: () =>
+          create(AgentSchema, {
+            metadata: create(ApiResourceMetadataSchema, { id: "agt_1", org: ACME_ID, slug: "reviewer", name: "Reviewer" }),
+            spec: create(AgentSpecSchema, {
+              env: { API_TOKEN: create(EnvVarDeclarationSchema, { isSecret: true, description: "API token" }) },
+            }),
+          }),
+      });
+      service(AgentInstanceQueryController, {
+        list: (request) => {
+          asked.push({ ...request.labels });
+          const matches = request.labels[FOR_AGENT] === saved.labels?.[FOR_AGENT];
+          return create(AgentInstanceListSchema, {
+            items: matches
+              ? [create(AgentInstanceSchema, { metadata: create(ApiResourceMetadataSchema, { id: "ain_saved", org: ACME_ID }) })]
+              : [],
+          });
+        },
+      });
+      service(EnvironmentQueryController, { list: () => create(EnvironmentListSchema, { items: [] }) });
+    }),
+  });
+}
+
+function wrapper(stigmer: Stigmer) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <FetchCacheContext.Provider value={null}>
+        <StigmerContext.Provider value={stigmer}>{children}</StigmerContext.Provider>
+      </FetchCacheContext.Provider>
+    );
+  };
+}
+
+describe("useAgentSetup's personal-instance label", () => {
+  it("is the label the builder gives a personal instance: the active organization's id and the agent's slug", () => {
+    expect(personalInstanceAgentLabel(ACME_ID, "reviewer")).toBe(`${ACME_ID}/reviewer`);
+    const input = buildPersonalInstanceInput({
+      org: ACME_ID,
+      agentId: "agt_1",
+      agentSlug: "reviewer",
+      environmentRef: { org: ACME_ID, slug: "personal", kind: ApiResourceKind.environment },
+    });
+    expect(input.labels?.[FOR_AGENT]).toBe(personalInstanceAgentLabel(ACME_ID, "reviewer"));
+  });
+
+  it("finds the saved instance when the reference names the organization by slug", async () => {
+    const asked: Record<string, string>[] = [];
+    const { result } = renderHook(() => useAgentSetup(ACME_ID), { wrapper: wrapper(client(asked)) });
+
+    await act(async () => {
+      await result.current.resolveAgent({ org: "acme", slug: "reviewer" });
+    });
+
+    expect(asked.map((labels) => labels[FOR_AGENT])).toContain(`${ACME_ID}/reviewer`);
+    expect(asked.map((labels) => labels[FOR_AGENT])).not.toContain("acme/reviewer");
+    expect(result.current.state.status).toBe("ready");
+    if (result.current.state.status === "ready") {
+      expect(result.current.state.resolution).toEqual({ mode: "saved", instanceId: "ain_saved" });
+    }
+  });
+});

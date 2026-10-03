@@ -374,7 +374,11 @@ export interface ResourceNameRename {
   readonly id: string;
   readonly from: string;
   readonly to: string;
-  /** When `from` stops resolving; "" holds it for good. */
+  /**
+   * When the names this rename demotes stop resolving; "" holds them for
+   * good. A name equal to `id` is held for good whatever this says: it is
+   * the id an earlier release filed the resource's rows under.
+   */
   readonly fromExpiresAt: string;
   /** RFC-3339 now, the instant expiry is judged against. */
   readonly now: string;
@@ -407,8 +411,10 @@ export interface ResourceNameStore {
   /**
    * Moves `id`'s current name from `from` to `to` in one transaction: `to`
    * becomes current (taken fresh, or taken back when it is one of `id`'s
-   * own previous names) and `from` becomes previous until `fromExpiresAt`.
-   * Lost, with nothing changed, when another resource holds `to`.
+   * own previous names) and every other current name of `id`, `from`
+   * included, becomes previous until `fromExpiresAt`, so `id` is left with
+   * exactly one current name however renames interleave. Lost, with
+   * nothing changed, when another resource holds `to`.
    */
   rename(rename: ResourceNameRename): Promise<ResourceNameClaim>;
   /** Undoes a rename whose resource write failed: `to` is let go and `from` is current again. Idempotent. */

@@ -133,7 +133,10 @@ export async function applyMessage(
   org: string,
   dryRun: boolean,
 ): Promise<ApplyOutcome> {
-  const orgWarning = await injectOrg(controller, message, org);
+  // An organization belongs to no organization: its own metadata.org stays
+  // empty, whatever the context or `--org` names for the file's other kinds.
+  const orgWarning =
+    handler.kind === ApiResourceKind.organization ? undefined : await injectOrg(controller, message, org);
   const created = (metaOf(message)?.id ?? "") === "";
 
   if (dryRun) {

@@ -1548,6 +1548,33 @@ export function describeStoreContract(
       expect((await names().claim(key("older"), "org_b", "2999-01-01T00:00:00.000Z")).claimed).toBe(false);
     });
 
+    it("a name equal to its id is held for good, whatever expiry the rename gives", async () => {
+      await names().claim(key("legacy"), "legacy", T0);
+      await names().rename({ ...ORG, id: "legacy", from: "legacy", to: "renamed", fromExpiresAt: T2, now: T1 });
+      expect(await names().resolve(key("legacy"), "2999-01-01T00:00:00.000Z")).toMatchObject({
+        id: "legacy", state: "previous", expiresAt: "",
+      });
+
+      // Renamed again, the name it moved to expires as any other.
+      await names().rename({ ...ORG, id: "legacy", from: "renamed", to: "again", fromExpiresAt: T2, now: T1 });
+      expect(await names().resolve(key("renamed"), T1)).toMatchObject({ state: "previous", expiresAt: T2 });
+      expect(await names().resolve(key("legacy"), "2999-01-01T00:00:00.000Z")).toMatchObject({ expiresAt: "" });
+    });
+
+    it("two renames from one name leave exactly one current name, the later one's", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      // Both renames read `acme` as the current name; the second runs after
+      // the first has moved it.
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-b", fromExpiresAt: T2, now: T1 });
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-c", fromExpiresAt: T2, now: T1 });
+
+      const states = await Promise.all(
+        ["acme", "acme-b", "acme-c"].map(async (name) => (await names().resolve(key(name), T1))?.state),
+      );
+      expect(states).toEqual(["previous", "previous", "current"]);
+      expect(await names().resolve(key("acme-b"), T2), "the overtaken name expires").toBeUndefined();
+    });
+
     it("a rename onto its own current name is refused", async () => {
       await names().claim(key("acme"), "org_a", T0);
       await expect(

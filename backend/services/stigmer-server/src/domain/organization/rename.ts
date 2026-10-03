@@ -103,10 +103,9 @@ export function newRenameOrganizationSlugStep(
         id: metadata.id,
         from: metadata.slug,
         to: ctx.input.slug,
-        fromExpiresAt:
-          metadata.slug === metadata.id
-            ? ""
-            : new Date(now.getTime() + RENAMED_SLUG_HOLD_MS).toISOString(),
+        // The store holds a name equal to the id for good (an organization
+        // from an earlier release, filed under its first slug).
+        fromExpiresAt: new Date(now.getTime() + RENAMED_SLUG_HOLD_MS).toISOString(),
         now: now.toISOString(),
       };
       let moved;

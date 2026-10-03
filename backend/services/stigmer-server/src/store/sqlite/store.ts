@@ -1706,17 +1706,22 @@ class SqliteResourceNameStore implements ResourceNameStore {
       if (row === undefined) {
         return { claimed: false, entry: nameHolderOf(db, to) };
       }
+      // Every other current name, not only `from`: a concurrent rename that
+      // moved `from` first leaves its own new name current, and this one
+      // demotes it too. A name equal to the id is never given an expiry.
       db.prepare(
         `UPDATE resource_names
-         SET state = 'previous', claimed_at = ?, expires_at = ?
-         WHERE kind = ? AND org = ? AND name = ? AND id = ?`,
+         SET state = 'previous', claimed_at = ?,
+             expires_at = CASE WHEN name = id THEN '' ELSE ? END
+         WHERE kind = ? AND org = ? AND id = ?
+           AND state = 'current' AND name <> ?`,
       ).run(
         rename.now,
         rename.fromExpiresAt,
         rename.kind,
         rename.org,
-        rename.from,
         rename.id,
+        rename.to,
       );
       return { claimed: true, entry: resourceNameEntryOf(row) };
     });

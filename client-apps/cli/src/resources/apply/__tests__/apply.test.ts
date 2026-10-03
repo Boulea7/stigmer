@@ -193,6 +193,27 @@ describe("applyMessage declared-slug follow-up", () => {
   });
 });
 
+describe("applyMessage on an organization beside other kinds", () => {
+  it("leaves the organization's own org empty, whatever organization the file's other kinds go to", async () => {
+    const sent: Message[] = [];
+    const { handler } = organizationHandler(organization("acme"), () => Promise.reject(new Error("must not be called")));
+    const recording: ApplyHandler = {
+      ...handler,
+      apply: (_c, message) => {
+        sent.push(message);
+        return Promise.resolve(organization("acme"));
+      },
+    };
+
+    const outcome = await applyMessage(controller, recording, organization("acme", ""), ACME_ID, false);
+    const preview = await applyMessage(controller, recording, organization("acme", ""), ACME_ID, true);
+
+    expect((sent[0] as { metadata?: { org?: string } }).metadata?.org).toBe("");
+    expect(outcome.warning).toBeUndefined();
+    expect(preview.warning).toBeUndefined();
+  });
+});
+
 describe("applyMessage org-mismatch warning", () => {
   /** A controller whose organization get answers the id each value names, or NotFound. */
   function organizationsNaming(ids: Record<string, string>): ControllerFn {
