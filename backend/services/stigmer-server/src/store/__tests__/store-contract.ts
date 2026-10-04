@@ -1575,6 +1575,19 @@ export function describeStoreContract(
       expect(await names().resolve(key("acme-b"), T2), "the overtaken name expires").toBeUndefined();
     });
 
+    it("overlapping renames of one resource leave exactly one current name", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await Promise.all(
+        ["acme-b", "acme-c", "acme-d", "acme-e"].map((to) =>
+          names().rename({ ...ORG, id: "org_a", from: "acme", to, fromExpiresAt: T2, now: T1 }),
+        ),
+      );
+      const states = await Promise.all(
+        ["acme", "acme-b", "acme-c", "acme-d", "acme-e"].map(async (name) => (await names().resolve(key(name), T1))?.state),
+      );
+      expect(states.filter((state) => state === "current")).toHaveLength(1);
+    });
+
     it("a rename onto its own current name is refused", async () => {
       await names().claim(key("acme"), "org_a", T0);
       await expect(

@@ -641,7 +641,7 @@ Input for creating or updating a Schedule.
   type={{
     name: { type: "string", description: "Resource name.", required: true },
     slug: { type: "string", description: "URL-friendly identifier." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
     labels: { type: "Record<string, string>", description: "Key-value labels." },
     cron: { type: "string", description: "Cron expression in the classic 5-field form (minute, hour, day-of-month, month, day-of-week), evaluated in `time_zone` — for example \"0 9 * * *\" for daily at 09:00." },
     timeZone: { type: "string", description: "IANA time zone the cron is evaluated in, e.g. \"Asia/Kolkata\"." },

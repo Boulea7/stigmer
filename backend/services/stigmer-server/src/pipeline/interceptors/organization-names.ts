@@ -34,12 +34,17 @@
  * organization-names-inventory.test.ts.
  *
  * Serving only, as the single-organization fill is: an in-process call is
- * server code, which passes the ids it read from storage. A request that
+ * server code, which passes the ids it read from storage. Content a person
+ * wrote that reaches the server inside something else (a plugin package's
+ * manifests) is resolved where it is read, with `resolveOrganizationNames`
+ * over the same rules 1 and 3 (domain/plugin/overlay/documents.ts); a
+ * workflow's agent_call config, which no field rule reaches, has its own
+ * step (domain/workflow/agent-call-organizations.ts). A request that
  * names nothing to resolve passes through untouched; one that does is
  * handed on as a resolved clone, never a mutation of the caller's message.
  */
 import { ScalarType, clone, getOption, hasOption } from "@bufbuild/protobuf";
-import type { DescField, DescMessage, DescMethod } from "@bufbuild/protobuf";
+import type { DescField, DescMessage, DescMethod, Message } from "@bufbuild/protobuf";
 import { reflect } from "@bufbuild/protobuf/reflect";
 import type { ReflectMessage } from "@bufbuild/protobuf/reflect";
 import type { Interceptor } from "@connectrpc/connect";
@@ -361,4 +366,34 @@ export function createOrganizationNameInterceptor(
     );
     return next({ ...request, message });
   };
+}
+
+/**
+ * Resolves, in place, every organization a message names by rules 1 and 3
+ * (one lookup per distinct name): for content a person wrote that is read
+ * on the server rather than received as a request. A name nothing holds is
+ * left as written, as the interceptor leaves it.
+ */
+export async function resolveOrganizationNames(
+  desc: DescMessage,
+  message: Message,
+  resolver: OrganizationNameResolver,
+): Promise<void> {
+  const names = new Set<string>();
+  visitMessage(reflect(desc, message), (value) => {
+    if (!isOrganizationId(value)) {
+      names.add(value);
+    }
+    return undefined;
+  });
+  const ids = new Map<string, string>();
+  for (const name of names) {
+    const id = await resolver.resolve(name);
+    if (id !== undefined && id !== name) {
+      ids.set(name, id);
+    }
+  }
+  if (ids.size > 0) {
+    visitMessage(reflect(desc, message), (value) => ids.get(value));
+  }
 }

@@ -9,7 +9,9 @@
  * this test keeps no list of its own, so a contract change that adds or
  * moves a field named `org` fails here with the row to write, never
  * silently. That is the review a field that breaks the spelling rule (a
- * field called `org` that names no organization) would get. The mutation
+ * field called `org` that names no organization) would get. A streaming
+ * method, which the interceptor passes untouched, is held to naming no
+ * organization at all. The mutation
  * proofs below show the comparison bites in each direction.
  */
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -96,6 +98,12 @@ describe("the organization-name inventory (docs/organization-names.md) is true t
     expect(rowsOf(readFileSync(INVENTORY_DOC, "utf8"))).toEqual(
       servedRows(server),
     );
+  });
+
+  it("no served streaming method names an organization: the interceptor resolves unary requests only", () => {
+    const streaming = servedMethods(server.routes).filter((method) => method.methodKind !== "unary");
+    expect(streaming.length, "the server serves streaming methods to judge").toBeGreaterThan(0);
+    expect(streaming.map(ruleRow).filter((row) => row !== undefined)).toEqual([]);
   });
 
   it("the comparison bites: a missing row, an extra row and a moved field each differ", () => {

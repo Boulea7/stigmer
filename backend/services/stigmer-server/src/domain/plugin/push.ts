@@ -112,7 +112,8 @@ import {
   slugHolder,
 } from "./members.js";
 import type { Member, PlannedMember } from "./members.js";
-import { parseOverlays } from "./overlay/documents.js";
+import type { OrganizationNameResolver } from "../../pipeline/interceptors/organization-names.js";
+import { parseOverlays, resolveOverlayOrganizations } from "./overlay/documents.js";
 import type { ParsedOverlays } from "./overlay/documents.js";
 import { OverlayParseError } from "./overlay/parse.js";
 import { sanitizeOverlays } from "./overlay/sanitize.js";
@@ -264,14 +265,22 @@ export function newGeneratePluginIdIfNeededStep(): PipelineStep<PushDesc> {
   };
 }
 
-/** ParseOverlayDocuments — the `ai.stigmer/` documents become protos, strictly. */
-export function newParseOverlayDocumentsStep(): PipelineStep<PushDesc> {
+/**
+ * ParseOverlayDocuments — the `ai.stigmer/` documents become protos,
+ * strictly, with every organization they name by slug resolved to its id
+ * (they are written through the in-process lane, which resolves nothing).
+ */
+export function newParseOverlayDocumentsStep(
+  resolver: OrganizationNameResolver,
+): PipelineStep<PushDesc> {
   return {
     name: "ParseOverlayDocuments",
-    execute(ctx: RequestContext<PushDesc>): void {
+    async execute(ctx: RequestContext<PushDesc>): Promise<void> {
       const pkg = ctx.get(PLUGIN_PACKAGE_KEY) as PluginPackage;
       try {
-        ctx.set(PLUGIN_OVERLAYS_KEY, parseOverlays(pkg.overlay, ctx.input.org));
+        const overlays = parseOverlays(pkg.overlay);
+        await resolveOverlayOrganizations(overlays, ctx.input.org, resolver);
+        ctx.set(PLUGIN_OVERLAYS_KEY, overlays);
       } catch (error) {
         if (error instanceof OverlayParseError) {
           throw invalidArgumentError(error.message);

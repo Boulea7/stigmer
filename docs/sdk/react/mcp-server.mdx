@@ -525,7 +525,7 @@ function useMcpServerSetup(org: string | null, poolKeys?: Set<string>): UseMcpSe
 
 <TypeTable
   type={{
-    org: { type: "string | null", description: "Organization slug. Pass `null` to disable.", required: true },
+    org: { type: "string | null", description: "Organization id (a slug is also accepted). Pass `null` to disable.", required: true },
     poolKeys: { type: "Set<string>", description: "Optional set of env-var keys already available   from the session env pool (manual secrets, one-time env vars from   other components). When provided, servers whose `env` keys   are fully covered by `poolKeys` + personal env auto-resolve to   `ready` without prompting. Reactive — when `poolKeys` changes,   `needsSetup` entries are re-evaluated." },
   }}
 />
@@ -792,13 +792,13 @@ and [`useMcpServerConnect`](#usemcpserverconnect).
 
 <TypeTable
   type={{
-    activeOrg: { type: "string", description: "The authenticated user's active organization slug. Used for credential storage — tokens are stored in the user's personal environment within this org. Falls back to `org` when omitted." },
+    activeOrg: { type: "string", description: "The authenticated user's active organization id (a slug is also accepted). Used for credential storage — tokens are stored in the user's personal environment within this org. Falls back to `org` when omitted." },
     className: { type: "string", description: "Additional CSS classes for the dialog element." },
     onClose: { type: "() => void", description: "Called when the dialog should close (backdrop click, cancel, or success).", required: true },
     onConnected: { type: "(serverName: string) => void", description: "Called after a successful connect with the server name." },
     onOpenDetails: { type: "() => void", description: "Called when the user needs the server's detail page — today the \"Use your own OAuth app\" escape hatch shown when the platform OAuth app is vendor-approval blocked on an `oauth_only` server, since the BYOA form lives on the detail page, not in this dialog.  The host owns navigation (and should close the dialog itself if its route keeps this component mounted). When omitted, the blocked notice still explains the state; only the navigation affordance is dropped." },
     open: { type: "boolean", description: "Whether the dialog is open.", required: true },
-    org: { type: "string", description: "Organization slug that owns the MCP server.", required: true },
+    org: { type: "string", description: "Id of the organization that owns the MCP server (a slug is also accepted).", required: true },
     slug: { type: "string", description: "MCP server slug.", required: true },
   }}
 />
@@ -878,7 +878,7 @@ All visual properties flow through `--stgm-*` design tokens.
 <TypeTable
   type={{
     actions: { type: "readonly DetailAction[]", description: "Secondary actions rendered in the kebab overflow menu." },
-    activeOrg: { type: "string", description: "The authenticated user's active organization slug. Used for OAuth token storage — tokens are stored in the user's personal environment within this org, not the MCP server's org. When omitted, falls back to the `org` prop (MCP server's org)." },
+    activeOrg: { type: "string", description: "The authenticated user's active organization id (a slug is also accepted). Used for OAuth token storage — tokens are stored in the user's personal environment within this org, not the MCP server's org. When omitted, falls back to the `org` prop (MCP server's org)." },
     className: { type: "string", description: "Additional CSS classes for the root container." },
     credentialPoolValues: { type: "(key: string) => EnvVarInput | undefined", description: "Pre-fill function for credential form inputs. When provided, the EnvVarForm receives these as `poolValues`, populating fields on mount. Useful for demo scenarios that simulate a user having already entered credentials." },
     defaultCapabilityTab: { type: "CapabilityTab", description: "Initial active capability tab. Defaults to `\"tools\"`. Useful for deep-linking or demo scenarios that need to start on a specific tab.", typeDescriptionLink: "#capabilitytab" },
@@ -888,7 +888,7 @@ All visual properties flow through `--stgm-*` design tokens.
     onPluginClick: { type: "(ref: { org: string; slug: string }) => void", description: "Called when the user selects the plugin named in the \"installed by a plugin\" notice; the host owns the route to the plugin's page. The notice shows when this resource carries a live plugin's label, and `editable` is then narrowed to `false`: the server refuses a client edit of a plugin's resource, so no edit form is offered." },
     onResourceLoad: { type: "(meta: { id: string; name: string }) => void", description: "Called once when the MCP server resource has been fetched successfully. Provides the resource display name for use cases like breadcrumbs, document titles, or analytics — without requiring the consumer to also call useMcpServer.  Not called on error or not-found states." },
     onResourceUpdated: { type: "(server: McpServer) => void", description: "Called after a successful inline field save with the updated server." },
-    org: { type: "string", description: "Organization slug that owns the MCP server.", required: true },
+    org: { type: "string", description: "Id of the organization that owns the MCP server (a slug is also accepted).", required: true },
     primaryAction: { type: "DetailAction", description: "Primary action rendered as a visible button in the header area.", typeDescriptionLink: "/docs/sdk/react/resource-detail#detailaction" },
     slug: { type: "string", description: "MCP server slug (URL-friendly identifier unique within the org).", required: true },
   }}
@@ -934,7 +934,7 @@ All visual properties flow through `--stgm-*` tokens.
 
 <TypeTable
   type={{
-    activeOrg: { type: "string", description: "The authenticated user's active organization slug. Used for OAuth token storage — tokens are stored in the user's personal environment within this org, not the MCP server's org. When omitted, falls back to the `org` prop." },
+    activeOrg: { type: "string", description: "The authenticated user's active organization id (a slug is also accepted). Used for OAuth token storage — tokens are stored in the user's personal environment within this org, not the MCP server's org. When omitted, falls back to the `org` prop." },
     className: { type: "string", description: "Additional CSS class names for the root container." },
     disabled: { type: "boolean", description: "Disables all interaction." },
     initialServerKey: { type: "string", description: "When provided, the picker opens directly to the configure view for the given server key (`\"org/slug\"`) instead of showing the list.  Intended for flows where the caller already knows which server needs configuration (e.g. a warning banner for a single unconfigured server, or a chip click on a specific server).  Only used as the initial view — subsequent navigation within the picker is unaffected. Ignored if the key does not match any entry in `setup.entries`." },
@@ -1130,7 +1130,7 @@ Result passed to `onComplete` after successful MCP server creation.
 <TypeTable
   type={{
     name: { type: "string", description: "MCP server display name.", required: true },
-    org: { type: "string", description: "Organization slug of the created MCP server.", required: true },
+    org: { type: "string", description: "The created MCP server's organization, by the id it is stored under.", required: true },
     slug: { type: "string", description: "MCP server slug (for URL construction).", required: true },
   }}
 />
@@ -1279,7 +1279,7 @@ a `McpServerInput` for submission on the final step.
   type={{
     authDiscoveryUrl: { type: "string", description: "OAuth discovery URL.", required: true },
     authEnabled: { type: "boolean", description: "Whether OAuth auth configuration is enabled.", required: true },
-    authOAuthAppOrg: { type: "string", description: "OAuth app reference — organization slug.", required: true },
+    authOAuthAppOrg: { type: "string", description: "OAuth app reference — its organization, by slug or id.", required: true },
     authOAuthAppSlug: { type: "string", description: "OAuth app reference — app slug.", required: true },
     authScopeHints: { type: "string", description: "OAuth scope hints (comma-separated, split on submit).", required: true },
     authTargetEnvVar: { type: "string", description: "Env var that receives the OAuth token.", required: true },

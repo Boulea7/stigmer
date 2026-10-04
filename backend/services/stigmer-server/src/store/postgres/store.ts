@@ -1586,6 +1586,13 @@ class PostgresResourceNameStore implements ResourceNameStore {
     assertRenameMoves(rename);
     const to = { kind: rename.kind, org: rename.org, name: rename.to };
     return this.transaction(async (client) => {
+      // Renames of one resource run one at a time: under READ COMMITTED a
+      // concurrent rename's demotion below could miss a name the other
+      // inserted after it began, leaving two current names.
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtextextended($1 || '/' || $2 || '/' || $3, 0))`,
+        [rename.kind, rename.org, rename.id],
+      );
       await removeExpired(client, to, rename.now);
       const before = await client.query<ResourceNameRow>(
         `SELECT ${RESOURCE_NAME_COLUMNS} FROM resource_names

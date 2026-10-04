@@ -1039,7 +1039,7 @@ function useWorkflowEditor(initialYaml: string, options: UseWorkflowEditorOption
 <TypeTable
   type={{
     initialYaml: { type: "string", description: "The YAML string to initialize the editor with.", required: true },
-    options: { type: "UseWorkflowEditorOptions", description: "Editor configuration (organization slug).", required: true },
+    options: { type: "UseWorkflowEditorOptions", description: "Editor configuration (organization id).", required: true },
   }}
 />
 
@@ -1593,7 +1593,7 @@ function useWorkflowSave(org: string): UseWorkflowSaveReturn
 
 <TypeTable
   type={{
-    org: { type: "string", description: "Organization slug for the target workflow.", required: true },
+    org: { type: "string", description: "Organization id for the target workflow (a slug is also accepted).", required: true },
   }}
 />
 
@@ -1719,7 +1719,7 @@ function useWorkflowYaml(org: string | null, slug: string | null): UseWorkflowYa
 
 <TypeTable
   type={{
-    org: { type: "string | null", description: "Organization slug, or `null` to skip fetching.", required: true },
+    org: { type: "string | null", description: "Organization id (a slug is also accepted), or `null` to skip fetching.", required: true },
     slug: { type: "string | null", description: "Workflow slug, or `null` to skip fetching.", required: true },
   }}
 />
@@ -1755,7 +1755,7 @@ Uses native `<dialog>` element for proper focus trapping and escape handling.
     onCreated: { type: "(instance: WorkflowInstance) => void", description: "Called after the instance is successfully created." },
     onOpenChange: { type: "(open: boolean) => void", description: "Called when the dialog should open or close.", required: true },
     open: { type: "boolean", description: "Whether the dialog is open.", required: true },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
     workflowId: { type: "string", description: "Workflow ID to bind the new instance to.", required: true },
   }}
 />
@@ -1844,9 +1844,9 @@ Styled via `--stgm-*` design tokens.
   type={{
     onError: { type: "(message: string) => void", description: "Called when generation or creation fails. Receives a human-readable message. Use for toast notifications." },
     onOpenChange: { type: "(open: boolean) => void", description: "Called when the dialog should close (cancel, backdrop click, Escape).", required: true },
-    onSuccess: { type: "(org: string, slug: string) => void", description: "Called after the workflow is created successfully. Receives the org slug and workflow slug for navigation.", required: true },
+    onSuccess: { type: "(org: string, slug: string) => void", description: "Called after the workflow is created successfully. Receives the workflow's organization id (as stored) and its slug for navigation.", required: true },
     open: { type: "boolean", description: "Whether the dialog is open.", required: true },
-    org: { type: "string", description: "Organization slug for generation context and workflow creation.", required: true },
+    org: { type: "string", description: "Organization id for generation context and workflow creation (a slug is also accepted).", required: true },
   }}
 />
 
@@ -1981,10 +1981,10 @@ All visual properties flow through `--stgm-*` design tokens.
     onResourceUpdated: { type: "(workflow: Workflow) => void", description: "Called after a successful inline field save with the updated workflow." },
     onTabChange: { type: "(tabId: string) => void", description: "Controlled tab change handler." },
     onViewLatestRun: { type: "(executionId: string) => void", description: "Called when the user clicks \"View latest run\" in the overview quick actions. Receives the execution ID of the most recent execution." },
-    org: { type: "string", description: "Organization slug that owns the workflow.", required: true },
+    org: { type: "string", description: "Id of the organization that owns the workflow (a slug is also accepted).", required: true },
     primaryAction: { type: "DetailAction", description: "Primary action rendered as a visible button in the header area.", typeDescriptionLink: "/docs/sdk/react/resource-detail#detailaction" },
     slug: { type: "string", description: "Workflow slug (URL-friendly identifier unique within the org).", required: true },
-    viewerOrg: { type: "string", description: "The viewer's active organization slug, feeding the Instances tab: it scopes the list to this org's instances of the workflow, so a member of several orgs sees the current org context only. Omit to default to the workflow's own org." },
+    viewerOrg: { type: "string", description: "The viewer's active organization id (a slug is also accepted), feeding the Instances tab: it scopes the list to this org's instances of the workflow, so a member of several orgs sees the current org context only. Omit to default to the workflow's own org." },
   }}
 />
 
@@ -2038,7 +2038,7 @@ visibility control, share panel (FGA-gated), and a delete action with cascade wa
     onExecutionClick: { type: "(executionId: string) => void", description: "Called when the user clicks an execution in the recent list." },
     onRunClick: { type: "(instance: WorkflowInstance) => void", description: "Called when the user clicks \"Run\" for this instance." },
     onUpdated: { type: "() => void", description: "Called when instance data changes (for parent refetch)." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
   }}
 />
 
@@ -2080,9 +2080,9 @@ This is an SDK component — embeddable by platform builders.
     onDeleteClick: { type: "(instance: WorkflowInstance) => void", description: "Called when the user clicks \"Delete\" on an instance." },
     onInstanceClick: { type: "(instance: WorkflowInstance) => void", description: "Called when the user clicks an instance row." },
     onRunClick: { type: "(instance: WorkflowInstance) => void", description: "Called when the user clicks \"Run\" on an instance." },
-    org: { type: "string", description: "The WORKFLOW's organization slug (needed for environment resolution and the create flow). Not the list scope — that is `viewerOrg`, which differs from `org` when viewing another org's workflow.", required: true },
+    org: { type: "string", description: "The WORKFLOW's organization id (a slug is also accepted; needed for environment resolution and the create flow). Not the list scope — that is `viewerOrg`, which differs from `org` when viewing another org's workflow.", required: true },
     refreshKey: { type: "number", description: "Increment this value to trigger a refetch of the instance list. Useful after creating or deleting an instance externally." },
-    viewerOrg: { type: "string", description: "The viewer's active organization slug. Scopes the list to this org's instances of the workflow, so a member of several orgs sees exactly the current org context's instances. Omit to default to the workflow's own org." },
+    viewerOrg: { type: "string", description: "The viewer's active organization id (a slug is also accepted). Scopes the list to this org's instances of the workflow, so a member of several orgs sees exactly the current org context's instances. Omit to default to the workflow's own org." },
     workflowId: { type: "string", description: "Workflow resource ID to list instances for.", required: true },
   }}
 />
@@ -2113,7 +2113,7 @@ Zero console dependencies.
     initialInstruction: { type: "string", description: "When provided, auto-sends this instruction on mount (e.g. from \"Fix with AI\"). Consumed once — subsequent renders with the same value are ignored." },
     onAccept: { type: "(yaml: string) => void", description: "Called when the user accepts a refinement. Receives the updated YAML.", required: true },
     onClose: { type: "() => void", description: "Called when the panel should close.", required: true },
-    org: { type: "string", description: "Organization slug for refinement context.", required: true },
+    org: { type: "string", description: "Organization id for refinement context (a slug is also accepted).", required: true },
   }}
 />
 
@@ -2143,7 +2143,7 @@ Styled via `--stgm-*` design tokens. Zero console dependencies.
     executionId: { type: "string", description: "ID of the failed workflow execution to diagnose.", required: true },
     onApplyFix: { type: "(yaml: string) => void", description: "Called when the user clicks \"Apply Fix\". Receives the suggested YAML. The host application handles navigation to the workflow editor." },
     onClose: { type: "() => void", description: "Called when the panel should close." },
-    org: { type: "string", description: "Organization slug for authorization and resource context.", required: true },
+    org: { type: "string", description: "Organization id for authorization and resource context (a slug is also accepted).", required: true },
   }}
 />
 
@@ -2171,7 +2171,7 @@ handling, and backdrop. Styled via `--stgm-*` design tokens.
     onOpenChange: { type: "(open: boolean) => void", description: "Called when the dialog should close (cancel, backdrop click, Escape).", required: true },
     onSuccess: { type: "(executionId: string) => void", description: "Called after the execution is created successfully. Receives the execution ID — use for navigation.", required: true },
     open: { type: "boolean", description: "Whether the dialog is open.", required: true },
-    org: { type: "string", description: "Organization slug that owns the workflow.", required: true },
+    org: { type: "string", description: "Id of the organization that owns the workflow (a slug is also accepted).", required: true },
     workflow: { type: "Workflow", description: "The workflow blueprint to run.", required: true, typeDescriptionLink: "/docs/sdk/resources/workflow" },
   }}
 />
@@ -3512,7 +3512,7 @@ Options for [`useDiagnoseExecutionFlow`](#usediagnoseexecutionflow).
     currentWorkflowYaml: { type: "string", description: "Current workflow YAML for diff computation (optional)." },
     executionId: { type: "string", description: "ID of the failed workflow execution to diagnose.", required: true },
     onError: { type: "(message: string) => void", description: "Called when any step fails. Also available via the `error` return." },
-    org: { type: "string", description: "Organization slug for session and execution creation.", required: true },
+    org: { type: "string", description: "Organization id for session and execution creation (a slug is also accepted).", required: true },
   }}
 />
 
@@ -3548,7 +3548,7 @@ Options for [`useExecutionHistoryData`](#useexecutionhistorydata).
 
 <TypeTable
   type={{
-    org: { type: "string | null | undefined", description: "Organization slug. When empty, the hook does not fetch.", required: true },
+    org: { type: "string | null | undefined", description: "Organization id (a slug is also accepted). When empty, the hook does not fetch.", required: true },
     pageSize: { type: "number", description: "Maximum results per page." },
     refetchInterval: { type: "number | false", description: "Refetch interval in milliseconds. `0` or `false` disables." },
   }}
@@ -3563,7 +3563,7 @@ Options for [`useRefineWorkflowFlow`](#userefineworkflowflow).
   type={{
     currentYaml: { type: "string", description: "Live YAML from the editor. Captured via ref at send-time, not reactively.", required: true },
     onError: { type: "(message: string) => void", description: "Called when any step fails. Also available via the `error` return." },
-    org: { type: "string", description: "Organization slug for session and execution creation.", required: true },
+    org: { type: "string", description: "Organization id for session and execution creation (a slug is also accepted).", required: true },
   }}
 />
 
@@ -3577,7 +3577,7 @@ Options for [`useRunWorkflowFlow`](#userunworkflowflow).
     instances: { type: "readonly WorkflowInstance[]", description: "Available workflow instances (for instance selector).", required: true },
     onError: { type: "(message: string) => void", description: "Called when submission fails. Receives a human-readable message. Errors are also available via UseRunWorkflowFlowReturn.error." },
     onSuccess: { type: "(executionId: string) => void", description: "Called after the execution is created successfully. Receives the execution ID for navigation.", required: true },
-    org: { type: "string", description: "Organization slug that owns the workflow.", required: true },
+    org: { type: "string", description: "Id of the organization that owns the workflow (a slug is also accepted).", required: true },
     workflow: { type: "Workflow", description: "Workflow resource (must include metadata and spec).", required: true, typeDescriptionLink: "/docs/sdk/resources/workflow" },
   }}
 />
@@ -3590,8 +3590,8 @@ Options for [`useWorkflowArchitectFlow`](#useworkflowarchitectflow).
 <TypeTable
   type={{
     onError: { type: "(message: string) => void", description: "Called when any step fails. Receives a human-readable message. Errors are also available via UseWorkflowArchitectFlowReturn.error." },
-    onSuccess: { type: "(org: string, slug: string) => void", description: "Called after the workflow is created successfully. Receives the org slug and workflow slug for navigation.", required: true },
-    org: { type: "string", description: "Organization slug — used for session, execution, and workflow creation.", required: true },
+    onSuccess: { type: "(org: string, slug: string) => void", description: "Called after the workflow is created successfully. Receives the workflow's organization id (as stored) and its slug for navigation.", required: true },
+    org: { type: "string", description: "Organization id — used for session, execution, and workflow creation (a slug is also accepted).", required: true },
   }}
 />
 
@@ -3623,7 +3623,7 @@ Options for [`useWorkflowCount`](#useworkflowcount).
 
 <TypeTable
   type={{
-    org: { type: "string | null | undefined", description: "Organization slug. When empty, the hook does not fetch.", required: true },
+    org: { type: "string | null | undefined", description: "Organization id (a slug is also accepted). When empty, the hook does not fetch.", required: true },
     refetchInterval: { type: "number | false", description: "Refetch interval in milliseconds. `0` or `false` disables." },
     timeWindow: { type: "SummaryTimeWindow", description: "Time window for aggregation." },
     workflowId: { type: "string", description: "When set, scopes the summary to executions of this workflow only. When omitted, aggregates across all workflows in the organization." },
@@ -3637,7 +3637,7 @@ Options for [`useWorkflowEditor`](#useworkfloweditor).
 
 <TypeTable
   type={{
-    org: { type: "string", description: "Organization slug for the save path.", required: true },
+    org: { type: "string", description: "Organization id for the save path (a slug is also accepted).", required: true },
   }}
 />
 
@@ -3691,7 +3691,7 @@ Options for [`useWorkflowExecutionList`](#useworkflowexecutionlist).
 <TypeTable
   type={{
     filter: { type: "Partial<ExecutionFilterCriteria>", description: "Server-side filter criteria. When set, the backend filters before returning results, reducing transfer size." },
-    org: { type: "string | null", description: "Organization slug to scope the cross-workflow listing to. Applies only to the `list()` branch (no `workflowId`); ignored by `listByWorkflow()`, which is already scoped by the workflow itself.  When omitted, results are bounded only by the caller's view permissions — for a member of several organizations that spans all of them. Console pages should always pass the active org." },
+    org: { type: "string | null", description: "Organization id to scope the cross-workflow listing to (a slug is also accepted). Applies only to the `list()` branch (no `workflowId`); ignored by `listByWorkflow()`, which is already scoped by the workflow itself.  When omitted, results are bounded only by the caller's view permissions — for a member of several organizations that spans all of them. Console pages should always pass the active org." },
     pageSize: { type: "number", description: "Executions per page, the first and each `loadMore`; the server caps it at 100." },
     pageToken: { type: "string", description: "Opaque page token the first page starts from; `loadMore` continues after it." },
     sortAscending: { type: "boolean", description: "When true, sorts ascending. Defaults to false (descending)." },
@@ -3976,7 +3976,7 @@ navigation callbacks.
     className: { type: "string", description: "" },
     onApprovalClick: { type: "(executionId: string) => void", description: "Called when the user clicks \"Review\" on a pending approval." },
     onFailedRunClick: { type: "(executionId: string) => void", description: "Called when the user clicks \"View\" on a failed execution." },
-    org: { type: "string | null | undefined", description: "Organization slug for scoping the dashboard data.", required: true },
+    org: { type: "string | null | undefined", description: "Organization id for scoping the dashboard data (a slug is also accepted).", required: true },
     timeWindow: { type: "SummaryTimeWindow", description: "Time window for the summary statistics." },
   }}
 />
@@ -4019,7 +4019,7 @@ Props for [`WorkflowEditorView`](#workfloweditorview).
     layoutEngine: { type: "LayoutEngine | null", description: "Layout engine for the visual canvas \"Auto Layout\" action. Pass the result of useElkLayoutEngine for ELK-powered layout. When omitted, dagre is used as the default." },
     onSaveError: { type: "(error: Error) => void", description: "Called when a save fails." },
     onSaveSuccess: { type: "() => void", description: "Called after a successful save." },
-    org: { type: "string", description: "Organization slug for the save path.", required: true },
+    org: { type: "string", description: "Organization id for the save path (a slug is also accepted).", required: true },
   }}
 />
 
@@ -4079,7 +4079,7 @@ Props for [`WorkflowExecutionHistory`](#workflowexecutionhistory).
   type={{
     className: { type: "string", description: "Additional CSS classes for the root container." },
     onExecutionClick: { type: "(executionId: string) => void", description: "Called when the user clicks an execution row." },
-    org: { type: "string", description: "Organization slug for scoping dashboard summary data.", required: true },
+    org: { type: "string", description: "Organization id for scoping dashboard summary data (a slug is also accepted).", required: true },
     pageSize: { type: "number", description: "Maximum executions per page." },
     workflowId: { type: "string", description: "When set, scopes to a single workflow's executions. When omitted, shows all executions across all workflows." },
   }}
@@ -4201,7 +4201,7 @@ Props for [`WorkflowExecutionViewer`](#workflowexecutionviewer).
     onNavigateToAgentExecution: { type: "(agentExecutionId: string) => void", description: "Callback when the user clicks a link to a child agent execution. Receives the AgentExecution ID. The host application is responsible for navigation — this keeps the component routing-agnostic." },
     onNavigateToWorkflowEditor: { type: "(yaml: string, workflowSlug: string) => void", description: "Callback when the user clicks \"Apply Fix\" in the repair card. Receives the suggested YAML and the workflow slug. The host application handles navigation to the workflow editor." },
     onPanelOpenChange: { type: "(open: boolean) => void", description: "Called on every panel open/close transition, in BOTH modes — pass it alone (uncontrolled) to simply observe the panel, e.g. widening a docked pane when Diagnose expands it and reclaiming the room on close. See UseWorkflowExecutionPanelOptions.onOpenChange for the exact request-vs-transition semantics in each mode." },
-    org: { type: "string", description: "Organization slug — needed for AI diagnosis authorization." },
+    org: { type: "string", description: "Organization id — needed for AI diagnosis authorization (a slug is also accepted)." },
     panel: { type: "WorkflowExecutionPanelMode", description: "Whether the viewer offers the execution panel at all. `\"none\"` removes the panel AND its toggle chip and withholds the Diagnose action (its conversation renders inside the panel) — for hosts whose surrounding surface already presents the execution's artifacts and usage.", typeDescriptionLink: "#workflowexecutionpanelmode" },
     panelOpen: { type: "boolean", description: "Controlled open state of the execution panel. When provided, the host owns the panel: the chip toggle, Diagnose, and artifact/file-change opens surface through WorkflowExecutionViewerProps.onPanelOpenChange instead of flipping state, and the panel follows this value. Leave `undefined` for the self-managing default." },
   }}

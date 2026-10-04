@@ -449,6 +449,9 @@ On save, calls `organization.update()` and fires `onUpdated`.
 The organization's owners (`can_delete` on it) can also rename it: the
 slug becomes an editable field whose Rename action calls
 `organization.rename()` and fires `onUpdated` with the renamed resource.
+Inside an [`OrgProvider`](#orgprovider), a rename also refreshes the provider's
+organizations, so every slug it shows follows, and the active
+organization stays selected.
 The field is never shown on a server that holds one organization, where
 the organization is not named anywhere.
 

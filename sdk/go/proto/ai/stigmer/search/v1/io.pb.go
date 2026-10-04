@@ -259,14 +259,16 @@ type SearchResult struct {
 	//
 	// Lowercase alphanumeric with hyphens (e.g., "code-review-agent", "web-search").
 	Slug string `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	// Fully qualified slug: "org/slug".
+	// Fully qualified reference: "<org>/<slug>", where org is the owning
+	// organization's id, as metadata.org carries it.
 	//
-	// Pre-computed for CLI and UI display.
-	// Example: "stigmer/web-search", "acme/code-reviewer"
+	// Example: "org_01j5q3k7m8r2s4tnz2hf6w8x9a/code-reviewer"; an organization
+	// made before ids were minted reads "acme/code-reviewer".
 	//
-	// This is the canonical reference format used in YAML configurations.
+	// A reference in this form resolves as written. Clients that show it to a
+	// person put the organization's slug in place of its id.
 	QualifiedSlug string `protobuf:"bytes,5,opt,name=qualified_slug,json=qualifiedSlug,proto3" json:"qualified_slug,omitempty"`
-	// Organization that owns this resource (e.g., "stigmer", "acme-corp").
+	// Organization that owns this resource, by id (e.g., "org_01j5q3k7m8r2s4tnz2hf6w8x9a").
 	Org string `protobuf:"bytes,6,opt,name=org,proto3" json:"org,omitempty"`
 	// Brief description of the resource for display in search results.
 	//

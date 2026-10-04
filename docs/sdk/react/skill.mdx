@@ -478,7 +478,7 @@ All visual properties flow through `--stgm-*` design tokens.
     onResourceUpdated: { type: "(skill: Skill) => void", description: "Called after a successful inline field save with the updated skill. Consumers can use this to refresh breadcrumbs, sync URL state, etc." },
     onTabChange: { type: "(tabId: string) => void", description: "Controlled tab change handler. When provided together with `activeTab`, the component operates in controlled mode." },
     onVersionSelect: { type: "(versionHash: string) => void", description: "Called when the user selects a version in the Versions tab timeline. Provides the version hash for use cases like navigation to a version-specific detail view or triggering a diff comparison." },
-    org: { type: "string", description: "Organization slug that owns the skill.", required: true },
+    org: { type: "string", description: "Id of the organization that owns the skill (a slug is also accepted).", required: true },
     primaryAction: { type: "DetailAction", description: "Primary action rendered as a visible button in the header area.", typeDescriptionLink: "/docs/sdk/react/resource-detail#detailaction" },
     slug: { type: "string", description: "Skill slug (URL-friendly identifier unique within the org).", required: true },
     version: { type: "string", description: "Optional version tag or content hash to pin to a specific version." },

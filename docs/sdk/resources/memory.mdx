@@ -399,7 +399,7 @@ Input for creating or updating a Memory.
   type={{
     name: { type: "string", description: "Resource name.", required: true },
     slug: { type: "string", description: "URL-friendly identifier." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
     labels: { type: "Record<string, string>", description: "Key-value labels." },
     content: { type: "string", description: "The remembered fact, verbatim." },
     subjectIdentityAccountId: { type: "string", description: "The identity account this memory is about." },

@@ -755,6 +755,21 @@ describe("Plugin push — refusals before any write", () => {
     );
     expect(agent.metadata?.labels[PLUGIN_LABEL]).toBe(installed.metadata?.id);
   });
+
+  it("installs an overlay that names its organization by slug, filing it under the organization's id", async () => {
+    const name = uniqueName("overlayslug");
+    const fixture = withFile(
+      thermosLike(name),
+      "ai.stigmer/agent.yaml",
+      `apiVersion: agentic.stigmer.ai/v1\nkind: Agent\nmetadata:\n  name: ${name}\n  org: ${ORG}\nspec:\n  instructions: The author's own instructions for this agent.\n`,
+    );
+    const installed = await plugins.push({ org: ORG, artifact: archiveOf(fixture) });
+    expect(installed.status?.state).toBe(PluginState.READY);
+    const agent = await agentQuery.getByReference(
+      createMessage(ApiResourceReferenceSchema, { org: ORG, kind: ApiResourceKind.agent, slug: name }),
+    );
+    expect(agent.metadata?.org).toBe(ORG_ID);
+  });
 });
 
 /**

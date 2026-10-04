@@ -770,7 +770,7 @@ Input for creating or updating an IAM Policy.
   type={{
     name: { type: "string", description: "Resource name.", required: true },
     slug: { type: "string", description: "URL-friendly identifier." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
     labels: { type: "Record<string, string>", description: "Key-value labels." },
     principal: { type: "ApiResourceRefInput", description: "Principal: WHO is being granted access This can be any API resource that acts as an identity: - identity_account (individual user) - team (group of users) - organization (for cross-org grants) - Any other resource that can be a subject in authorization.", typeDescriptionLink: "#apiresourcerefinput", required: true },
     resource: { type: "ApiResourceRefInput", description: "Resource: WHAT is being accessed This can be any API resource that is being protected: - organization - environment - cloud_resource (VPC, S3 bucket, etc.) - service - Any other resource that requires access control.", typeDescriptionLink: "#apiresourcerefinput", required: true },

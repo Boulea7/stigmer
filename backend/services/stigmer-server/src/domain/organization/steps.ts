@@ -84,6 +84,12 @@ export function newCheckOrgDuplicateStep(
 /**
  * Refuses an organization that names an organization of its own: an
  * organization belongs to none, so its metadata.org is always empty.
+ *
+ * An org that names the organization itself, by its own id or slug, is
+ * cleared instead: earlier releases stored an organization's own slug
+ * there (clients sent it on create), so its `get -o yaml` manifest, and
+ * the clients of that time, still carry it. Stored rows are not
+ * rewritten; an update keeps what the row holds.
  */
 export function newRefuseOrganizationOrgStep(): PipelineStep<
   typeof OrganizationSchema
@@ -91,7 +97,13 @@ export function newRefuseOrganizationOrgStep(): PipelineStep<
   return {
     name: "RefuseOrganizationOrg",
     execute(ctx: RequestContext<typeof OrganizationSchema>): void {
-      if ((metadataOf(ctx.newState)?.org ?? "") !== "") {
+      const metadata = metadataOf(ctx.newState);
+      const org = metadata?.org ?? "";
+      if (metadata !== undefined && org !== "" && (org === metadata.id || org === metadata.slug)) {
+        metadata.org = "";
+        return;
+      }
+      if (org !== "") {
         throw invalidArgumentError(
           "an organization belongs to no organization: metadata.org must be empty",
         );

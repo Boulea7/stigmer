@@ -15,8 +15,10 @@
  * stricter than the SDK's, on purpose: the document's `kind` must be the
  * one its location promises (an `agent.yaml` holding a Workflow is a
  * mistake, not a choice), and a `metadata.org` other than the installing
- * organization is refused rather than honoured with a warning, because an
- * overlay is materialised on the caller's behalf and must not reach across
+ * organization is refused rather than honoured with a warning
+ * (`checkOverlayOrg`, judged once the document's organization names are
+ * resolved to ids: overlay/documents.ts), because an overlay is
+ * materialised on the caller's behalf and must not reach across
  * organizations.
  *
  * Protovalidate is not run here: it runs where it always runs, in the
@@ -26,7 +28,7 @@
  * accepts and refuses.
  */
 import { fromJson } from "@bufbuild/protobuf";
-import type { DescMessage, JsonValue, MessageShape } from "@bufbuild/protobuf";
+import type { DescMessage, JsonValue, Message, MessageShape } from "@bufbuild/protobuf";
 import { load as loadYaml } from "js-yaml";
 
 import { metadataOf } from "../../../pipeline/steps/shapes.js";
@@ -46,8 +48,6 @@ export interface OverlayExpectation<Desc extends DescMessage> {
   readonly schema: Desc;
   /** The YAML `kind` the location promises: "Agent", "Workflow", "McpServer". */
   readonly yamlKind: string;
-  /** The organization the plugin is installed into; the document's must be empty or equal. */
-  readonly org: string;
 }
 
 /** Parses one overlay document into its proto, strictly. */
@@ -99,17 +99,21 @@ export function parseOverlayDocument<Desc extends DescMessage>(
     );
   }
 
+  return message;
+}
+
+/**
+ * Refuses a document whose metadata.org is not the installing
+ * organization's id; an empty one is the installing organization's. Read
+ * after the document's organization names are resolved, so a slug that
+ * names the installing organization passes.
+ */
+export function checkOverlayOrg(path: string, message: Message, org: string): void {
   const metadata = metadataOf(message);
-  if (
-    metadata !== undefined &&
-    metadata.org !== "" &&
-    metadata.org !== expectation.org
-  ) {
+  if (metadata !== undefined && metadata.org !== "" && metadata.org !== org) {
     throw new OverlayParseError(
       path,
-      `metadata.org '${metadata.org}' is not the organization the plugin is installed into ('${expectation.org}')`,
+      `metadata.org '${metadata.org}' is not the organization the plugin is installed into ('${org}')`,
     );
   }
-
-  return message;
 }

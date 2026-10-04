@@ -1313,7 +1313,7 @@ Input for creating or updating an Agent Execution.
   type={{
     name: { type: "string", description: "Resource name.", required: true },
     slug: { type: "string", description: "URL-friendly identifier." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
     labels: { type: "Record<string, string>", description: "Key-value labels." },
     sessionId: { type: "string", description: "Session ID this execution belongs to (optional)." },
     agentId: { type: "string", description: "Agent ID (optional)." },

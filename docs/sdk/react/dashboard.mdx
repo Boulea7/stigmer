@@ -234,7 +234,7 @@ Options for [`useAgentExecutionSummary`](#useagentexecutionsummary).
 
 <TypeTable
   type={{
-    org: { type: "string | null | undefined", description: "Organization slug. When empty/null, the hook does not fetch.", required: true },
+    org: { type: "string | null | undefined", description: "Organization id (a slug is also accepted). When empty/null, the hook does not fetch.", required: true },
     refetchInterval: { type: "number | false", description: "Refetch interval in milliseconds. `0` or `false` disables." },
     timeWindow: { type: "AgentExecutionSummaryTimeWindow", description: "Time window for aggregation." },
   }}

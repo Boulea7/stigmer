@@ -244,6 +244,37 @@ describe("organization names (composed server, trusted-local posture)", () => {
     expect(await resolve("nested")).toBeUndefined();
   });
 
+  it("an organization naming itself, as earlier releases stored it, is cleared rather than refused", async () => {
+    // A create from a client of that time sends its own slug as its org.
+    const made = await organizations.create({
+      ...organizationInput("selfnamed"),
+      metadata: { name: "selfnamed", slug: "selfnamed", org: "selfnamed" },
+    });
+    expect(made.metadata?.org).toBe("");
+
+    // An organization an earlier release made stores its slug, its id, as
+    // its org; applying its own `get -o yaml` back succeeds, and the row
+    // keeps what it holds.
+    await server.store.saveResource(
+      ApiResourceKind.organization,
+      "olden",
+      OrganizationSchema,
+      create(OrganizationSchema, {
+        apiVersion: "tenancy.stigmer.ai/v1",
+        kind: "Organization",
+        metadata: { id: "olden", slug: "olden", name: "Olden", org: "olden" },
+      }),
+    );
+    await server.store.resourceNames.claim(organizationNameKey("olden"), "olden", new Date().toISOString());
+    const applied = await organizations.apply({
+      ...organizationInput("olden"),
+      metadata: { id: "olden", name: "Olden", slug: "olden", org: "olden" },
+      spec: { description: "applied back from its own manifest" },
+    });
+    expect(applied.metadata?.id).toBe("olden");
+    expect(applied.spec?.description).toBe("applied back from its own manifest");
+  });
+
   it("of two concurrent creates of one slug, exactly one succeeds and the other is a duplicate", async () => {
     const results = await Promise.allSettled([
       organizations.create(organizationInput("contended")),

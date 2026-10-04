@@ -748,7 +748,7 @@ Input for creating or updating an Identity Account.
   type={{
     name: { type: "string", description: "Resource name.", required: true },
     slug: { type: "string", description: "URL-friendly identifier." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
     labels: { type: "Record<string, string>", description: "Key-value labels." },
     idpId: { type: "string", description: "IDP ID of the identity account.", required: true },
     email: { type: "string", description: "Email of the identity account." },
