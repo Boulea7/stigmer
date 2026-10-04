@@ -190,7 +190,7 @@ describe.skipIf(testDatabaseAdminUrl() === undefined)(
         await expect
           .poll(async () => {
             const connections = await client.query<{ n: number }>(
-              `SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()`,
+              `SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND backend_type = 'client backend' AND pid <> pg_backend_pid()`,
             );
             return connections.rows[0]!.n;
           })

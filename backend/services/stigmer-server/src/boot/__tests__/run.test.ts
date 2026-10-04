@@ -8,7 +8,7 @@
  *   - SIGTERM runs the composed shutdown and exits 0, and a second signal
  *     does nothing more; a shutdown that fails is logged and exits 1;
  *   - a failed start is logged and exits 1, with no ready line;
- *   - a composition failure rejects, for the entry to report on stderr.
+ *   - a composition failure rejects, for the entry to report on stderr;
  *   - a newer database schema rejects before listening or announcing readiness.
  *
  * The shipped entry itself (main.ts) is proven on the built artifact by
