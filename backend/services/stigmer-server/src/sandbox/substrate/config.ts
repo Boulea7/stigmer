@@ -12,12 +12,19 @@
  * Substrate's `ate-client` account elsewhere). A missing required value is
  * one boot throw naming the variable.
  *
- * The idle windows default to the hypothesis this driver ships with (a
- * pause after 5 idle minutes, a suspend to storage after 30) until
- * measurements replace them. Boot refuses windows that would keep a
- * sandbox paused for longer than MAX_IN_PLACE_PAUSE_SECONDS, the longest
- * a paused runner may sleep and still renew its credential on waking
- * (driver.ts).
+ * The idle windows default to a pause after 5 idle minutes and a suspend
+ * to storage at 5.5, chosen from measurements on a local Agent Substrate
+ * cluster (kind, Substrate v0.3.0, 2026-10-03), timed from the server
+ * accepting a message to the runner starting on it: a wake from storage
+ * took 1.73 s at the 95th percentile and never more than 1.76 s, while a
+ * sandbox paused for 1 to 25 minutes woke in 3.79 s at the 95th percentile
+ * and once in 12 s, its paused state's restore growing with the pause. So
+ * a sandbox stays paused only briefly before it is suspended, and the
+ * sweep runs every 30 s, because a suspend lands on the pass after the
+ * pause and the interval is what bounds how long a sandbox stays paused. Boot refuses
+ * windows that would keep a sandbox paused for longer than
+ * MAX_IN_PLACE_PAUSE_SECONDS, the longest a paused runner may sleep and
+ * still renew its credential on waking (driver.ts).
  */
 import { MAX_IN_PLACE_PAUSE_SECONDS } from "./limits.js";
 
@@ -117,8 +124,8 @@ export function newSubstrateSettingsFromEnv(
     httpsEgress,
     extraHttpEgress: parseDestinations(optional("EGRESS_HTTP", "")),
     pauseAfterSeconds: seconds("PAUSE_AFTER_SECONDS", 300),
-    suspendAfterSeconds: seconds("SUSPEND_AFTER_SECONDS", 1800),
-    sweepIntervalSeconds: seconds("SWEEP_INTERVAL_SECONDS", 60),
+    suspendAfterSeconds: seconds("SUSPEND_AFTER_SECONDS", 330),
+    sweepIntervalSeconds: seconds("SWEEP_INTERVAL_SECONDS", 30),
   };
   validateWindows(settings);
   return settings;
