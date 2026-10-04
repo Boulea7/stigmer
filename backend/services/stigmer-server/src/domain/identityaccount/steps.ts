@@ -18,8 +18,8 @@
  *     proto-required, and a machine subject whose IdP releases no email
  *     must still provision.
  *   - DeriveAccountId: `metadata.id = accountIdFor(spec.idp_id)`,
- *     replacing whatever the caller sent (the organization's CopySlugToId
- *     precedent, `metadata.proto`'s documented exception). Runs BEFORE
+ *     replacing whatever the caller sent (`metadata.proto`'s documented
+ *     exception). Runs BEFORE
  *     BuildNewState and claims the id through `assignServerId`, the one
  *     way an id survives that step (stigmer/stigmer#1266).
  *   - CheckDuplicate: by SUBJECT, a primary-key read of the derived id —

@@ -52,7 +52,7 @@ message SearchRequest {
 
   // Organization to scope the search.
   //
-  // Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+  // The organization's slug (e.g., "acme") or its id (org_<ulid>).
   //
   // Behavior:
   // - Empty: Search all organizations the caller has access to
@@ -62,7 +62,7 @@ message SearchRequest {
   // Caller must have access to at least one resource in the org.
   string org = 3 [
     (buf.validate.field).string.max_len = 63,
-    (buf.validate.field).string.pattern = "^$|^[a-z][a-z0-9-]*$"
+    (buf.validate.field).string.pattern = "^$|^[a-z][a-z0-9-]*$|^org_[0-9a-z]{26}$"
   ];
 
   // 4 was exclude_public and 6 was cross_org_public, the two switches of
@@ -163,15 +163,17 @@ message SearchResult {
   // From metadata.slug.
   string slug = 4;
 
-  // Fully qualified slug: "org/slug".
+  // Fully qualified reference: "<org>/<slug>", where org is the owning
+  // organization's id, as metadata.org carries it.
   //
-  // Pre-computed for CLI and UI display.
-  // Example: "stigmer/web-search", "acme/code-reviewer"
+  // Example: "org_01j5q3k7m8r2s4tnz2hf6w8x9a/code-reviewer"; an organization
+  // made before ids were minted reads "acme/code-reviewer".
   //
-  // This is the canonical reference format used in YAML configurations.
+  // A reference in this form resolves as written. Clients that show it to a
+  // person put the organization's slug in place of its id.
   string qualified_slug = 5;
 
-  // Organization that owns this resource (e.g., "stigmer", "acme-corp").
+  // Organization that owns this resource, by id (e.g., "org_01j5q3k7m8r2s4tnz2hf6w8x9a").
   //
   // @internal
   // From metadata.org.

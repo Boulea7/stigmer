@@ -315,7 +315,7 @@ describe.skipIf(!enforcementServed)(
         .clientsPresenting(token)
         .organizationQuery.findMyOrganizations({});
       expect(
-        mine.entries.map((organization) => organization.metadata?.slug),
+        mine.entries.map((organization) => organization.metadata?.id),
       ).toEqual([context.org]);
     });
 

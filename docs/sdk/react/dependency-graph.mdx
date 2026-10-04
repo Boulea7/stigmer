@@ -158,7 +158,7 @@ Options for [`useDependencyGraph`](#usedependencygraph).
 <TypeTable
   type={{
     agentName: { type: "string", description: "Display name of the agent (used as the root node label).", required: true },
-    agentOrg: { type: "string", description: "Organization slug of the agent (used for cross-org label detection).", required: true },
+    agentOrg: { type: "string", description: "Id of the agent's organization, as its `metadata.org` stores it (compared with each reference's org for cross-org label detection).", required: true },
     spec: { type: "{ mcpServerUsages: readonly { enabledTools: readonly string[]; mcpServerRef?: { org: string; slug: string }; toolApprovalOverrides: readonly unknown[] }[]; skillRefs: readonly { org: string; slug: string }[]; subAgents: readonly { description: string; mcpAccess: readonly { enabledTools: readonly string[]; mcpServer: string }[]; modelOverride: string; name: string; skillRefs: readonly { org: string; slug: string }[] }[] } | undefined", description: "The agent's spec containing dependency references. Pass `undefined` while the agent is loading — the hook returns `null` for `tree` and `true` for `isEmpty`.", required: true },
   }}
 />

@@ -20,10 +20,12 @@ const SCHEDULES_ORG = "e2e-schedules";
  *   round-tripping a schedule that carries tags).
  */
 
-async function pinActiveOrg(page: Page): Promise<void> {
+/** Makes the schedules organization the console's active one (stored by id) before the first page loads. */
+async function pinActiveOrg(page: Page, stigmerClient: Stigmer): Promise<void> {
+  const id = await ensureOrg(stigmerClient, SCHEDULES_ORG, "E2E schedules");
   await page.addInitScript((org) => {
-    localStorage.setItem("stigmer:activeOrgSlug", org);
-  }, SCHEDULES_ORG);
+    localStorage.setItem("stigmer:activeOrg", org);
+  }, id);
 }
 
 /**
@@ -71,8 +73,8 @@ async function createTestSchedule(
 }
 
 test.describe("Schedules list page", () => {
-  test.beforeEach(async ({ page }) => {
-    await pinActiveOrg(page);
+  test.beforeEach(async ({ page, stigmerClient }) => {
+    await pinActiveOrg(page, stigmerClient);
   });
 
   test("renders heading, workbench, both creation paths — and no search box", async ({
@@ -135,8 +137,8 @@ test.describe("Schedules list page", () => {
 });
 
 test.describe("Schedule creation form", () => {
-  test.beforeEach(async ({ page }) => {
-    await pinActiveOrg(page);
+  test.beforeEach(async ({ page, stigmerClient }) => {
+    await pinActiveOrg(page, stigmerClient);
   });
 
   test("creates a schedule from the form with the Daily preset", async ({
@@ -206,8 +208,8 @@ test.describe("Schedule creation form", () => {
 });
 
 test.describe("Schedule detail tabs and inline editing", () => {
-  test.beforeEach(async ({ page }) => {
-    await pinActiveOrg(page);
+  test.beforeEach(async ({ page, stigmerClient }) => {
+    await pinActiveOrg(page, stigmerClient);
   });
 
   test("deep-links to the Runs tab and inline-edits the message losslessly", async ({
@@ -270,8 +272,8 @@ test.describe("Schedule detail tabs and inline editing", () => {
 });
 
 test.describe("Disabled-vs-paused rendering", () => {
-  test.beforeEach(async ({ page }) => {
-    await pinActiveOrg(page);
+  test.beforeEach(async ({ page, stigmerClient }) => {
+    await pinActiveOrg(page, stigmerClient);
   });
 
   test("owner-disabled schedule shows the banner and Enable re-applies losslessly", async ({

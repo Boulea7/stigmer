@@ -63,6 +63,7 @@ import {
   encodeInProcessCaller,
   serverActingFor,
 } from "../../pipeline/interceptors/auth.js";
+import { organizationNameKey } from "../../domain/organization/names.js";
 import { newSingleOrganizationHolder } from "../../pipeline/interceptors/single-organization.js";
 import type { PipelineStep } from "../../pipeline/pipeline.js";
 
@@ -187,18 +188,20 @@ describe("ensureSingleOrganization", () => {
     const { holder, run } = ensure();
     await run();
 
+    // The server's organization is named `stigmer` and filed under an id
+    // the create minted; the record, the holder and the log carry that id.
     const held = await organizations();
-    expect(held.map((org) => org.metadata?.id)).toEqual(["stigmer"]);
+    expect(held.map((org) => org.metadata?.slug)).toEqual(["stigmer"]);
+    const id = held[0]?.metadata?.id ?? "";
+    expect(id).toMatch(/^org_[0-9a-z]{26}$/);
     expect(held[0]?.metadata?.org).toBe("");
     expect(held[0]?.status?.audit?.specAudit?.createdBy?.id).toBe("system");
-    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(
-      "stigmer",
-    );
-    expect(holder.current()).toBe("stigmer");
+    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(id);
+    expect(holder.current()).toBe(id);
     expect(lines).toContainEqual(
       expect.objectContaining({
         message: "single organization ensured",
-        org: "stigmer",
+        org: id,
       }),
     );
   });
@@ -257,11 +260,15 @@ describe("ensureSingleOrganization", () => {
 
   it("a store whose ledger retired the slug, holding none, warns, fills nothing and boots", async () => {
     await composeWith();
-    await server.store.organizationSlugs.claim("stigmer");
-    await server.store.organizationSlugs.retire("stigmer");
+    // The upgrade carries a slug the old ledger retired as a name reserved
+    // for good: an earlier release's deleted `stigmer`, whose id it was.
+    await server.store.resourceNames.claim(organizationNameKey("stigmer"), "stigmer", new Date().toISOString());
+    await server.store.resourceNames.release("organization", "", "stigmer");
     const { holder, run } = ensure();
+    const started = Date.now();
     await run();
 
+    expect(Date.now() - started, "no wait for a winner that will never come").toBeLessThan(500);
     expect(await organizations()).toHaveLength(0);
     expect(holder.current()).toBeUndefined();
     expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe("");
@@ -272,6 +279,7 @@ describe("ensureSingleOrganization", () => {
     expect(lines).toContainEqual(
       expect.objectContaining({ level: "warn", slug: "stigmer" }),
     );
+    expect(lines.some((line) => line.message.includes("is reserved for an organization an earlier release made and deleted"))).toBe(true);
   });
 
   it.each([
@@ -322,6 +330,7 @@ describe("ensureSingleOrganization", () => {
       );
     },
   );
+
 
   it("a create that loses the race before the winner's row is stored finds it on a re-read, and fills it", async () => {
     await composeWith();

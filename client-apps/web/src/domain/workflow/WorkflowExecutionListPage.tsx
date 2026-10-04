@@ -4,7 +4,7 @@ import { Activity } from "lucide-react";
 import {
   Button,
   WorkflowExecutionPhaseBadge,
-  useActiveOrgSlug,
+  useActiveOrgId,
   useWorkflowExecutionList,
 } from "@stigmer/react";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
@@ -12,7 +12,7 @@ import { useExecutionNavigation } from "@/domain/workflow/execution-navigation";
 
 export function WorkflowExecutionListPage() {
   const { navigateToExecution } = useExecutionNavigation();
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const {
     executions,
     isLoading,

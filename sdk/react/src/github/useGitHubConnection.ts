@@ -214,7 +214,7 @@ function personalEnvHasKey(
  * hook directly. The styled `WorkspaceEditor` component accepts the
  * return value as a prop.
  *
- * @param org - The active organization slug. Required for server-side
+ * @param org - The active organization id (a slug is also accepted). Required for server-side
  *   token storage. Pass `null` to skip all server operations.
  * @param config - Optional configuration for desktop / non-browser
  *   environments. See {@link UseGitHubConnectionConfig}.

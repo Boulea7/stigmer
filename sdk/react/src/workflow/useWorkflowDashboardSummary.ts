@@ -12,7 +12,7 @@ import { useFetch } from "../internal/useFetch.js";
 export type { SummaryTimeWindow };
 
 export interface UseWorkflowDashboardSummaryOptions {
-  /** Organization slug. When empty, the hook does not fetch. */
+  /** Organization id (a slug is also accepted). When empty, the hook does not fetch. */
   readonly org: string | null | undefined;
   /** Time window for aggregation. @default SUMMARY_TIME_WINDOW_LAST_7D */
   readonly timeWindow?: SummaryTimeWindow;

@@ -23,7 +23,7 @@
           "type": {
             "kind": "string"
           },
-          "description": "URL-friendly identifier, unique within the organization.\n Combined with org, forms the canonical reference: \"org/slug\".\n Format: lowercase alphanumeric characters and hyphens (min 2 chars);\n must start with a letter and end with a letter or digit. When empty,\n the server derives the slug from the name.",
+          "description": "URL-friendly identifier, unique within the organization (an\n Organization's own slug is unique across the server).\n Combined with org, forms the canonical reference: \"org/slug\".\n Fixed once created: update and apply ignore a changed slug. A kind\n whose slug may change has a rename RPC (Organization does).\n Format: lowercase alphanumeric characters and hyphens (min 2 chars);\n must start with a letter and end with a letter or digit. When empty,\n the server derives the slug from the name.",
           "required": false,
           "validation": {
             "minLength": 2,
@@ -37,7 +37,7 @@
           "type": {
             "kind": "string"
           },
-          "description": "System-generated unique identifier.\n\n For every kind this is a generated, prefixed id (e.g. agt_\u003culid\u003e). Three\n kinds derive it from their natural key instead: Organization's id equals\n its slug (the globally unique tenancy root is addressed by slug, not a\n minted id); a direct IdentityAccount's id is derived from its issuer\n subject (`ida_` followed by 26 Crockford-base32 characters of\n sha256(spec.idp_id)), so one subject can only ever be one account; and\n an IamPolicy's id is derived from its triple (`iamp_` followed by 26\n Crockford-base32 characters of sha256 over\n `principal.kind:principal.id#principal.relation@resource.kind:resource.id#relation`),\n so one grant can only ever be one row.",
+          "description": "System-generated unique identifier.\n\n For every kind this is a generated, prefixed id (e.g. agt_\u003culid\u003e,\n org_\u003culid\u003e). An organization made by a release before organization ids\n were minted keeps the id it was given then, which equals its first slug.\n Two kinds derive it from their natural key instead: a direct\n IdentityAccount's id is derived from its issuer subject (`ida_` followed by 26 Crockford-base32 characters of\n sha256(spec.idp_id)), so one subject can only ever be one account; and\n an IamPolicy's id is derived from its triple (`iamp_` followed by 26\n Crockford-base32 characters of sha256 over\n `principal.kind:principal.id#principal.relation@resource.kind:resource.id#relation`),\n so one grant can only ever be one row.",
           "required": false
         },
         {
@@ -47,7 +47,7 @@
           "type": {
             "kind": "string"
           },
-          "description": "Organization that owns this resource.\n On a server that holds one organization (the open-source edition,\n GetServerInfoOutput.single_org), an empty org is that organization:\n the server makes it the first time it starts and fills it into every\n request that leaves it empty.\n On a server that holds several: required, and enforced by\n authorization.\n All resources belong to exactly one organization.",
+          "description": "Organization that owns this resource, by id.\n A request may name it by id or by slug; the server stores, and answers\n with, the id, so a resource stays in its organization across a rename.\n On a server that holds one organization (the open-source edition,\n GetServerInfoOutput.single_org), an empty org is that organization:\n the server makes it the first time it starts and fills it into every\n request that leaves it empty.\n On a server that holds several: required, and enforced by\n authorization.\n Every organization-scoped resource belongs to exactly one organization.\n An Organization's own org is always empty: it belongs to no\n organization.",
           "required": false
         },
         {
@@ -376,7 +376,7 @@
         {
           "name": "organization",
           "number": 30,
-          "description": "The boundary that holds people, Agents, Workflows, Sessions and secrets\n together; nothing outside it sees them.\n\n Organization is the one resource whose metadata.id equals its metadata.slug\n (set by the create pipeline), not a minted org_\u003culid\u003e. It is the immutable,\n globally unique tenancy root that every child resource references by slug\n (metadata.org), so its slug is globally unique and doubles as its id.\n id_prefix below is retained deliberately: it still anchors legacy org_\u003culid\u003e\n records and the CLI's id-vs-slug detection — it is not used to mint new ids."
+          "description": "The boundary that holds people, Agents, Workflows, Sessions and secrets\n together; nothing outside it sees them.\n\n Its id is a minted org_\u003culid\u003e that never changes; every organization-scoped\n resource names it by that id (metadata.org). Its slug is unique across the\n server and may change through rename; requests may name the organization\n by either."
         },
         {
           "name": "platform",

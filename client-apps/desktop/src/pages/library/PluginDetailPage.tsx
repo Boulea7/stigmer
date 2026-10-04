@@ -8,6 +8,7 @@ import {
   ConfirmDialog,
   useBreadcrumbOverride,
   type DetailAction,
+  useOrgSlugForId,
 } from "@stigmer/react";
 
 /**
@@ -22,6 +23,7 @@ function agentSessionUrl(org: string, slug: string): string {
 export default function PluginDetailPage() {
   const { org, slug } = useParams<{ org: string; slug: string }>();
   const navigate = useNavigate();
+  const slugForOrg = useOrgSlugForId();
   const { setLabel } = useBreadcrumbOverride();
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [resourceName, setResourceName] = useState<string>("Plugin");
@@ -94,10 +96,10 @@ export default function PluginDetailPage() {
         slug={slug}
         onResourceLoad={handleResourceLoad}
         onStartSession={({ org: o, slug: s }) => navigate(agentSessionUrl(o, s))}
-        onSkillClick={({ org: o, slug: s }) => navigate(`/library/skills/${o}/${s}`)}
-        onMcpServerClick={({ org: o, slug: s }) => navigate(`/library/mcp-servers/${o}/${s}`)}
-        onAgentClick={({ org: o, slug: s }) => navigate(`/library/agents/${o}/${s}`)}
-        onWorkflowClick={({ org: o, slug: s }) => navigate(`/library/workflows/${o}/${s}`)}
+        onSkillClick={({ org: o, slug: s }) => navigate(`/library/skills/${slugForOrg(o)}/${s}`)}
+        onMcpServerClick={({ org: o, slug: s }) => navigate(`/library/mcp-servers/${slugForOrg(o)}/${s}`)}
+        onAgentClick={({ org: o, slug: s }) => navigate(`/library/agents/${slugForOrg(o)}/${s}`)}
+        onWorkflowClick={({ org: o, slug: s }) => navigate(`/library/workflows/${slugForOrg(o)}/${s}`)}
         onCreateAgent={(usages) =>
           navigate(`/library/agents/new?mcp=${usages.map((u) => encodeURIComponent(u.mcpServerRef.slug)).join(",")}`)
         }

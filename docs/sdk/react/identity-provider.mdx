@@ -315,7 +315,7 @@ All visual properties flow through `--stgm-*` design tokens.
     className: { type: "string", description: "Additional CSS class names for the root container." },
     onCancel: { type: "() => void", description: "Fired when the user cancels creation." },
     onCreated: { type: "(idp: IdentityProvider) => void", description: "Fired with the newly created identity provider on success." },
-    org: { type: "string", description: "Organization slug — the IdP will be created in this org.", required: true },
+    org: { type: "string", description: "Organization id — the IdP will be created in this org (a slug is also accepted).", required: true },
   }}
 />
 
@@ -390,7 +390,7 @@ All visual properties flow through `--stgm-*` design tokens.
     emptyState: { type: "ReactNode", description: "Shown when the list is empty. Defaults to \"No identity providers configured.\" The list holds only the providers the caller may view, so a host that knows the caller may not manage providers should say who does instead." },
     onEdit: { type: "(idp: IdentityProvider) => void", description: "Fired when the user wants to edit an identity provider." },
     onRefetchRef: { type: "(refetch: () => void) => void", description: "Expose the refetch function so parents can trigger a list refresh." },
-    org: { type: "string", description: "Organization slug whose identity providers should be listed.", required: true },
+    org: { type: "string", description: "Id of the organization whose identity providers should be listed (a slug is also accepted).", required: true },
   }}
 />
 
@@ -432,7 +432,7 @@ All visual properties flow through `--stgm-*` design tokens.
     className: { type: "string", description: "Additional CSS class names for the root container." },
     onCancel: { type: "() => void", description: "Fired when the user cancels the wizard." },
     onCreated: { type: "(idp: IdentityProvider) => void", description: "Fired with the newly created identity provider on success." },
-    org: { type: "string", description: "Organization slug — the IdP will be created in this org.", required: true },
+    org: { type: "string", description: "Organization id — the IdP will be created in this org (a slug is also accepted).", required: true },
   }}
 />
 

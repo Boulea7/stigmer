@@ -34,6 +34,7 @@ import type { PreparedInstall } from "./sources/read.js";
 import { type InstallPluginOutcome, useInstallPlugin } from "./useInstallPlugin.js";
 import { useInstallRelation } from "./useInstallRelation.js";
 import { type PluginUploadPhase, looksLikeDroppedDotfiles, usePluginUpload } from "./usePluginUpload.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Props for {@link PluginUploader}. */
 export interface PluginUploaderProps {
@@ -202,6 +203,7 @@ function PreviewPhase({
   readonly onBack: () => void;
   readonly onComplete?: (outcome: InstallPluginOutcome) => void;
 }) {
+  const slugForOrg = useOrgSlugForId();
   const relation = useInstallRelation(prepared, org);
   const { install, isInstalling, error: installError } = useInstallPlugin();
   const [outcome, setOutcome] = useState<InstallPluginOutcome | null>(null);
@@ -225,7 +227,7 @@ function PreviewPhase({
           {verb} {prepared.plugin.name}
         </h2>
         <p className="stg:mt-0.5 stg:text-xs stg:text-muted-foreground">
-          From {describeOrigin(prepared.origin)} into {org}. The archive is rebuilt from the selected files, so its digest is
+          From {describeOrigin(prepared.origin)} into {slugForOrg(org)}. The archive is rebuilt from the selected files, so its digest is
           the one `stigmer push plugin` prints for this folder.
         </p>
       </header>

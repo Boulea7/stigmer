@@ -86,7 +86,7 @@ export interface DependencyGraphProps {
 export interface UseDependencyGraphOptions {
   /** Display name of the agent (used as the root node label). */
   readonly agentName: string;
-  /** Organization slug of the agent (used for cross-org label detection). */
+  /** Id of the agent's organization, as its `metadata.org` stores it (compared with each reference's org for cross-org label detection). */
   readonly agentOrg: string;
   /**
    * The agent's spec containing dependency references.

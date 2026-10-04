@@ -70,7 +70,11 @@ const KEYS: Record<string, ConfigKey> = {
   "context.org": {
     get: (config) => config.context?.org ?? "",
     set: (config, value) => {
-      (config.context ??= {}).org = value;
+      // The raw escape hatch stores the value as given; the slug stored
+      // beside an earlier checked value would no longer describe it.
+      const context = (config.context ??= {});
+      context.org = value;
+      delete context.org_slug;
     },
   },
 };

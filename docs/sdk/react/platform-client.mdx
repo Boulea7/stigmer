@@ -283,7 +283,7 @@ All visual properties flow through `--stgm-*` design tokens.
     className: { type: "string", description: "Additional CSS class names for the root container." },
     onCancel: { type: "() => void", description: "Fired when the user cancels creation." },
     onCreated: { type: "(response: PlatformClientCreateResponse) => void", description: "Fired with the full PlatformClientCreateResponse on success. The response includes the one-time raw `clientSecret`." },
-    org: { type: "string", description: "Organization slug — the PlatformClient will be created in this org.", required: true },
+    org: { type: "string", description: "Organization id — the PlatformClient will be created in this org (a slug is also accepted).", required: true },
   }}
 />
 
@@ -371,7 +371,7 @@ All visual properties flow through `--stgm-*` design tokens.
     now: { type: "Date", description: "Reference instant for the \"last used\" relative stamp. Defaults to the live clock. **Deterministic hosts (documentation embeds, video export) must pass a frozen instant** — otherwise a depicted client's \"2h ago\" drifts with every replay." },
     onEdit: { type: "(pc: PlatformClient) => void", description: "Fired when the user wants to edit a platform client." },
     onRefetchRef: { type: "(refetch: () => void) => void", description: "Expose the refetch function so parents can trigger a list refresh." },
-    org: { type: "string", description: "Organization slug whose platform clients should be listed.", required: true },
+    org: { type: "string", description: "Id of the organization whose platform clients should be listed (a slug is also accepted).", required: true },
   }}
 />
 

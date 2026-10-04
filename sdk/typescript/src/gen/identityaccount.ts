@@ -106,7 +106,7 @@ export class IdentityAccountClient {
   }
 }
 
-/** Input for creating/updating a IdentityAccount. */
+/** Input for creating/updating an IdentityAccount. */
 export interface IdentityAccountInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

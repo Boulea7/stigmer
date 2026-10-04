@@ -122,6 +122,8 @@ import {
   collectAgentCallReferences,
   newValidateAgentCallReferencesStep,
 } from "./agent-call-references.js";
+import { newResolveAgentCallOrganizationsStep } from "./agent-call-organizations.js";
+import { newOrganizationNameResolver } from "../organization/names.js";
 import {
   newCleanupIamPoliciesStep,
   newCreateAuthorizationTuplesStep,
@@ -250,6 +252,7 @@ async function createWorkflow(
     .addStep(newGuardReservedLabelsStep(deps.authorizer))
     .addStep(newNormalizeReferencesStep())
     .addStep(newValidateReferencesStep(deps.store, deps.authorizer))
+    .addStep(newResolveAgentCallOrganizationsStep(newOrganizationNameResolver(deps.store)))
     .addStep(newValidateAgentCallReferencesStep(deps.store, deps.authorizer))
     .addStep(newPopulateServerlessValidationStep(deps.logger))
     .addStep(newComputeVersionHashStep(deps.logger))
@@ -316,6 +319,7 @@ async function update(
     .addStep(newGuardReservedLabelsStep(deps.authorizer))
     .addStep(newNormalizeReferencesStep())
     .addStep(newValidateReferencesStep(deps.store, deps.authorizer))
+    .addStep(newResolveAgentCallOrganizationsStep(newOrganizationNameResolver(deps.store)))
     .addStep(newValidateAgentCallReferencesStep(deps.store, deps.authorizer))
     .addStep(newPopulateServerlessValidationStepForUpdate(deps.logger))
     .addStep(newComputeVersionHashStep(deps.logger))

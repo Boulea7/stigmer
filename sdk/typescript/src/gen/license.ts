@@ -55,8 +55,8 @@ export interface LicenseInput {
   name: string;
   slug?: string;
   /**
-   * Always empty: a License belongs to the platform, not to an
-   * organization, so `metadata.org` stays unset. Omit it.
+   * Always empty: a License belongs to no organization, so
+   * `metadata.org` stays unset. Omit it.
    */
   org?: "";
   labels?: Record<string, string>;

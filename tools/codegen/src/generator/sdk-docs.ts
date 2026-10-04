@@ -12,6 +12,7 @@ import { marshalIndent } from "../gojson.js";
 import { goTrimSpace } from "../internalcomment/internalcomment.js";
 import type { EnumSchema, MethodSchema, ServiceSchemaFile } from "./gen-common.js";
 import {
+  indefiniteArticle,
   isEmptyType,
   isIDType,
   isSpecialType,
@@ -720,7 +721,7 @@ function docWriteTypesWithCommons(
   const inputName = cfg.inputPrefix + "Input";
   const displayName = docDisplayName(cfg.protoResType);
   buf.push(`### ${inputName}\n\n`);
-  buf.push(`Input for creating or updating ${docArticle(displayName)} ${displayName}.\n\n`);
+  buf.push(`Input for creating or updating ${indefiniteArticle(displayName)} ${displayName}.\n\n`);
 
   const specFields = specSchema.fields.filter((f) => !META_FIELD_NAMES.has(f.name));
 
@@ -728,7 +729,7 @@ function docWriteTypesWithCommons(
   buf.push('    name: { type: "string", description: "Resource name.", required: true },\n');
   buf.push('    slug: { type: "string", description: "URL-friendly identifier." },\n');
   if (!cfg.isOrgless) {
-    buf.push('    org: { type: "string", description: "Organization slug.", required: true },\n');
+    buf.push('    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },\n');
   }
   buf.push('    labels: { type: "Record<string, string>", description: "Key-value labels." },\n');
   for (const f of specFields) {
@@ -1171,20 +1172,6 @@ function docExampleID(idPrefix: string): string {
 
 function docExampleResourceName(protoResType: string): string {
   return "my-" + docSlug(protoResType);
-}
-
-function docArticle(name: string): string {
-  if (name.length === 0) return "a";
-  switch (name[0].toLowerCase()) {
-    case "a":
-    case "e":
-    case "i":
-    case "o":
-    case "u":
-      return "an";
-    default:
-      return "a";
-  }
 }
 
 // =========================================================================

@@ -41,7 +41,7 @@ export interface McpServerWizardData {
   readonly env: EnvVarEntry[];
   /** Whether OAuth auth configuration is enabled. */
   readonly authEnabled: boolean;
-  /** OAuth app reference — organization slug. */
+  /** OAuth app reference — its organization, by slug or id. */
   readonly authOAuthAppOrg: string;
   /** OAuth app reference — app slug. */
   readonly authOAuthAppSlug: string;

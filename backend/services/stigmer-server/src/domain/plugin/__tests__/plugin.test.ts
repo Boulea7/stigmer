@@ -65,7 +65,10 @@ import {
   PLUGIN_VERSION_LABEL,
   SYSTEM_LABEL,
 } from "../../../pipeline/apiresource-labels.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -73,6 +76,9 @@ const silentLogger = createLogger({
   write: () => {},
 });
 const ORG = "acme";
+// The id the server minted for ORG: the refusal copies name the
+// organization by the id its rows store.
+let ORG_ID: string;
 
 let server: ComposedServer;
 let plugins: Client<typeof PluginCommandController>;
@@ -109,7 +115,7 @@ beforeAll(async () => {
   const transport: Transport = createGrpcTransport({
     baseUrl: `http://127.0.0.1:${port}`,
   });
-  await seedOrganizations(transport, [ORG]);
+  ORG_ID = organizationId(await seedOrganizations(transport, [ORG]), ORG);
   plugins = createClient(PluginCommandController, transport);
   pluginQuery = createClient(PluginQueryController, transport);
   agents = createClient(AgentCommandController, transport);
@@ -749,6 +755,35 @@ describe("Plugin push — refusals before any write", () => {
     );
     expect(agent.metadata?.labels[PLUGIN_LABEL]).toBe(installed.metadata?.id);
   });
+
+  it("refuses an overlay that names another organization, naming the installing one by its slug", async () => {
+    const name = uniqueName("overlayforeign");
+    const fixture = withFile(
+      thermosLike(name),
+      "ai.stigmer/agent.yaml",
+      `apiVersion: agentic.stigmer.ai/v1\nkind: Agent\nmetadata:\n  name: ${name}\n  org: somebody-else\nspec:\n  instructions: The author's own instructions for this agent.\n`,
+    );
+    await expectCode(
+      plugins.push({ org: ORG, artifact: archiveOf(fixture) }),
+      Code.InvalidArgument,
+      `metadata.org 'somebody-else' is not the organization the plugin is installed into ('${ORG}')`,
+    );
+  });
+
+  it("installs an overlay that names its organization by slug, filing it under the organization's id", async () => {
+    const name = uniqueName("overlayslug");
+    const fixture = withFile(
+      thermosLike(name),
+      "ai.stigmer/agent.yaml",
+      `apiVersion: agentic.stigmer.ai/v1\nkind: Agent\nmetadata:\n  name: ${name}\n  org: ${ORG}\nspec:\n  instructions: The author's own instructions for this agent.\n`,
+    );
+    const installed = await plugins.push({ org: ORG, artifact: archiveOf(fixture) });
+    expect(installed.status?.state).toBe(PluginState.READY);
+    const agent = await agentQuery.getByReference(
+      createMessage(ApiResourceReferenceSchema, { org: ORG, kind: ApiResourceKind.agent, slug: name }),
+    );
+    expect(agent.metadata?.org).toBe(ORG_ID);
+  });
 });
 
 /**
@@ -774,6 +809,9 @@ describe("Plugin push under an authorizer that enforces reserved labels", () => 
   // the hosted default) or the platform operator (granted). The tests flip
   // it, so one composition shows both sides of every reserved-label rule.
   let reservedLabels: "deny" | "allow" = "deny";
+  // Whether the caller may create skills in the organization, which a
+  // plugin's skill members need.
+  let createSkills: "deny" | "allow" = "allow";
 
   beforeAll(async () => {
     enforcingDir = mkdtempSync(path.join(tmpdir(), "plugin-domain-enforcing-"));
@@ -786,6 +824,9 @@ describe("Plugin push under an authorizer that enforces reserved labels", () => 
               ? { kind: "allow" }
               : { kind: "deny", reason: "reserved labels are the platform's" },
           );
+        }
+        if (check.permission === IamPermission.can_create_skill && createSkills === "deny") {
+          return Promise.resolve({ kind: "deny", reason: "members may not create skills" });
         }
         return Promise.resolve({ kind: "allow" });
       },
@@ -860,6 +901,19 @@ describe("Plugin push under an authorizer that enforces reserved labels", () => 
       ),
       Code.NotFound,
     );
+  });
+
+  it("refuses an install whose members the caller may not create, naming the permission and the organization", async () => {
+    createSkills = "deny";
+    try {
+      await expectCode(
+        enforcingPlugins.push({ org: ORG, artifact: archiveOf(thermosLike(uniqueName("plg-noskill"))) }),
+        Code.PermissionDenied,
+        `needs can_create_skill in organization '${ORG}'`,
+      );
+    } finally {
+      createSkills = "allow";
+    }
   });
 
   it("installs a plain overlay under the same authorizer: the platform stamps its own labels through the in-process origin", async () => {

@@ -271,7 +271,7 @@ private static final long serialVersionUID = 0L;
    * <pre>
    * Organization to scope the search.
    *
-   * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+   * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
    *
    * Behavior:
    * - Empty: Search all organizations the caller has access to
@@ -298,7 +298,7 @@ private static final long serialVersionUID = 0L;
    * <pre>
    * Organization to scope the search.
    *
-   * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+   * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
    *
    * Behavior:
    * - Empty: Search all organizations the caller has access to
@@ -1275,7 +1275,7 @@ private static final long serialVersionUID = 0L;
      * <pre>
      * Organization to scope the search.
      *
-     * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+     * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
      *
      * Behavior:
      * - Empty: Search all organizations the caller has access to
@@ -1301,7 +1301,7 @@ private static final long serialVersionUID = 0L;
      * <pre>
      * Organization to scope the search.
      *
-     * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+     * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
      *
      * Behavior:
      * - Empty: Search all organizations the caller has access to
@@ -1328,7 +1328,7 @@ private static final long serialVersionUID = 0L;
      * <pre>
      * Organization to scope the search.
      *
-     * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+     * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
      *
      * Behavior:
      * - Empty: Search all organizations the caller has access to
@@ -1351,7 +1351,7 @@ private static final long serialVersionUID = 0L;
      * <pre>
      * Organization to scope the search.
      *
-     * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+     * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
      *
      * Behavior:
      * - Empty: Search all organizations the caller has access to
@@ -1371,7 +1371,7 @@ private static final long serialVersionUID = 0L;
      * <pre>
      * Organization to scope the search.
      *
-     * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+     * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
      *
      * Behavior:
      * - Empty: Search all organizations the caller has access to

@@ -382,7 +382,7 @@ export interface UseSessionConversationReturn {
  * locally, so it is safe in every environment.
  *
  * @param sessionId - Session to display and converse in. Pass `null` to skip.
- * @param org - Organization slug to act in until the session has loaded; after that the session's own organization is used (the returned `org`).
+ * @param org - Organization id (a slug is also accepted) to act in until the session has loaded; after that the session's own organization is used (the returned `org`).
  *
  * @example
  * ```tsx

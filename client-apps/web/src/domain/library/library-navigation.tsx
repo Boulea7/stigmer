@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
+import { useCanonicalOrgSlug, useOrgSlugForId } from "@stigmer/react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,17 @@ interface ActiveDetail {
   readonly resourceType: LibraryResourceType;
   readonly org: string;
   readonly slug: string;
+  /**
+   * The org segment the detail was opened with, when its spelling was
+   * corrected since (an id, or a slug the org was renamed from, replaced by
+   * the current slug): the view keeps its identity across the correction.
+   */
+  readonly opened?: string;
+}
+
+/** The detail view's identity: a correction of the org segment's spelling keeps it. */
+export function detailKey(detail: ActiveDetail): string {
+  return `${detail.resourceType}/${detail.opened ?? detail.org}/${detail.slug}`;
 }
 
 interface LibraryNavigationValue {
@@ -47,7 +59,11 @@ interface LibraryNavigationValue {
   activeDetail: ActiveDetail | null;
   /** The current library path — either the real pathname or the virtual pushState path. */
   currentLibraryPath: string;
-  /** Navigate to a resource detail page without a full page reload. */
+  /**
+   * Navigate to a resource detail page without a full page reload. `org`
+   * may be the id a stored resource names its org by; the URL carries the
+   * org's slug when it is one of the person's organizations.
+   */
   navigateToDetail: (
     resourceType: LibraryResourceType,
     org: string,
@@ -114,6 +130,12 @@ function detailsEqual(a: ActiveDetail | null, b: ActiveDetail | null): boolean {
  * Static library routes (`/library`, `/library/agents`, etc.) continue
  * to use Next.js `<Link>` routing normally. When Next.js navigates away
  * from the library zone, the provider clears detail state automatically.
+ *
+ * A detail URL's org segment reads the org's current slug: a link built
+ * from a stored org id, or one carrying a slug the org has since been
+ * renamed away from, still opens the page (the server accepts either),
+ * and the URL is then replaced in place, with no new history entry, by
+ * the one naming the current slug.
  */
 export function LibraryNavigationProvider({
   children,
@@ -148,16 +170,43 @@ export function LibraryNavigationProvider({
     activeDetailRef.current = activeDetail;
   }, [activeDetail]);
 
+  const slugForOrg = useOrgSlugForId();
+
   const navigateToDetail = useCallback(
     (resourceType: LibraryResourceType, org: string, slug: string) => {
-      const next: ActiveDetail = { resourceType, org, slug };
+      const next: ActiveDetail = { resourceType, org: slugForOrg(org), slug };
       if (!detailsEqual(activeDetailRef.current, next)) {
         setActiveDetail(next);
         window.history.pushState(null, "", detailToPath(next));
       }
     },
-    [],
+    [slugForOrg],
   );
+
+  // A detail whose org segment is not the org's current slug takes the
+  // current slug (adjusted during render, like the pathname sync above),
+  // and the URL then follows the state in place, adding no history entry.
+  const canonicalOrg = useCanonicalOrgSlug(activeDetail?.org ?? null);
+  if (canonicalOrg && activeDetail && activeDetail.org !== canonicalOrg) {
+    setActiveDetail({ ...activeDetail, org: canonicalOrg, opened: activeDetail.opened ?? activeDetail.org });
+  }
+  useEffect(() => {
+    if (!activeDetail) return;
+    const shown = parseLibraryDetailPath(window.location.pathname);
+    if (
+      !shown ||
+      shown.resourceType !== activeDetail.resourceType ||
+      shown.slug !== activeDetail.slug ||
+      shown.org === activeDetail.org
+    ) {
+      return;
+    }
+    window.history.replaceState(
+      null,
+      "",
+      `${detailToPath(activeDetail)}${window.location.search}${window.location.hash}`,
+    );
+  }, [activeDetail]);
 
   const clearDetail = useCallback(() => {
     if (activeDetailRef.current) {

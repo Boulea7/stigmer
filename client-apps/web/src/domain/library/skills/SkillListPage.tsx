@@ -8,7 +8,9 @@ import {
   ResourceWorkbench,
   ActionMenu,
   useStigmer,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  OrgSlugText,
+  useOrgSlugForId,
   useConfirmAction,
   ConfirmDialog,
   toast,
@@ -34,7 +36,7 @@ const SKILL_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
     id: "org",
     header: "Organization",
     cell: (item) => (
-      <span className="text-muted-foreground">{item.org}</span>
+      <OrgSlugText orgId={item.org} className="text-muted-foreground" />
     ),
     flex: 1,
   },
@@ -51,7 +53,8 @@ const SKILL_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
 ];
 
 export function SkillListPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const stigmer = useStigmer();
   const { navigateToDetail } = useLibraryNavigation();
   const { confirmState, confirm, handleConfirm, handleCancel } = useConfirmAction();
@@ -143,7 +146,7 @@ export function SkillListPage() {
                 <ActionMenu.Item
                   icon={<Copy className="size-4" />}
                   onSelect={() => {
-                    navigator.clipboard.writeText(`${item.org}/${item.slug}`);
+                    navigator.clipboard.writeText(`${slugForOrg(item.org)}/${item.slug}`);
                     toast.success("Copied skill ID");
                   }}
                 >

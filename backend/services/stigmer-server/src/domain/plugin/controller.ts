@@ -221,7 +221,7 @@ async function push(
     .addStep(newBuildInitialPluginStep())
     .addStep(newFindExistingPluginBySlugStep(deps.store))
     .addStep(newGeneratePluginIdIfNeededStep())
-    .addStep(newParseOverlayDocumentsStep())
+    .addStep(newParseOverlayDocumentsStep(deps.store))
     .addStep(newSanitizePluginMetadataStep(deps.authorizer))
     .addStep(newPlanMaterializationStep(deps.store, deps.authorizer))
     .addStep(newGuardPluginVisibilityStep())

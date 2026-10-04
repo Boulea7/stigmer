@@ -5,7 +5,9 @@ import {
   ResourceWorkbench,
   ActionMenu,
   useStigmer,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  OrgSlugText,
+  useOrgSlugForId,
   useConfirmAction,
   ConfirmDialog,
   toast,
@@ -31,7 +33,7 @@ const PLUGIN_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
     id: "org",
     header: "Organization",
     cell: (item) => (
-      <span className="text-muted-foreground">{item.org}</span>
+      <OrgSlugText orgId={item.org} className="text-muted-foreground" />
     ),
     flex: 1,
   },
@@ -70,7 +72,8 @@ function WaysIn({ size }: { readonly size: "sm" | "xs" }) {
 }
 
 export default function PluginListPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const stigmer = useStigmer();
   const navigate = useNavigate();
   const { confirmState, confirm, handleConfirm, handleCancel } = useConfirmAction();
@@ -130,7 +133,7 @@ export default function PluginListPage() {
         emptyDescription="Install a plugin from the Marketplace, or upload one from your computer, to add skills, MCP servers and an agent that uses them, as one unit."
         headerAction={<WaysIn size="sm" />}
         emptyAction={<WaysIn size="xs" />}
-        onItemClick={(item) => navigate(`/library/plugins/${item.org}/${item.slug}`)}
+        onItemClick={(item) => navigate(`/library/plugins/${slugForOrg(item.org)}/${item.slug}`)}
         renderItemAction={(item) => (
           <div onClick={(e) => e.stopPropagation()}>
             <ActionMenu>
@@ -140,14 +143,14 @@ export default function PluginListPage() {
               <ActionMenu.Content>
                 <ActionMenu.Item
                   icon={<ExternalLink className="size-4" />}
-                  onSelect={() => navigate(`/library/plugins/${item.org}/${item.slug}`)}
+                  onSelect={() => navigate(`/library/plugins/${slugForOrg(item.org)}/${item.slug}`)}
                 >
                   View details
                 </ActionMenu.Item>
                 <ActionMenu.Item
                   icon={<Copy className="size-4" />}
                   onSelect={() => {
-                    navigator.clipboard.writeText(`${item.org}/${item.slug}`);
+                    navigator.clipboard.writeText(`${slugForOrg(item.org)}/${item.slug}`);
                     toast.success("Copied plugin ID");
                   }}
                 >

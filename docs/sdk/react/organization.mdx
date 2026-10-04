@@ -12,9 +12,11 @@ description: Hooks and components for organization creation and management.
 Convenience accessor: returns the active org's system ID (`metadata.id`),
 or an empty string when no org is selected.
 
-This is the identifier used as the `organization` object in authorization
-(FGA) — e.g. for member lookups in the share picker — as opposed to the
-human-readable slug returned by [`useActiveOrgSlug`](#useactiveorgslug).
+Every request field that names the active org (`org`, `metadata.org`, a
+reference's `org`) carries this id, and stored resources name their org
+by it, so comparisons against `metadata.org` use it too. It never
+changes, unlike the human-readable slug returned by
+[`useActiveOrgSlug`](#useactiveorgslug), which is for display and URLs.
 
 **Signature**
 
@@ -25,13 +27,50 @@ function useActiveOrgId(): string
 
 ### useActiveOrgSlug
 
-Convenience accessor: returns the active org's slug for use in API
-calls, or an empty string when no org is selected.
+Convenience accessor: returns the active org's slug for display text and
+URLs, or an empty string when no org is selected. A request names the
+org by id ([`useActiveOrgId`](#useactiveorgid)): the slug can be renamed.
 
 **Signature**
 
 ```tsx
 function useActiveOrgSlug(): string
+```
+
+
+### useCanonicalOrgSlug
+
+Answers the slug a URL's org segment should read, or `null` when the
+segment already reads it or the answer is not known.
+
+- A segment equal to one of the person's organizations' current slugs
+  is canonical: `null`, with no request.
+- A segment equal to one of their organizations' ids answers that
+  organization's slug, with no request.
+- Any other segment is looked up once (the server resolves an id or an
+  old slug to the organization); its slug is answered when it differs.
+  A lookup the server refuses answers `null`.
+
+Waits for [`OrgProvider`](#orgprovider)'s list to load, and answers `null` when no
+provider is mounted.
+
+**Signature**
+
+```tsx
+function useCanonicalOrgSlug(orgSegment: string | null | undefined): string | null
+```
+
+<TypeTable
+  type={{
+    orgSegment: { type: "string | null | undefined", description: "The org segment of the current URL, or `\"\"`/`null`   when the URL has none.", required: true },
+  }}
+/>
+
+```tsx
+const canonical = useCanonicalOrgSlug(params.org);
+useEffect(() => {
+  if (canonical) navigate(`/library/agents/${canonical}/${params.slug}`, { replace: true });
+}, [canonical]);
 ```
 
 
@@ -192,7 +231,7 @@ function useOrgGate(options: UseOrgGateOptions): UseOrgGateReturn
 
 <TypeTable
   type={{
-    refresh: { type: "(targetSlug?: string) => void", description: "Refetch orgs (e.g. after creating one). Optionally auto-select by slug." },
+    refresh: { type: "(target?: string) => void", description: "Refetch orgs (e.g. after creating one). Optionally auto-select one by id or slug." },
     retry: { type: "() => void", description: "Re-attempt the organization fetch after a failure." },
     state: { type: "OrgGateState", description: "Current gate state. Discriminated union on `status`.", typeDescriptionLink: "#orggatestate" },
   }}
@@ -210,8 +249,86 @@ switch (state.status) {
   case "error":
     return <ErrorScreen message={state.message} onRetry={retry} />;
   case "no-orgs":
-    return <OnboardingForm onCreated={(org) => refresh(org.slug)} />;
+    return <OnboardingForm onCreated={(org) => refresh(org.metadata?.id)} />;
 }
+```
+
+
+### useOrgIdForRef
+
+Returns a function answering the id of the organization a reference
+names, where the reference is a slug or an id (a URL's org segment, for
+one). Use it before comparing a reference with a stored `metadata.org`,
+which is an id.
+
+The answer is the org's id when the reference names one of the person's
+organizations by id or current slug, and the reference unchanged
+otherwise.
+
+**Signature**
+
+```tsx
+function useOrgIdForRef(): (orgRef: string) => string
+```
+
+```tsx
+const orgIdFor = useOrgIdForRef();
+const isOwn = agent.metadata?.org === orgIdFor(routeOrg);
+```
+
+
+### useOrgSlugForId
+
+Returns a function answering the slug of the organization an id names,
+for display text and URL segments.
+
+The answer is the org's current slug when it is one of the person's
+organizations, and the id unchanged otherwise.
+
+**Signature**
+
+```tsx
+function useOrgSlugForId(): (orgId: string) => string
+```
+
+```tsx
+const slugForOrg = useOrgSlugForId();
+navigate(`/library/agents/${slugForOrg(agent.metadata.org)}/${agent.metadata.slug}`);
+```
+
+
+### useRenameOrganization
+
+Mutation hook that wraps `organization.rename()` with loading and
+error state.
+
+Renaming changes an organization's slug, the name people read and that
+console URLs carry; its id, which every resource names it by, stays the
+same. Links built with the old slug keep resolving for a while after the
+rename. Only the organization's owners may rename it.
+
+**Signature**
+
+```tsx
+function useRenameOrganization(): UseRenameOrganizationReturn
+```
+
+**Returns** — `UseRenameOrganizationReturn`
+
+<TypeTable
+  type={{
+    clearError: { type: "() => void", description: "Reset `error` to `null`." },
+    error: { type: "Error | null", description: "Error from the last failed rename, or `null` when healthy." },
+    isRenaming: { type: "boolean", description: "`true` while the rename request is in flight." },
+    rename: { type: "(orgId: string, slug: string) => Promise<Organization>", description: "Give the organization `orgId` names (an id or its current slug) the new `slug`. Resolves with the renamed resource." },
+  }}
+/>
+
+```tsx
+const { rename, isRenaming, error } = useRenameOrganization();
+
+const renamed = await rename(org.metadata.id, "acme-labs");
+refresh(renamed.metadata?.id);
 ```
 
 
@@ -266,8 +383,9 @@ Compact form for creating a new `Organization` resource.
 
 Collects a name, auto-generates a URL-friendly slug, and accepts an
 optional description. The slug is derived from the name by default
-but can be manually overridden. It is sent to the server as both
-`metadata.slug` and `metadata.org` (organizations are self-owning).
+but can be manually overridden. It is sent as `metadata.slug`; the
+server gives the new organization its permanent id, and an organization
+belongs to no organization, so `metadata.org` stays unset.
 
 All visual properties flow through `--stgm-*` design tokens.
 
@@ -328,6 +446,19 @@ Fetches the organization by ID, displays editable fields (name,
 description, logo URL) and read-only identifiers (slug, ID).
 On save, calls `organization.update()` and fires `onUpdated`.
 
+The organization's owners (`can_delete` on it) can also rename it: the
+slug becomes an editable field whose Rename action calls
+`organization.rename()` and fires `onUpdated` with the renamed resource.
+The Rename action stays disabled until the panel shows the renamed slug,
+so one rename is in flight at a time.
+
+Inside an [`OrgProvider`](#orgprovider), the panel is the one that refreshes the
+provider's organizations after a save or a rename, once each, so every
+name and slug it shows follows, and the active organization stays
+selected.
+The field is never shown on a server that holds one organization, where
+the organization is not named anywhere.
+
 All visual properties flow through `--stgm-*` design tokens. The
 component has zero dependencies on Console routing, auth context,
 or layout — platform builders can embed it directly:
@@ -337,7 +468,7 @@ or layout — platform builders can embed it directly:
 <TypeTable
   type={{
     className: { type: "string", description: "Additional CSS class names for the root container." },
-    onUpdated: { type: "(org: Organization) => void", description: "Fired with the updated resource after a successful save." },
+    onUpdated: { type: "(org: Organization) => void", description: "Fired with the updated resource after a successful save or rename. Inside an OrgProvider the panel has already refreshed the provider's organizations, so a handler need not refresh them again." },
     org: { type: "string", description: "The ID of the organization to display and edit.", required: true },
   }}
 />
@@ -357,7 +488,7 @@ Provides organization context to the component tree.
 Fetches the authenticated user's organizations via
 `stigmer.organization.findMyOrganizations()`, manages the active
 organization selection, and persists the choice to `localStorage`
-under the key `stigmer:activeOrgSlug`.
+under the key `stigmer:activeOrg` by the organization's id.
 
 Must be rendered inside a [`StigmerProvider`](/docs/sdk/react/core#stigmerprovider). Mount it BELOW
 `FetchCacheProvider` (when one is used): switching the active org clears
@@ -374,6 +505,25 @@ responsibility via `OrgSwitcher`'s `onOrgChanged` callback.
     </OrgProvider>
   </FetchCacheProvider>
 </StigmerProvider>
+```
+
+
+### OrgSlugText
+
+Renders the slug of the organization `orgId` names when it is one of the
+person's organizations, and the id itself otherwise.
+
+**Props** — `OrgSlugTextProps`
+
+<TypeTable
+  type={{
+    className: { type: "string", description: "Additional CSS class names for the text span." },
+    orgId: { type: "string", description: "The organization's id, as a stored `metadata.org` carries it.", required: true },
+  }}
+/>
+
+```tsx
+cell: (item) => <OrgSlugText orgId={item.org} className="text-muted-foreground" />
 ```
 
 
@@ -419,7 +569,7 @@ Value exposed by [`OrgProvider`](#orgprovider) via [`useOrg`](#useorg).
     error: { type: "string | null", description: "Non-null when the fetch failed.", required: true },
     isLoading: { type: "boolean", description: "True during the initial fetch of organizations.", required: true },
     orgs: { type: "Organization[]", description: "All organizations the authenticated user belongs to.", required: true },
-    refresh: { type: "(targetSlug?: string) => void", description: "Refetch the organization list. If `targetSlug` is provided, the org matching that slug will be auto-selected after the fetch completes (useful after creating a new organization).", required: true },
+    refresh: { type: "(target?: string) => void", description: "Refetch the organization list. If `target` is provided, the org it names — by id or by slug — is selected after the fetch completes (useful after creating or renaming an organization).", required: true },
     retry: { type: "() => void", description: "Re-attempt the organization fetch after a failure.", required: true },
     setActiveOrg: { type: "(org: Organization) => void", description: "Switch the active organization. Persisted to localStorage.", required: true },
   }}

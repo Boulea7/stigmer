@@ -63,7 +63,7 @@ class ApiKeyClient:
 
 @dataclass
 class ApiKeyInput:
-    """Input for creating or updating a ApiKey."""
+    """Input for creating or updating an ApiKey."""
 
     name: str
     org: str

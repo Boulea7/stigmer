@@ -43,6 +43,12 @@ class OrganizationClient:
         except grpc.RpcError as e:
             raise wrap_error(e) from e
 
+    def rename(self, input: io_pb2.RenameInput) -> api_pb2.Organization:
+        try:
+            return self._command.rename(input)
+        except grpc.RpcError as e:
+            raise wrap_error(e) from e
+
     def delete(self, id: str) -> api_pb2.Organization:
         try:
             return self._command.delete(io_pb2.OrganizationId(value=id))
@@ -76,10 +82,11 @@ class OrganizationClient:
 
 @dataclass
 class OrganizationInput:
-    """Input for creating or updating a Organization."""
+    """Input for creating or updating an Organization."""
 
     name: str
-    org: str
+    # Always empty: an Organization belongs to no organization.
+    org: str = ""
     id: str | None = None
     slug: str | None = None
     labels: dict[str, str] | None = None

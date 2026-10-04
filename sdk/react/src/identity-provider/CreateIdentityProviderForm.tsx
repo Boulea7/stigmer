@@ -12,7 +12,7 @@ import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 
 /** Props for {@link CreateIdentityProviderForm}. */
 export interface CreateIdentityProviderFormProps {
-  /** Organization slug — the IdP will be created in this org. */
+  /** Organization id — the IdP will be created in this org (a slug is also accepted). */
   readonly org: string;
   /** Fired with the newly created identity provider on success. */
   readonly onCreated?: (idp: IdentityProvider) => void;

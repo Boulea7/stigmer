@@ -52,7 +52,11 @@ import {
   sameOrgInvariantMessage,
 } from "../constants.js";
 import { findShareByOrgAndSlug, sharingLinkTokenAllowed } from "../steps.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
+import type { OrganizationIds } from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -71,6 +75,14 @@ let shares: ShareCommand;
 let query: ShareQuery;
 let agents: AgentCommand;
 let dir: string;
+
+// Requests name organizations by slug, which the serving chain turns into
+// the minted id; rows written straight to the store, and what the server
+// answers or interpolates into an error, carry the id.
+let organizationIds: OrganizationIds;
+function idOf(slug: string): string {
+  return organizationId(organizationIds, slug);
+}
 
 beforeAll(async () => {
   dir = mkdtempSync(path.join(tmpdir(), "agentshare-domain-test-"));
@@ -98,7 +110,7 @@ beforeAll(async () => {
     baseUrl: `http://127.0.0.1:${port}`,
   });
   // Every Organization a describe below writes into (each names its own).
-  await seedOrganizations(transport, [
+  organizationIds = await seedOrganizations(transport, [
     "create-test-org",
     "launchgate-test-org",
     "update-test-org",
@@ -385,7 +397,7 @@ describe("launch-gate config", () => {
           id: "env_shared_credentials",
           name: "shared-credentials",
           slug: "shared-credentials",
-          org: ORG,
+          org: idOf(ORG),
           visibility: ApiResourceVisibility.visibility_org,
         },
       }),
@@ -493,7 +505,7 @@ describe("the same-organization invariant", () => {
       shares.create(shareInAnotherOrg(existing, true)),
     );
     expect(err.code).toBe(Code.FailedPrecondition);
-    expect(err.rawMessage).toBe(sameOrgInvariantMessage(PROVIDER));
+    expect(err.rawMessage).toBe(sameOrgInvariantMessage(idOf(PROVIDER)));
 
     const ghost = shareFor(existing, true);
     ghost.metadata.org = CONSUMER;
@@ -504,7 +516,7 @@ describe("the same-organization invariant", () => {
     } as never;
     const ghostErr = await grpcError(() => shares.create(ghost));
     expect(ghostErr.code).toBe(Code.FailedPrecondition);
-    expect(ghostErr.rawMessage).toBe(sameOrgInvariantMessage(PROVIDER));
+    expect(ghostErr.rawMessage).toBe(sameOrgInvariantMessage(idOf(PROVIDER)));
   });
 
   it("a stored share whose agent is in another organization fails the profile closed, like a dangling reference", async () => {
@@ -520,12 +532,12 @@ describe("the same-organization invariant", () => {
         id: "ash_legacy_cross_org",
         name: "legacy-cross-org",
         slug: "legacy-cross-org",
-        org: CONSUMER,
+        org: idOf(CONSUMER),
       },
       spec: {
         agentRef: {
           kind: ApiResourceKind.agent,
-          org: PROVIDER,
+          org: idOf(PROVIDER),
           slug: agent.metadata!.slug,
         },
         enabled: true,
@@ -850,9 +862,11 @@ describe("getByAgent", () => {
     named.metadata = { ...named.metadata, name: "second link" } as never;
     await shares.create(named);
 
+    // The request names the organization by slug; the shares it answers
+    // record the organization's id.
     const cases: Array<{ org: string; want: number; wantOrg: string }> = [
       { org: "", want: 2, wantOrg: "" },
-      { org: "gba-provider-org", want: 2, wantOrg: "gba-provider-org" },
+      { org: "gba-provider-org", want: 2, wantOrg: idOf("gba-provider-org") },
       { org: "gba-bystander-org", want: 0, wantOrg: "" },
     ];
     for (const tt of cases) {

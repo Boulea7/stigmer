@@ -37,7 +37,7 @@ function useGitHubConnection(org: string | null, config?: UseGitHubConnectionCon
 
 <TypeTable
   type={{
-    org: { type: "string | null", description: "The active organization slug. Required for server-side   token storage. Pass `null` to skip all server operations.", required: true },
+    org: { type: "string | null", description: "The active organization id (a slug is also accepted). Required for server-side   token storage. Pass `null` to skip all server operations.", required: true },
     config: { type: "UseGitHubConnectionConfig", description: "Optional configuration for desktop / non-browser   environments. See UseGitHubConnectionConfig." },
   }}
 />

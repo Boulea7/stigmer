@@ -318,7 +318,7 @@ export interface SessionComposerProps {
   readonly onBrowseLocalFolder?: () => Promise<string | null>;
 
   /**
-   * Organization slug for agent, MCP server, and skill searches.
+   * Organization id for agent, MCP server, and skill searches (a slug is also accepted).
    * Required when agent, MCP, or skill pickers are enabled.
    */
   readonly org?: string;

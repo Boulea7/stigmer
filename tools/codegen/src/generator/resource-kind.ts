@@ -20,8 +20,10 @@ export const apiResourceKindEnumNames = new Map<number, string>();
 export const versionedKinds = new Set<number>();
 
 /**
- * Kinds whose kind_meta.authorization.scope_type is NONE: platform-level
- * resources whose metadata.org the contract says is empty (License, Plan).
+ * Kinds whose metadata.org the contract says is empty: the platform-level
+ * resources whose kind_meta.authorization.scope_type is NONE (License,
+ * Plan), and Organization, which belongs to no organization (its scope is
+ * its owner's, which it shares with kinds that do carry one).
  */
 export const orglessKinds = new Set<number>();
 
@@ -49,7 +51,10 @@ for (const value of ApiResourceKindSchema.values) {
   if (meta.isVersioned) {
     versionedKinds.add(value.number);
   }
-  if (meta.authorization?.scopeType === AuthorizationScopeType.NONE) {
+  if (
+    meta.authorization?.scopeType === AuthorizationScopeType.NONE ||
+    value.name === "organization"
+  ) {
     orglessKinds.add(value.number);
   }
   if (meta.name !== "") {

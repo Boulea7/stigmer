@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file ai/stigmer/search/v1/io.proto.
  */
 export const file_ai_stigmer_search_v1_io: GenFile = /*@__PURE__*/
-  fileDesc("Ch1haS9zdGlnbWVyL3NlYXJjaC92MS9pby5wcm90bxIUYWkuc3RpZ21lci5zZWFyY2gudjEikQIKDVNlYXJjaFJlcXVlc3QSXQoFa2luZHMYASADKA4yPy5haS5zdGlnbWVyLmNvbW1vbnMuYXBpcmVzb3VyY2UuYXBpcmVzb3VyY2VraW5kLkFwaVJlc291cmNlS2luZEINukgKkgEHIgWCAQIQARIXCgVxdWVyeRgCIAEoCUIIukgFcgMY9AMSKgoDb3JnGAMgASgJQh26SBpyGBg/MhReJHxeW2Etel1bYS16MC05LV0qJBIuCgRwYWdlGAUgASgLMiAuYWkuc3RpZ21lci5jb21tb25zLnJwYy5QYWdlSW5mb0oECAQQBUoECAYQB1IOZXhjbHVkZV9wdWJsaWNSEGNyb3NzX29yZ19wdWJsaWMi9AEKDlNlYXJjaFJlc3BvbnNlEjMKB2VudHJpZXMYASADKAsyIi5haS5zdGlnbWVyLnNlYXJjaC52MS5TZWFyY2hSZXN1bHQSTgoOY291bnRzX2J5X2tpbmQYAiADKAsyNi5haS5zdGlnbWVyLnNlYXJjaC52MS5TZWFyY2hSZXNwb25zZS5Db3VudHNCeUtpbmRFbnRyeRITCgt0b3RhbF9jb3VudBgDIAEoBRITCgt0b3RhbF9wYWdlcxgEIAEoBRozChFDb3VudHNCeUtpbmRFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAU6AjgBIpkDCgxTZWFyY2hSZXN1bHQSTQoEa2luZBgBIAEoDjI/LmFpLnN0aWdtZXIuY29tbW9ucy5hcGlyZXNvdXJjZS5hcGlyZXNvdXJjZWtpbmQuQXBpUmVzb3VyY2VLaW5kEgoKAmlkGAIgASgJEgwKBG5hbWUYAyABKAkSDAoEc2x1ZxgEIAEoCRIWCg5xdWFsaWZpZWRfc2x1ZxgFIAEoCRILCgNvcmcYBiABKAkSEwoLZGVzY3JpcHRpb24YByABKAkSSQoKdmlzaWJpbGl0eRgIIAEoDjI1LmFpLnN0aWdtZXIuY29tbW9ucy5hcGlyZXNvdXJjZS5BcGlSZXNvdXJjZVZpc2liaWxpdHkSDAoEdGFncxgJIAMoCRIuCgpjcmVhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBINCgVzY29yZRgMIAEoAhIQCghpY29uX3VybBgNIAEoCWIGcHJvdG8z", [file_ai_stigmer_commons_apiresource_apiresourcekind_api_resource_kind, file_ai_stigmer_commons_apiresource_enum, file_ai_stigmer_commons_rpc_pagination, file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("Ch1haS9zdGlnbWVyL3NlYXJjaC92MS9pby5wcm90bxIUYWkuc3RpZ21lci5zZWFyY2gudjEipAIKDVNlYXJjaFJlcXVlc3QSXQoFa2luZHMYASADKA4yPy5haS5zdGlnbWVyLmNvbW1vbnMuYXBpcmVzb3VyY2UuYXBpcmVzb3VyY2VraW5kLkFwaVJlc291cmNlS2luZEINukgKkgEHIgWCAQIQARIXCgVxdWVyeRgCIAEoCUIIukgFcgMY9AMSPQoDb3JnGAMgASgJQjC6SC1yKxg/MideJHxeW2Etel1bYS16MC05LV0qJHxeb3JnX1swLTlhLXpdezI2fSQSLgoEcGFnZRgFIAEoCzIgLmFpLnN0aWdtZXIuY29tbW9ucy5ycGMuUGFnZUluZm9KBAgEEAVKBAgGEAdSDmV4Y2x1ZGVfcHVibGljUhBjcm9zc19vcmdfcHVibGljIvQBCg5TZWFyY2hSZXNwb25zZRIzCgdlbnRyaWVzGAEgAygLMiIuYWkuc3RpZ21lci5zZWFyY2gudjEuU2VhcmNoUmVzdWx0Ek4KDmNvdW50c19ieV9raW5kGAIgAygLMjYuYWkuc3RpZ21lci5zZWFyY2gudjEuU2VhcmNoUmVzcG9uc2UuQ291bnRzQnlLaW5kRW50cnkSEwoLdG90YWxfY291bnQYAyABKAUSEwoLdG90YWxfcGFnZXMYBCABKAUaMwoRQ291bnRzQnlLaW5kRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgFOgI4ASKZAwoMU2VhcmNoUmVzdWx0Ek0KBGtpbmQYASABKA4yPy5haS5zdGlnbWVyLmNvbW1vbnMuYXBpcmVzb3VyY2UuYXBpcmVzb3VyY2VraW5kLkFwaVJlc291cmNlS2luZBIKCgJpZBgCIAEoCRIMCgRuYW1lGAMgASgJEgwKBHNsdWcYBCABKAkSFgoOcXVhbGlmaWVkX3NsdWcYBSABKAkSCwoDb3JnGAYgASgJEhMKC2Rlc2NyaXB0aW9uGAcgASgJEkkKCnZpc2liaWxpdHkYCCABKA4yNS5haS5zdGlnbWVyLmNvbW1vbnMuYXBpcmVzb3VyY2UuQXBpUmVzb3VyY2VWaXNpYmlsaXR5EgwKBHRhZ3MYCSADKAkSLgoKY3JlYXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFc2NvcmUYDCABKAISEAoIaWNvbl91cmwYDSABKAliBnByb3RvMw", [file_ai_stigmer_commons_apiresource_apiresourcekind_api_resource_kind, file_ai_stigmer_commons_apiresource_enum, file_ai_stigmer_commons_rpc_pagination, file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * SearchRequest specifies criteria for searching API resources.
@@ -71,7 +71,7 @@ export type SearchRequest = Message<"ai.stigmer.search.v1.SearchRequest"> & {
   /**
    * Organization to scope the search.
    *
-   * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+   * The organization's slug (e.g., "acme") or its id (org_<ulid>).
    *
    * Behavior:
    * - Empty: Search all organizations the caller has access to
@@ -216,19 +216,21 @@ export type SearchResult = Message<"ai.stigmer.search.v1.SearchResult"> & {
   slug: string;
 
   /**
-   * Fully qualified slug: "org/slug".
+   * Fully qualified reference: "<org>/<slug>", where org is the owning
+   * organization's id, as metadata.org carries it.
    *
-   * Pre-computed for CLI and UI display.
-   * Example: "stigmer/web-search", "acme/code-reviewer"
+   * Example: "org_01j5q3k7m8r2s4tnz2hf6w8x9a/code-reviewer"; an organization
+   * made before ids were minted reads "acme/code-reviewer".
    *
-   * This is the canonical reference format used in YAML configurations.
+   * A reference in this form resolves as written. Clients that show it to a
+   * person put the organization's slug in place of its id.
    *
    * @generated from field: string qualified_slug = 5;
    */
   qualifiedSlug: string;
 
   /**
-   * Organization that owns this resource (e.g., "stigmer", "acme-corp").
+   * Organization that owns this resource, by id (e.g., "org_01j5q3k7m8r2s4tnz2hf6w8x9a").
    *
    * @generated from field: string org = 6;
    */

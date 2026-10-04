@@ -6,7 +6,7 @@ import {
   EditResourceYamlDialog,
   McpServerDetailView,
   useMcpServer,
-  useActiveOrgSlug,
+  useActiveOrgId,
   useCopyResource,
   useConfirmAction,
   useDeleteResource,
@@ -33,7 +33,7 @@ export function McpServerDetailPageInner({
   const { navigateToDetail } = useLibraryNavigation();
   const router = useRouter();
   const { setLabel } = useBreadcrumbOverride();
-  const activeOrgSlug = useActiveOrgSlug();
+  const activeOrgId = useActiveOrgId();
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [resourceName, setResourceName] = useState<string>("MCP Server");
   const { copyId, copyQualifiedSlug } = useCopyResource();
@@ -139,7 +139,7 @@ export function McpServerDetailPageInner({
         org={org}
         slug={slug}
         mcpServerState={mcpServerState}
-        activeOrg={activeOrgSlug}
+        activeOrg={activeOrgId}
         onResourceLoad={handleResourceLoad}
         onPluginClick={({ org: o, slug: s }) => navigateToDetail("plugins", o, s)}
         editable

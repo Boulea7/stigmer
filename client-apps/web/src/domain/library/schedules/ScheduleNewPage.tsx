@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ScheduleForm,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  useOrgSlugForId,
   useBreadcrumbOverride,
 } from "@stigmer/react";
 
@@ -16,7 +17,8 @@ import {
  * completion (navigate to detail) and cancellation (navigate to list).
  */
 export function ScheduleNewPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const router = useRouter();
   const { setLabel } = useBreadcrumbOverride();
 
@@ -31,7 +33,7 @@ export function ScheduleNewPage() {
       org={org}
       onComplete={(schedule) =>
         router.push(
-          `/library/schedules/${schedule.metadata?.org}/${schedule.metadata?.slug}`,
+          `/library/schedules/${slugForOrg(schedule.metadata?.org ?? "")}/${schedule.metadata?.slug}`,
         )
       }
       onCancel={() => router.push("/library/schedules")}

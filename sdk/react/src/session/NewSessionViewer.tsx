@@ -15,6 +15,7 @@ import { useWorkspaceEditors } from "../internal/store/index.js";
 import { WorkspaceSurface } from "../workspace/WorkspaceSurface.js";
 import type { SetupTabProps } from "./facets/SetupTab.js";
 import { useNewSessionFlow } from "./useNewSessionFlow.js";
+import { useOrgIdForRef } from "../organization/useOrgRefs.js";
 import { useSessionPanel } from "./useSessionPanel.js";
 import { useSessionRailViews } from "./useSessionRailViews.js";
 import { SessionPanelChip } from "./SessionPanelChip.js";
@@ -25,7 +26,7 @@ import type { SessionRunConfig } from "./run-config.js";
 
 /** Props for {@link NewSessionViewer}. */
 export interface NewSessionViewerProps {
-  /** Organization slug. Required for session creation. */
+  /** Organization id (a slug is also accepted). Required for session creation. */
   readonly org: string;
   /** Called after the session and first execution are created. */
   readonly onSessionCreated: (sessionId: string) => void;
@@ -342,26 +343,33 @@ export function NewSessionViewer({
     flow.setResolution(null);
   }, [flow.setAgentRef, flow.setResolution]);
 
+  // A reference may name its org by slug (one a host or URL supplied) or by
+  // id (a stored or picked one), so both sides are compared by id.
+  const orgIdFor = useOrgIdForRef();
+
   const handleRemoveMcp = useCallback(
     (ref: ResourceRef) => {
+      const refOrg = orgIdFor(ref.org);
       flow.setMcpServerUsages(
         flow.mcpServerUsages.filter(
-          (u) => !(u.mcpServerRef.org === ref.org && u.mcpServerRef.slug === ref.slug),
+          (u) =>
+            !(orgIdFor(u.mcpServerRef.org) === refOrg && u.mcpServerRef.slug === ref.slug),
         ),
       );
     },
-    [flow.mcpServerUsages, flow.setMcpServerUsages],
+    [flow.mcpServerUsages, flow.setMcpServerUsages, orgIdFor],
   );
 
   const handleRemoveSkill = useCallback(
     (ref: ResourceRef) => {
+      const refOrg = orgIdFor(ref.org);
       flow.setSkillRefs(
         flow.skillRefs.filter(
-          (r) => !(r.org === ref.org && r.slug === ref.slug),
+          (r) => !(orgIdFor(r.org) === refOrg && r.slug === ref.slug),
         ),
       );
     },
-    [flow.skillRefs, flow.setSkillRefs],
+    [flow.skillRefs, flow.setSkillRefs, orgIdFor],
   );
 
   const sessionConfig: SetupTabProps = useMemo(

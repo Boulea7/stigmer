@@ -37,7 +37,7 @@ export type RefinePhase =
 
 /** Options for {@link useRefineWorkflowFlow}. */
 export interface UseRefineWorkflowFlowOptions {
-  /** Organization slug for session and execution creation. */
+  /** Organization id for session and execution creation (a slug is also accepted). */
   readonly org: string;
   /** Live YAML from the editor. Captured via ref at send-time, not reactively. */
   readonly currentYaml: string;

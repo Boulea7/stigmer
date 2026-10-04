@@ -25,11 +25,15 @@ import { FetchCacheContext } from "../../internal/FetchCacheProvider";
 import { OrgProvider, useOrg } from "../OrgProvider";
 import { useFollowSessionOrganization } from "../useFollowSessionOrganization";
 
+// Ids differ from slugs, as for every organization made today: a stored
+// session names its organization by id.
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+const GLOBEX_ID = "org_01jbbbbbbbbbbbbbbbbbbbbbbb";
 const acme = {
-  metadata: { id: "acme", slug: "acme", name: "Acme" },
+  metadata: { id: ACME_ID, slug: "acme", name: "Acme" },
 } as Organization;
 const globex = {
-  metadata: { id: "globex", slug: "globex", name: "Globex" },
+  metadata: { id: GLOBEX_ID, slug: "globex", name: "Globex" },
 } as Organization;
 
 function sessionIn(id: string, org: string): Session {
@@ -78,20 +82,20 @@ function renderFollowing(
 describe("useFollowSessionOrganization", () => {
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem("stigmer:activeOrgSlug", "acme");
+    localStorage.setItem("stigmer:activeOrg", ACME_ID);
   });
 
   it("makes a session's organization active when the person belongs to it, and persists it", async () => {
-    const { result } = renderFollowing(sessionIn("ses_1", "globex"));
+    const { result } = renderFollowing(sessionIn("ses_1", GLOBEX_ID));
 
     await waitFor(() =>
       expect(result.current.activeOrg?.metadata?.slug).toBe("globex"),
     );
-    expect(localStorage.getItem("stigmer:activeOrgSlug")).toBe("globex");
+    expect(localStorage.getItem("stigmer:activeOrg")).toBe(GLOBEX_ID);
   });
 
   it("switches nothing for a session in the active organization", async () => {
-    const { result } = renderFollowing(sessionIn("ses_1", "acme"));
+    const { result } = renderFollowing(sessionIn("ses_1", ACME_ID));
 
     await waitFor(() => expect(result.current.activeOrg).not.toBeNull());
     // act flushes every pending effect and the state updates they make, so
@@ -111,7 +115,7 @@ describe("useFollowSessionOrganization", () => {
   });
 
   it("aligns once per visit: a choice made while the conversation stays open stands", async () => {
-    const session = sessionIn("ses_1", "globex");
+    const session = sessionIn("ses_1", GLOBEX_ID);
     const { result, rerender } = renderFollowing(session);
     await waitFor(() =>
       expect(result.current.activeOrg?.metadata?.slug).toBe("globex"),
@@ -124,14 +128,14 @@ describe("useFollowSessionOrganization", () => {
     await act(async () => {});
     expect(result.current.activeOrg?.metadata?.slug).toBe("acme");
 
-    rerender({ current: sessionIn("ses_2", "globex") });
+    rerender({ current: sessionIn("ses_2", GLOBEX_ID) });
     await waitFor(() =>
       expect(result.current.activeOrg?.metadata?.slug).toBe("globex"),
     );
   });
 
   it("follows again on a new visit to the conversation", async () => {
-    const session = sessionIn("ses_1", "globex");
+    const session = sessionIn("ses_1", GLOBEX_ID);
     const first = renderFollowing(session);
     await waitFor(() =>
       expect(first.result.current.activeOrg?.metadata?.slug).toBe("globex"),
@@ -151,7 +155,7 @@ describe("useFollowSessionOrganization", () => {
     const orgs = new Promise<Organization[]>((resolve) => {
       release = resolve;
     });
-    const { result } = renderFollowing(sessionIn("ses_1", "globex"), orgs);
+    const { result } = renderFollowing(sessionIn("ses_1", GLOBEX_ID), orgs);
     expect(result.current.activeOrg).toBeNull();
 
     await act(async () => {

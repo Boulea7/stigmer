@@ -40,11 +40,11 @@ export type ArchitectPhase =
 
 /** Options for {@link useWorkflowArchitectFlow}. */
 export interface UseWorkflowArchitectFlowOptions {
-  /** Organization slug — used for session, execution, and workflow creation. */
+  /** Organization id — used for session, execution, and workflow creation (a slug is also accepted). */
   readonly org: string;
   /**
    * Called after the workflow is created successfully.
-   * Receives the org slug and workflow slug for navigation.
+   * Receives the workflow's organization id (as stored) and its slug for navigation.
    */
   readonly onSuccess: (org: string, slug: string) => void;
   /**
@@ -120,11 +120,15 @@ const MIN_PROMPT_LENGTH = 10;
  * The hook is framework-agnostic and returns referentially
  * stable values.
  *
+ * `onSuccess` receives the workflow's organization by id; the console URL
+ * carries the slug.
+ *
  * @example
  * ```tsx
+ * const slugForOrg = useOrgSlugForId();
  * const flow = useWorkflowArchitectFlow({
  *   org: "acme",
- *   onSuccess: (org, slug) => router.push(`/library/workflows/${org}/${slug}`),
+ *   onSuccess: (org, slug) => router.push(`/library/workflows/${slugForOrg(org)}/${slug}`),
  *   onError: (msg) => toast.error(msg),
  * });
  *

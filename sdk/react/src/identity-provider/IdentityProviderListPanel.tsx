@@ -14,7 +14,7 @@ import { LoadingRegion } from "../internal/LoadingRegion.js";
 
 /** Props for {@link IdentityProviderListPanel}. */
 export interface IdentityProviderListPanelProps {
-  /** Organization slug whose identity providers should be listed. */
+  /** Id of the organization whose identity providers should be listed (a slug is also accepted). */
   readonly org: string;
   /** Fired when the user wants to edit an identity provider. */
   readonly onEdit?: (idp: IdentityProvider) => void;

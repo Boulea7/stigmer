@@ -101,12 +101,14 @@ public interface SearchResultOrBuilder extends
 
   /**
    * <pre>
-   * Fully qualified slug: "org/slug".
+   * Fully qualified reference: "&lt;org&gt;/&lt;slug&gt;", where org is the owning
+   * organization's id, as metadata.org carries it.
    *
-   * Pre-computed for CLI and UI display.
-   * Example: "stigmer/web-search", "acme/code-reviewer"
+   * Example: "org_01j5q3k7m8r2s4tnz2hf6w8x9a/code-reviewer"; an organization
+   * made before ids were minted reads "acme/code-reviewer".
    *
-   * This is the canonical reference format used in YAML configurations.
+   * A reference in this form resolves as written. Clients that show it to a
+   * person put the organization's slug in place of its id.
    * </pre>
    *
    * <code>string qualified_slug = 5 [json_name = "qualifiedSlug"];</code>
@@ -115,12 +117,14 @@ public interface SearchResultOrBuilder extends
   java.lang.String getQualifiedSlug();
   /**
    * <pre>
-   * Fully qualified slug: "org/slug".
+   * Fully qualified reference: "&lt;org&gt;/&lt;slug&gt;", where org is the owning
+   * organization's id, as metadata.org carries it.
    *
-   * Pre-computed for CLI and UI display.
-   * Example: "stigmer/web-search", "acme/code-reviewer"
+   * Example: "org_01j5q3k7m8r2s4tnz2hf6w8x9a/code-reviewer"; an organization
+   * made before ids were minted reads "acme/code-reviewer".
    *
-   * This is the canonical reference format used in YAML configurations.
+   * A reference in this form resolves as written. Clients that show it to a
+   * person put the organization's slug in place of its id.
    * </pre>
    *
    * <code>string qualified_slug = 5 [json_name = "qualifiedSlug"];</code>
@@ -131,7 +135,7 @@ public interface SearchResultOrBuilder extends
 
   /**
    * <pre>
-   * Organization that owns this resource (e.g., "stigmer", "acme-corp").
+   * Organization that owns this resource, by id (e.g., "org_01j5q3k7m8r2s4tnz2hf6w8x9a").
    * </pre>
    *
    * <code>string org = 6 [json_name = "org"];</code>
@@ -140,7 +144,7 @@ public interface SearchResultOrBuilder extends
   java.lang.String getOrg();
   /**
    * <pre>
-   * Organization that owns this resource (e.g., "stigmer", "acme-corp").
+   * Organization that owns this resource, by id (e.g., "org_01j5q3k7m8r2s4tnz2hf6w8x9a").
    * </pre>
    *
    * <code>string org = 6 [json_name = "org"];</code>

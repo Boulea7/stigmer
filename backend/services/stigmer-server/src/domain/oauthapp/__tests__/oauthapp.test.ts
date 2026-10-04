@@ -53,7 +53,11 @@ import {
   deleteBlockedByMcpServerMessage,
 } from "../constants.js";
 import { resolveOAuthAppRef } from "../refresolution.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
+import type { OrganizationIds } from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({ level: "error", pretty: false, write: () => {} });
 
@@ -70,6 +74,12 @@ interface TestServer {
   command: CommandClient;
   query: QueryClient;
   dir: string;
+  /**
+   * The id this server minted for each seeded organization: a row written
+   * straight to the store and a stored reference name an organization by
+   * id, while a request may name it by slug.
+   */
+  orgIds: OrganizationIds;
 }
 
 async function startServer(env: Record<string, string>): Promise<TestServer> {
@@ -97,7 +107,7 @@ async function startServer(env: Record<string, string>): Promise<TestServer> {
   });
   // Not "stigmer" or "res-org-none": the ref-resolution cases need an org
   // that does not exist here.
-  await seedOrganizations(transport, [
+  const orgIds = await seedOrganizations(transport, [
     ORG,
     "other-org",
     "org-a",
@@ -113,6 +123,7 @@ async function startServer(env: Record<string, string>): Promise<TestServer> {
     command: createClient(OAuthAppCommandController, transport),
     query: createClient(OAuthAppQueryController, transport),
     dir,
+    orgIds,
   };
 }
 
@@ -152,9 +163,13 @@ async function storedApp(store: Store, id: string) {
   return store.getResource(ApiResourceKind.oauth_app, id, OAuthAppSchema);
 }
 
-/** Seeds an McpServer row whose auth references the given (org, slug). */
+/**
+ * Seeds an McpServer row in ORG whose auth references the given (org,
+ * slug); a stored row names its organizations by id, so `refOrg` is an id
+ * unless the arm means an organization that does not exist here.
+ */
 async function seedReferencingMcpServer(
-  store: Store,
+  ts: TestServer,
   id: string,
   name: string,
   refOrg: string,
@@ -163,7 +178,7 @@ async function seedReferencingMcpServer(
   const mcp = create(McpServerSchema, {
     apiVersion: "agentic.stigmer.ai/v1",
     kind: "McpServer",
-    metadata: { id, name, org: ORG, slug: name },
+    metadata: { id, name, org: organizationId(ts.orgIds, ORG), slug: name },
     spec: {
       description: "references an OAuthApp for the delete-block pins",
       serverType: { case: "stdio", value: { command: "npx", args: ["-y", "x"] } },
@@ -173,7 +188,7 @@ async function seedReferencingMcpServer(
       },
     },
   });
-  await store.saveResource(ApiResourceKind.mcp_server, id, McpServerSchema, mcp);
+  await ts.server.store.saveResource(ApiResourceKind.mcp_server, id, McpServerSchema, mcp);
 }
 
 async function grpcError(run: () => Promise<unknown>): Promise<ConnectError> {
@@ -322,10 +337,10 @@ describe("oauthapp domain (encryption enabled)", () => {
     it("blocks deletion while an exact (org, slug) ref resolves to the app, then frees it", async () => {
       const app = await ts.command.create(appInput());
       await seedReferencingMcpServer(
-        ts.server.store,
+        ts,
         "mcps_01refexact",
         "ref-exact",
-        ORG,
+        organizationId(ts.orgIds, ORG),
         app.metadata!.slug,
       );
 
@@ -334,7 +349,11 @@ describe("oauthapp domain (encryption enabled)", () => {
       );
       expect(err.code).toBe(Code.FailedPrecondition);
       expect(err.rawMessage).toBe(
-        deleteBlockedByMcpServerMessage(ORG, app.metadata!.slug, "ref-exact"),
+        deleteBlockedByMcpServerMessage(
+          organizationId(ts.orgIds, ORG),
+          app.metadata!.slug,
+          "ref-exact",
+        ),
       );
 
       await ts.server.store.deleteResource(ApiResourceKind.mcp_server, "mcps_01refexact");
@@ -347,7 +366,7 @@ describe("oauthapp domain (encryption enabled)", () => {
       // A public server's posture: ref pinned to `org: stigmer`, app applied
       // in the user's own org — resolution reaches it via unique slug (#584).
       await seedReferencingMcpServer(
-        ts.server.store,
+        ts,
         "mcps_01reffallback",
         "ref-fallback",
         "stigmer",
@@ -371,10 +390,10 @@ describe("oauthapp domain (encryption enabled)", () => {
       // The ref names org-b explicitly: it resolves to org-b's app, so
       // deleting org-a's app (same slug) must NOT be blocked.
       await seedReferencingMcpServer(
-        ts.server.store,
+        ts,
         "mcps_01refother",
         "ref-other",
-        "org-b",
+        organizationId(ts.orgIds, "org-b"),
         other.metadata!.slug,
       );
 
@@ -454,7 +473,10 @@ describe("resolveOAuthAppRef", () => {
   it("an empty slug resolves to nothing (the DCR/manual-token arm)", async () => {
     const resolved = await resolveOAuthAppRef(
       ts.server.store,
-      create(ApiResourceReferenceSchema, { org: ORG, slug: "" }),
+      create(ApiResourceReferenceSchema, {
+        org: organizationId(ts.orgIds, ORG),
+        slug: "",
+      }),
       silentLogger,
     );
     expect(resolved).toBeUndefined();
@@ -467,7 +489,10 @@ describe("resolveOAuthAppRef", () => {
 
     const resolved = await resolveOAuthAppRef(
       ts.server.store,
-      create(ApiResourceReferenceSchema, { org: "res-org-b", slug: exact.metadata!.slug }),
+      create(ApiResourceReferenceSchema, {
+        org: organizationId(ts.orgIds, "res-org-b"),
+        slug: exact.metadata!.slug,
+      }),
       silentLogger,
     );
     expect(resolved?.metadata?.id).toBe(exact.metadata?.id);
@@ -500,7 +525,10 @@ describe("resolveOAuthAppRef", () => {
   it("an unknown slug resolves to nothing", async () => {
     const resolved = await resolveOAuthAppRef(
       ts.server.store,
-      create(ApiResourceReferenceSchema, { org: ORG, slug: "never-created" }),
+      create(ApiResourceReferenceSchema, {
+        org: organizationId(ts.orgIds, ORG),
+        slug: "never-created",
+      }),
       silentLogger,
     );
     expect(resolved).toBeUndefined();

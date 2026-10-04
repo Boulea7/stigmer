@@ -73,7 +73,7 @@ class OAuthAppClient:
 
 @dataclass
 class OAuthAppInput:
-    """Input for creating or updating a OAuthApp."""
+    """Input for creating or updating an OAuthApp."""
 
     name: str
     org: str

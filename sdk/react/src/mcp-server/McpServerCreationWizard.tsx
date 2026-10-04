@@ -17,7 +17,7 @@ import type { McpServerWizardData } from "./steps/types.js";
 
 /** Result passed to `onComplete` after successful MCP server creation. */
 export interface McpServerCreationResult {
-  /** Organization slug of the created MCP server. */
+  /** The created MCP server's organization, by the id it is stored under. */
   readonly org: string;
   /** MCP server slug (for URL construction). */
   readonly slug: string;
@@ -93,11 +93,15 @@ const STEPS: WizardStepDef<McpServerWizardData>[] = [
  * This component is an SDK-first, embeddable wizard with zero Console
  * dependencies. Platform builders can mount it anywhere.
  *
+ * `onComplete` receives the organization by id; the URL carries the slug.
+ *
  * @example
  * ```tsx
+ * const slugForOrg = useOrgSlugForId();
+ *
  * <McpServerCreationWizard
  *   org="acme"
- *   onComplete={({ org, slug }) => navigate(`/mcp-servers/${org}/${slug}`)}
+ *   onComplete={({ org, slug }) => navigate(`/mcp-servers/${slugForOrg(org)}/${slug}`)}
  *   onCancel={() => navigate("/mcp-servers")}
  * />
  * ```

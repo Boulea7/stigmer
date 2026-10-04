@@ -39,7 +39,7 @@ export interface UseWorkflowExecutionListOptions {
    */
   readonly workflowId?: string | null;
   /**
-   * Organization slug to scope the cross-workflow listing to. Applies only
+   * Organization id to scope the cross-workflow listing to (a slug is also accepted). Applies only
    * to the `list()` branch (no `workflowId`); ignored by `listByWorkflow()`,
    * which is already scoped by the workflow itself.
    *

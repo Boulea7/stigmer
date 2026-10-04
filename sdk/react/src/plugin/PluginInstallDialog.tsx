@@ -26,6 +26,7 @@ import { InstallPreview, PrepareRefusal, describeOrigin } from "./InstallPreview
 import type { OpenedMarketplace } from "./sources/read.js";
 import { type InstallPluginOutcome, useInstallPlugin } from "./useInstallPlugin.js";
 import { usePreparePluginInstall } from "./usePreparePluginInstall.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Props for {@link PluginInstallDialog}. */
 export interface PluginInstallDialogProps {
@@ -111,6 +112,7 @@ function InstallDialogContent({
   readonly onClose: () => void;
   readonly onInstalled?: (outcome: InstallPluginOutcome) => void;
 }) {
+  const slugForOrg = useOrgSlugForId();
   const { prepared, relation, isPreparing, error: prepareError, refetch } = usePreparePluginInstall(opened, entryName, org);
   const { install, isInstalling, error: installError, clearError } = useInstallPlugin();
   const [outcome, setOutcome] = useState<InstallPluginOutcome | null>(null);
@@ -139,7 +141,7 @@ function InstallDialogContent({
         <div>
           <h2 className="stg:text-base stg:font-semibold stg:text-foreground">{title}</h2>
           <p className="stg:mt-0.5 stg:text-xs stg:text-muted-foreground">
-            From {sourceName} ({prepared ? describeOrigin(prepared.origin) : opened.tree.describe}) into {org}
+            From {sourceName} ({prepared ? describeOrigin(prepared.origin) : opened.tree.describe}) into {slugForOrg(org)}
           </p>
         </div>
       </header>

@@ -80,7 +80,7 @@ export class AgentInstanceClient {
   }
 }
 
-/** Input for creating/updating a AgentInstance. */
+/** Input for creating/updating an AgentInstance. */
 export interface AgentInstanceInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

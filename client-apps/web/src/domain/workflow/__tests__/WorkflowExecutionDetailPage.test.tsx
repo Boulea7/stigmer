@@ -2,12 +2,13 @@
  * Pins the web workflow-execution page's wiring: the viewer is keyed on the
  * execution id, so switching executions remounts it and all per-execution
  * state resets; the header mounts the execution's access dialog in the
- * active organization; the org falls back to the active one; and an
- * agent-call drill-down resolves to its session and opens it. The viewer is
- * pinned in @stigmer/react.
+ * active organization; the org falls back to the active one; an
+ * agent-call drill-down resolves to its session and opens it; and "open in
+ * editor" loads the workflow's library page under its org's slug. The
+ * viewer is pinned in @stigmer/react.
  */
 import type { ReactNode } from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render } from "@testing-library/react";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 
@@ -17,6 +18,7 @@ interface ViewerProps {
   nodesDraggable?: boolean;
   headerActions?: ReactNode;
   onNavigateToAgentExecution: (agentExecutionId: string) => void;
+  onNavigateToWorkflowEditor: (yaml: string, workflowSlug: string) => void;
 }
 
 const page = vi.hoisted(() => ({
@@ -40,8 +42,9 @@ vi.mock("@stigmer/react", async () => {
       page.access.push(props);
       return null;
     },
-    useActiveOrgSlug: () => "acme",
     useActiveOrgId: () => "org_acme",
+    // The person's organizations: org_acme reads "acme" in a URL.
+    useOrgSlugForId: () => (id: string) => (id === "org_acme" ? "acme" : id),
     useResolveAgentExecutionSession: (id: string | null) => ({
       sessionId: id ? page.sessionFor.get(id) : undefined,
       isLoading: false,
@@ -65,11 +68,15 @@ beforeEach(() => {
   page.sessionFor.clear();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("web WorkflowExecutionDetailPage", () => {
   it("shows the execution in the active org, with that execution's access dialog", () => {
     render(<WorkflowExecutionDetailPage executionId="wfe_1" />);
 
-    expect(page.viewer.at(-1)).toMatchObject({ executionId: "wfe_1", org: "acme", nodesDraggable: true });
+    expect(page.viewer.at(-1)).toMatchObject({ executionId: "wfe_1", org: "org_acme", nodesDraggable: true });
     expect(page.access.at(-1)?.resource).toEqual({
       kind: ApiResourceKind.workflow_execution,
       kindString: "workflow_execution",
@@ -99,5 +106,15 @@ describe("web WorkflowExecutionDetailPage", () => {
     act(() => page.viewer.at(-1)?.onNavigateToAgentExecution("aex_7"));
 
     expect(page.sessions).toEqual(["ses_7"]);
+  });
+
+  it("opens the workflow editor under the org's slug, not its id", () => {
+    const location = { href: "" } as Location;
+    vi.spyOn(window, "location", "get").mockReturnValue(location);
+    render(<WorkflowExecutionDetailPage executionId="wfe_1" />);
+
+    act(() => page.viewer.at(-1)?.onNavigateToWorkflowEditor("document: {}", "nightly"));
+
+    expect(location.href).toBe("/library/workflows/acme/nightly");
   });
 });

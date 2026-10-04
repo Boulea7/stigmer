@@ -17,7 +17,7 @@ export interface CreateAgentInstanceDialogProps {
   readonly open: boolean;
   /** Called when the dialog should open or close. */
   readonly onOpenChange: (open: boolean) => void;
-  /** Organization slug. */
+  /** Organization id (a slug is also accepted). */
   readonly org: string;
   /** Agent ID to bind the new instance to. */
   readonly agentId: string;

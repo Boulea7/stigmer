@@ -198,7 +198,7 @@ function computeDefaultEnabledTools(
  *
  * Pass `null` as `org` to disable all operations (stable no-op).
  *
- * @param org - Organization slug. Pass `null` to disable.
+ * @param org - Organization id (a slug is also accepted). Pass `null` to disable.
  * @param poolKeys - Optional set of env-var keys already available
  *   from the session env pool (manual secrets, one-time env vars from
  *   other components). When provided, servers whose `env` keys

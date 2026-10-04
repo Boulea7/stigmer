@@ -9,7 +9,7 @@ import { useEnvironmentList } from "./useEnvironmentList.js";
 
 /** Props for {@link EnvironmentPicker}. */
 export interface EnvironmentPickerProps {
-  /** Organization slug to list environments from. */
+  /** Organization id to list environments from (a slug is also accepted). */
   readonly org: string;
   /** Currently selected environment references, in merge order. */
   readonly value: readonly ResourceRef[];

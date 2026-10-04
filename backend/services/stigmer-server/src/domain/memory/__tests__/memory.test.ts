@@ -114,10 +114,14 @@ afterAll(async () => {
 });
 
 let orgCounter = 0;
+/** Each provisioned organization's minted id, by its slug. */
+const orgIds = new Map<string, string>();
 /**
  * Provisions an org with the memory switch in the requested position (the
- * memory conformance suite's pattern). Organization id equals slug — the
- * tenancy-root addressing rule.
+ * memory conformance suite's pattern) and answers its slug, which a wire
+ * request may name it by. The server mints its id (org_<ulid>); `idOf`
+ * answers it, for rows written straight to the store and for values the
+ * server stores or interpolates.
  */
 async function createOrg(memoryEnabled: boolean): Promise<string> {
   orgCounter += 1;
@@ -127,7 +131,17 @@ async function createOrg(memoryEnabled: boolean): Promise<string> {
     metadata: { name: `Memory Test Org ${orgCounter}` },
     spec: { preferences: { memoryEnabled } },
   });
+  orgIds.set(org.metadata!.slug, org.metadata!.id);
   return org.metadata!.slug;
+}
+
+/** The minted id of an organization `createOrg` provisioned. */
+function idOf(slug: string): string {
+  const id = orgIds.get(slug);
+  if (id === undefined) {
+    throw new Error(`organization ${slug} was not provisioned`);
+  }
+  return id;
 }
 
 let memoryCounter = 0;
@@ -242,7 +256,7 @@ describe("memory enablement (fail-closed)", () => {
     const org = await createOrg(false);
     const error = await grpcError(() => createMemory(org));
     expect(error.code).toBe(Code.FailedPrecondition);
-    expect(error.rawMessage).toBe(memoryDisabledMessage(org));
+    expect(error.rawMessage).toBe(memoryDisabledMessage(idOf(org)));
   });
 
   it("answers NotFound for an unknown org — the check fails closed", async () => {
@@ -253,16 +267,17 @@ describe("memory enablement (fail-closed)", () => {
 });
 
 /**
- * Seeds a full ceiling for `subject` in `org` directly through the store
- * (the RPC path would be needlessly slow at 100 creates).
+ * Seeds a full ceiling for `subject` in the organization `orgId` directly
+ * through the store (the RPC path would be needlessly slow at 100
+ * creates); a stored row names its organization by id.
  */
-async function seedCeiling(org: string, subject: string): Promise<void> {
+async function seedCeiling(orgId: string, subject: string): Promise<void> {
   for (let i = 0; i < MAX_MEMORIES_PER_SUBJECT; i++) {
     const id = generateId("mem");
     const seeded = create(MemorySchema, {
       apiVersion: MEMORY_API_VERSION,
       kind: MEMORY_KIND,
-      metadata: { id, name: id, slug: id, org },
+      metadata: { id, name: id, slug: id, org: orgId },
       spec: { content: `Seeded fact ${i}.`, subjectIdentityAccountId: subject },
     });
     await server.store.saveResource(
@@ -281,7 +296,7 @@ describe("memory cap", () => {
 
     // The refused create goes through the RPC. Seeded rows carry the
     // sentinel subject "" the create path would derive.
-    await seedCeiling(org, "");
+    await seedCeiling(idOf(org), "");
 
     const error = await grpcError(() => createMemory(org, "One too many."));
     expect(error.code).toBe(Code.FailedPrecondition);
@@ -297,7 +312,7 @@ describe("memory cap", () => {
 
   it("counts only the subject's own rows: another person's full ceiling in the org does not block", async () => {
     const org = await createOrg(true);
-    await seedCeiling(org, "ida_someone_else");
+    await seedCeiling(idOf(org), "ida_someone_else");
 
     const created = await createMemory(org, "Plenty of room for me.");
     expect(created.metadata?.id).toMatch(/^mem_/);
@@ -509,7 +524,7 @@ describe("memory list", () => {
       mine.metadata?.id,
     );
     for (const item of listed.items) {
-      expect(item.metadata?.org).toBe(org);
+      expect(item.metadata?.org).toBe(idOf(org));
     }
   });
 
@@ -530,7 +545,7 @@ describe("memory list", () => {
         create(MemorySchema, {
           apiVersion: MEMORY_API_VERSION,
           kind: MEMORY_KIND,
-          metadata: { id, name: id, slug: id, org },
+          metadata: { id, name: id, slug: id, org: idOf(org) },
           spec: { content: `Fact of day ${day}.` },
           status: {
             audit: {

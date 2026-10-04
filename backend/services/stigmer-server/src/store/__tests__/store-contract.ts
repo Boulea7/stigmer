@@ -17,9 +17,10 @@
  * token match / single-term prefix / AND; wire-ready 0–1 scores;
  * list-mode newest-first at exactly 1.0 — search-mode ranking ORDER is
  * deliberately NOT asserted here, it is driver-relative), the two-phase
- * signal-dedupe hold (oss#442), the organization-slug ledger (one winner
- * of concurrent claims, a retire that sticks, a release that frees only
- * its own unretired claim), OAuth grants, once-only pending-state
+ * signal-dedupe hold (oss#442), the resource-name table (one winner of
+ * concurrent claims, lazy expiry, renames that move, take back, revert and
+ * overlap to one current name, a name equal to its id reserved for good,
+ * a release that frees only its own names), OAuth grants, once-only pending-state
  * redemption with its 10-minute TTL, the closed-store failure mode, and
  * the list index (../list-index.ts): one organization's or one parent's
  * rows newest first, a cursor walk with no gap and no duplicate, keys
@@ -1447,28 +1448,38 @@ export function describeStoreContract(
     });
   });
 
-  describe("organization slugs", () => {
-    it("claims a fresh slug once; a second claim loses to the entry that holds it", async () => {
-      expect(await fx.store.organizationSlugs.find("acme")).toBeUndefined();
+  describe("resource names", () => {
+    const ORG = { kind: "organization", org: "" } as const;
+    const key = (name: string) => ({ ...ORG, name });
+    const T0 = "2026-01-01T00:00:00.000Z";
+    const T1 = "2026-01-02T00:00:00.000Z";
+    const T2 = "2026-01-03T00:00:00.000Z";
+    const T3 = "2026-01-04T00:00:00.000Z";
+    const names = () => fx.store.resourceNames;
 
-      const first = await fx.store.organizationSlugs.claim("acme");
+    it("claims a free name once; a second claim loses to the entry that holds it", async () => {
+      expect(await names().resolve(key("acme"), T0)).toBeUndefined();
+
+      const first = await names().claim(key("acme"), "org_a", T0);
       expect(first.claimed).toBe(true);
-      expect(first.entry.slug).toBe("acme");
-      expect(first.entry.retiredAt).toBe("");
-      expect(Date.parse(first.entry.claimedAt)).not.toBeNaN();
+      expect(first.entry).toEqual({
+        ...key("acme"),
+        id: "org_a",
+        state: "current",
+        claimedAt: T0,
+        expiresAt: "",
+      });
 
-      const second = await fx.store.organizationSlugs.claim("acme");
+      const second = await names().claim(key("acme"), "org_b", T1);
       expect(second.claimed).toBe(false);
       expect(second.entry).toEqual(first.entry);
-      expect(await fx.store.organizationSlugs.find("acme")).toEqual(
-        first.entry,
-      );
+      expect(await names().resolve(key("acme"), T1)).toEqual(first.entry);
     });
 
-    it("of concurrent claims of one slug, exactly one wins", async () => {
+    it("of concurrent claims of one name, exactly one wins", async () => {
       const claims = await Promise.all(
-        Array.from({ length: 8 }, () =>
-          fx.store.organizationSlugs.claim("contended"),
+        Array.from({ length: 8 }, (_, i) =>
+          names().claim(key("contended"), `org_${i}`, T0),
         ),
       );
       expect(claims.filter((claim) => claim.claimed)).toHaveLength(1);
@@ -1478,52 +1489,238 @@ export function describeStoreContract(
       }
     });
 
-    it("retire marks a held slug retired, keeps the first time, and records an unknown slug retired", async () => {
-      const { entry } = await fx.store.organizationSlugs.claim("acme");
-      await fx.store.organizationSlugs.retire("acme");
-      const retired = await fx.store.organizationSlugs.find("acme");
-      expect(retired?.claimedAt).toBe(entry.claimedAt);
-      expect(retired?.retiredAt).not.toBe("");
-
-      await fx.store.organizationSlugs.retire("acme");
-      expect(await fx.store.organizationSlugs.find("acme")).toEqual(retired);
-
-      // An organization created before the ledger existed has no entry;
-      // its delete still retires the slug.
-      await fx.store.organizationSlugs.retire("older");
-      const older = await fx.store.organizationSlugs.find("older");
-      expect(older?.retiredAt).not.toBe("");
-
-      const lost = await fx.store.organizationSlugs.claim("older");
-      expect(lost.claimed).toBe(false);
-      expect(lost.entry).toEqual(older);
+    it("a name is unique within its kind and scope only", async () => {
+      expect((await names().claim(key("acme"), "org_a", T0)).claimed).toBe(true);
+      expect(
+        (await names().claim({ kind: "organization", org: "org_a", name: "acme" }, "x_1", T0)).claimed,
+      ).toBe(true);
+      expect(
+        (await names().claim({ kind: "agent", org: "", name: "acme" }, "agt_1", T0)).claimed,
+      ).toBe(true);
     });
 
-    it("release frees only its own unretired claim", async () => {
-      const { entry } = await fx.store.organizationSlugs.claim("acme");
-      await fx.store.organizationSlugs.release(entry);
-      expect(await fx.store.organizationSlugs.find("acme")).toBeUndefined();
-      const reclaimed = await fx.store.organizationSlugs.claim("acme");
-      expect(reclaimed.claimed, "a released slug is claimable at once").toBe(
-        true,
-      );
-
-      // Another create's claim of the same slug carries another time, so
-      // a stale release never frees it.
-      await fx.store.organizationSlugs.release({
-        ...reclaimed.entry,
-        claimedAt: "2000-01-01T00:00:00.000Z",
+    it("a rename makes the new name current and leaves the old one resolving until it expires, then free", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      const moved = await names().rename({
+        ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T2, now: T1,
       });
-      expect(await fx.store.organizationSlugs.find("acme")).toEqual(
-        reclaimed.entry,
-      );
+      expect(moved.claimed).toBe(true);
+      expect(moved.entry).toMatchObject({ name: "acme-corp", id: "org_a", state: "current", expiresAt: "" });
 
-      // A retired slug is never freed, whoever asks.
-      await fx.store.organizationSlugs.retire("acme");
-      await fx.store.organizationSlugs.release(reclaimed.entry);
+      expect(await names().resolve(key("acme"), T1)).toMatchObject({
+        id: "org_a", state: "previous", expiresAt: T2,
+      });
+      const held = await names().claim(key("acme"), "org_b", T1);
+      expect(held.claimed, "nobody else takes a previous name before it expires").toBe(false);
+      expect(held.entry.id).toBe("org_a");
+
+      expect(await names().resolve(key("acme"), T2), "expired at its time").toBeUndefined();
+      const taken = await names().claim(key("acme"), "org_b", T3);
+      expect(taken.claimed, "an expired name is taken by the next claim").toBe(true);
+      expect(await names().resolve(key("acme"), T3)).toMatchObject({ id: "org_b", state: "current" });
+      expect(await names().resolve(key("acme-corp"), T3)).toMatchObject({ id: "org_a" });
+    });
+
+    it("a rename onto another's name loses and changes nothing; onto its own previous name takes it back", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await names().claim(key("globex"), "org_b", T0);
+      const lost = await names().rename({
+        ...ORG, id: "org_a", from: "acme", to: "globex", fromExpiresAt: T3, now: T1,
+      });
+      expect(lost.claimed).toBe(false);
+      expect(lost.entry).toMatchObject({ name: "globex", id: "org_b" });
+      expect(await names().resolve(key("acme"), T1)).toMatchObject({ id: "org_a", state: "current" });
+
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 });
+      const back = await names().rename({
+        ...ORG, id: "org_a", from: "acme-corp", to: "acme", fromExpiresAt: T3, now: T2,
+      });
+      expect(back.claimed).toBe(true);
+      expect(await names().resolve(key("acme"), T2)).toMatchObject({ id: "org_a", state: "current", expiresAt: "" });
+      expect(await names().resolve(key("acme-corp"), T2)).toMatchObject({ id: "org_a", state: "previous" });
+    });
+
+    it("an old name with no expiry is held for good", async () => {
+      await names().claim(key("older"), "older", T0);
+      await names().rename({ ...ORG, id: "older", from: "older", to: "newer", fromExpiresAt: "", now: T1 });
+      expect(await names().resolve(key("older"), "2999-01-01T00:00:00.000Z")).toMatchObject({
+        id: "older", state: "previous", expiresAt: "",
+      });
+      expect((await names().claim(key("older"), "org_b", "2999-01-01T00:00:00.000Z")).claimed).toBe(false);
+    });
+
+    it("a name equal to its id is held for good, whatever expiry the rename gives", async () => {
+      await names().claim(key("legacy"), "legacy", T0);
+      await names().rename({ ...ORG, id: "legacy", from: "legacy", to: "renamed", fromExpiresAt: T2, now: T1 });
+      expect(await names().resolve(key("legacy"), "2999-01-01T00:00:00.000Z")).toMatchObject({
+        id: "legacy", state: "previous", expiresAt: "",
+      });
+
+      // Renamed again, the name it moved to expires as any other.
+      await names().rename({ ...ORG, id: "legacy", from: "renamed", to: "again", fromExpiresAt: T2, now: T1 });
+      expect(await names().resolve(key("renamed"), T1)).toMatchObject({ state: "previous", expiresAt: T2 });
+      expect(await names().resolve(key("legacy"), "2999-01-01T00:00:00.000Z")).toMatchObject({ expiresAt: "" });
+    });
+
+    it("two renames from one name leave exactly one current name, the later one's", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      // Both renames read `acme` as the current name; the second runs after
+      // the first has moved it.
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-b", fromExpiresAt: T2, now: T1 });
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-c", fromExpiresAt: T2, now: T1 });
+
+      const states = await Promise.all(
+        ["acme", "acme-b", "acme-c"].map(async (name) => (await names().resolve(key(name), T1))?.state),
+      );
+      expect(states).toEqual(["previous", "previous", "current"]);
+      expect(await names().resolve(key("acme-b"), T2), "the overtaken name expires").toBeUndefined();
+    });
+
+    it("overlapping renames of one resource leave exactly one current name", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await Promise.all(
+        ["acme-b", "acme-c", "acme-d", "acme-e"].map((to) =>
+          names().rename({ ...ORG, id: "org_a", from: "acme", to, fromExpiresAt: T2, now: T1 }),
+        ),
+      );
+      const states = await Promise.all(
+        ["acme", "acme-b", "acme-c", "acme-d", "acme-e"].map(async (name) => (await names().resolve(key(name), T1))?.state),
+      );
+      expect(states.filter((state) => state === "current")).toHaveLength(1);
+    });
+
+    it("a rename onto its own current name is refused", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await expect(
+        names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme", fromExpiresAt: T2, now: T1 }),
+      ).rejects.toThrow(/both its old and new name/);
+      expect(await names().resolve(key("acme"), T1)).toMatchObject({ state: "current" });
+    });
+
+    it("revertRename puts the names back, and is idempotent", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      const move = { ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 };
+      await names().rename(move);
+      await names().revertRename(move);
+      await names().revertRename(move);
+      expect(await names().resolve(key("acme"), T2)).toMatchObject({ id: "org_a", state: "current", expiresAt: "" });
+      expect(await names().resolve(key("acme-corp"), T2)).toBeUndefined();
+    });
+
+    it("a move back after an overlapping rename leaves the later rename's name the one current name", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      const first = { ...ORG, id: "org_a", from: "acme", to: "acme-y", fromExpiresAt: T2, now: T1 };
+      await names().rename(first);
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-z", fromExpiresAt: T2, now: T1 });
+      // The first rename's row write fails: its names move back.
+      await names().revertRename(first);
+
+      expect(await names().resolve(key("acme-y"), T1)).toBeUndefined();
+      expect(await names().current("organization", "", "org_a")).toMatchObject({ name: "acme-z" });
+      expect(await names().resolve(key("acme"), T1)).toMatchObject({ state: "previous" });
+    });
+
+    it("revertRename restores a name the rename took back, as it stood, instead of letting it go", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 });
+      const back = { ...ORG, id: "org_a", from: "acme-corp", to: "acme", fromExpiresAt: T3, now: T2 };
+      const moved = await names().rename(back);
+      expect(moved.claimed).toBe(true);
+      const takenBack = moved.claimed ? moved.takenBack : undefined;
+      expect(takenBack).toMatchObject({ name: "acme", id: "org_a", state: "previous", expiresAt: T3 });
+
+      await names().revertRename(back, takenBack);
+      await names().revertRename(back, takenBack);
+      expect(await names().resolve(key("acme-corp"), T2)).toMatchObject({ state: "current", expiresAt: "" });
+      expect(await names().resolve(key("acme"), T2)).toMatchObject({ id: "org_a", state: "previous", expiresAt: T3 });
+    });
+
+    it("a move back never lets go of a name equal to its id", async () => {
+      await names().claim(key("older"), "older", T0);
+      await names().rename({ ...ORG, id: "older", from: "older", to: "newer", fromExpiresAt: T2, now: T1 });
+      const back = { ...ORG, id: "older", from: "newer", to: "older", fromExpiresAt: T2, now: T1 };
+      const moved = await names().rename(back);
+      await names().revertRename(back, moved.claimed ? moved.takenBack : undefined);
+
+      expect(await names().resolve(key("older"), "2999-01-01T00:00:00.000Z")).toMatchObject({
+        id: "older", state: "previous", expiresAt: "",
+      });
+      expect((await names().claim(key("older"), "org_b", "2999-01-01T00:00:00.000Z")).claimed).toBe(false);
+    });
+
+    it("a rename onto a name taken fresh carries nothing taken back", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      const moved = await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 });
+      expect(moved.claimed && moved.takenBack).toBeUndefined();
+    });
+
+    it("current answers the one current name a resource holds, and nothing once it holds none", async () => {
+      expect(await names().current("organization", "", "org_a")).toBeUndefined();
+      await names().claim(key("acme"), "org_a", T0);
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 });
+      expect(await names().current("organization", "", "org_a")).toMatchObject({ name: "acme-corp", state: "current" });
+      await names().release("organization", "", "org_a");
+      expect(await names().current("organization", "", "org_a")).toBeUndefined();
+    });
+
+    it("release keeps a name equal to the id reserved for good, and lets go of every other", async () => {
+      await names().claim(key("older"), "older", T0);
+      await names().rename({ ...ORG, id: "older", from: "older", to: "newer", fromExpiresAt: T2, now: T1 });
+      await names().release("organization", "", "older");
+      await names().release("organization", "", "older");
+      expect(await names().resolve(key("newer"), T1)).toBeUndefined();
+      expect(await names().resolve(key("older"), "2999-01-01T00:00:00.000Z")).toMatchObject({
+        id: "older", state: "previous", expiresAt: "",
+      });
+      expect((await names().claim(key("older"), "org_b", "2999-01-01T00:00:00.000Z")).claimed).toBe(false);
+    });
+
+    it("release lets go of every name one resource holds, and only its", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T3, now: T1 });
+      await names().claim(key("globex"), "org_b", T0);
+      await names().release("organization", "", "org_a");
+      await names().release("organization", "", "org_a");
+      expect(await names().resolve(key("acme"), T1)).toBeUndefined();
+      expect(await names().resolve(key("acme-corp"), T1)).toBeUndefined();
+      expect(await names().resolve(key("globex"), T1)).toMatchObject({ id: "org_b" });
+      expect((await names().claim(key("acme"), "org_c", T1)).claimed).toBe(true);
+    });
+
+    // The two cases below make the engine refuse a write by binding NULL to
+    // a NOT NULL column (the types forbid it, so the value is cast): the one
+    // refusal both engines raise on demand. Each proves the write's earlier
+    // statements are rolled back with it.
+
+    it("a claim the engine refuses fails, claims nothing, and keeps the expired name it would have cleared", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await names().rename({ ...ORG, id: "org_a", from: "acme", to: "acme-corp", fromExpiresAt: T2, now: T1 });
+
+      // At T3 the claim first clears acme's expired previous name, then its
+      // insert is refused.
+      await expect(names().claim(key("acme"), null as unknown as string, T3)).rejects.toThrow();
+
+      expect(await names().resolve(key("acme"), T3)).toBeUndefined();
       expect(
-        (await fx.store.organizationSlugs.find("acme"))?.retiredAt,
-      ).not.toBe("");
+        await names().resolve(key("acme"), T1),
+        "the clearing rolled back with the refused insert",
+      ).toMatchObject({ id: "org_a", state: "previous", expiresAt: T2 });
+      expect((await names().claim(key("acme"), "org_b", T3)).claimed).toBe(true);
+    });
+
+    it("a rename whose second write the engine refuses moves nothing", async () => {
+      await names().claim(key("acme"), "org_a", T0);
+      await expect(
+        names().rename({
+          ...ORG, id: "org_a", from: "acme", to: "acme-corp",
+          fromExpiresAt: null as unknown as string, now: T1,
+        }),
+      ).rejects.toThrow();
+
+      expect(await names().resolve(key("acme-corp"), T1), "the new name stays free").toBeUndefined();
+      expect(await names().resolve(key("acme"), T1)).toMatchObject({
+        id: "org_a", state: "current", expiresAt: "",
+      });
     });
   });
 
@@ -1972,9 +2169,13 @@ export function describeStoreContract(
       await expect(fx.store.signalDedupe.release("o", "k")).rejects.toThrow(
         "store is closed",
       );
-      await expect(fx.store.organizationSlugs.claim("o")).rejects.toThrow(
-        "store is closed",
-      );
+      await expect(
+        fx.store.resourceNames.claim(
+          { kind: "organization", org: "", name: "o" },
+          "org_o",
+          new Date().toISOString(),
+        ),
+      ).rejects.toThrow("store is closed");
     });
   });
 }

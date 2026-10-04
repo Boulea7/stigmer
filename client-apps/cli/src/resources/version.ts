@@ -2,7 +2,8 @@
 // version retrieval (`get <workflow> --version <hashOrTag>`). Versioning is a
 // workflow-only feature: applies create immutable, hash-addressed versions that
 // can be tagged and diffed. Mirrors Go's workflow.RunVersionsList /
-// RunVersionsGet, including the table layout and the empty-history guidance.
+// RunVersionsGet, including the table layout and the empty-history guidance,
+// which names the organization by slug where the caller can see it.
 
 import { create } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
@@ -12,6 +13,7 @@ import {
   type WorkflowVersionEntry,
 } from "@stigmer/protos/ai/stigmer/agentic/workflow/v1/version_pb";
 import type { Stigmer } from "@stigmer/sdk";
+import { organizationLabel } from "../client/organizations.js";
 import { CliExitError, ExitCode } from "../errors/index.js";
 
 // Go caps the history view at 50 entries (workflow.getWorkflow → RunVersionsList).
@@ -27,7 +29,7 @@ export async function renderWorkflowVersionHistory(client: Stigmer, org: string,
     return [
       "",
       // An empty org is a server that holds one: it is never named.
-      `No version history found for ${org === "" ? slug : `${org}/${slug}`}`,
+      `No version history found for ${org === "" ? slug : `${await organizationLabel(client, org)}/${slug}`}`,
       "Tip: Apply a workflow to create the first version:",
       "  stigmer apply -f workflow.yaml",
       "",

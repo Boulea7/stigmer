@@ -5,11 +5,18 @@
  * the shared suite deliberately leaves out (search-result order within one
  * driver is contract; order across drivers is not).
  *
+ * Also two faults of this driver's name-store transactions: a race only
+ * this engine admits (a release that commits between a losing name claim's
+ * insert and its read of the holder, which read committed lets the claim
+ * see; the claim fails and claims nothing, never answering a holder that is
+ * gone), and a rollback that fails after a failed write (the write's error
+ * is the one reported).
+ *
  * Gated on TEST_DATABASE_URL (see support.ts): visible skips without a
  * database, always exercised in CI via the ci.stigmer-server service
  * container.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 
@@ -38,7 +45,7 @@ const ALL_TABLES = [
   "workflow_execution_events",
   "schedule_runs",
   "signal_dedupe",
-  "organization_slugs",
+  "resource_names",
   "oauth_grant",
   "pending_oauth_state",
 ] as const;
@@ -167,6 +174,103 @@ describe.skipIf(testDatabaseAdminUrl() === undefined)(
           expect(result.hits[0]?.resourceId).toBe("agt-name");
           expect(result.hits[0]!.score).toBeGreaterThan(result.hits[1]!.score);
         } finally {
+          await store.close();
+        }
+      });
+    });
+
+    describe("the name store's transactions under faults", () => {
+      type Query = (...args: unknown[]) => Promise<unknown>;
+
+      /**
+       * Wraps the query method of every client the store checks out with a
+       * bare connect() (its transactions); the hook pool's queries pass a
+       * callback and are left alone. Restore the spy to stop wrapping.
+       */
+      function wrapTransactionQueries(wrap: (query: Query) => Query) {
+        const connect = pg.Pool.prototype.connect;
+        return vi
+          .spyOn(pg.Pool.prototype, "connect")
+          .mockImplementation(function (
+            this: pg.Pool,
+            ...args: unknown[]
+          ): Promise<pg.PoolClient> {
+            const checkout = (connect as (...a: unknown[]) => unknown).apply(
+              this,
+              args,
+            ) as Promise<pg.PoolClient>;
+            if (args.length > 0) {
+              return checkout;
+            }
+            return checkout.then((client) => {
+              const query = client.query.bind(client) as Query;
+              (client as { query: unknown }).query = wrap(query);
+              return client;
+            });
+          } as typeof pg.Pool.prototype.connect);
+      }
+
+      const key = { kind: "organization", org: "", name: "acme" };
+      const now = "2026-01-01T00:00:00.000Z";
+
+      async function freshStore(): Promise<PostgresStore> {
+        await hooks.query(
+          `TRUNCATE ${ALL_TABLES.join(", ")} RESTART IDENTITY CASCADE`,
+        );
+        return PostgresStore.open(db.databaseUrl);
+      }
+
+      it("a lost claim fails, claiming nothing, when its holder is released before it reads it", async () => {
+        const store = await freshStore();
+        await store.resourceNames.claim(key, "org_a", now);
+        // The release commits on the hook pool's own connection right after
+        // the claim's conflicting insert, the window no ordering of two calls
+        // can otherwise reach.
+        const spy = wrapTransactionQueries((query) => async (...a) => {
+          const result = await query(...a);
+          if (typeof a[0] === "string" && a[0].includes("DO NOTHING")) {
+            await hooks.query(`DELETE FROM resource_names WHERE name = 'acme'`);
+          }
+          return result;
+        });
+        try {
+          await expect(
+            store.resourceNames.claim(key, "org_b", now),
+          ).rejects.toThrow(/its holder disappeared during the write/);
+          spy.mockRestore();
+          expect(await store.resourceNames.resolve(key, now)).toBeUndefined();
+          expect(
+            (await store.resourceNames.claim(key, "org_b", now)).claimed,
+            "a retry takes the name the release freed",
+          ).toBe(true);
+        } finally {
+          spy.mockRestore();
+          await store.close();
+        }
+      });
+
+      it("a failed write reports its own error when the rollback fails too", async () => {
+        const store = await freshStore();
+        // The insert fails; the rollback runs, then reports a broken
+        // connection, as a dropped socket would.
+        const spy = wrapTransactionQueries((query) => async (...a) => {
+          if (typeof a[0] === "string" && a[0].includes("DO NOTHING")) {
+            throw new Error("the write failed");
+          }
+          if (a[0] === "ROLLBACK") {
+            await query(...a);
+            throw new Error("connection terminated");
+          }
+          return query(...a);
+        });
+        try {
+          await expect(
+            store.resourceNames.claim(key, "org_a", now),
+          ).rejects.toThrow("the write failed");
+          spy.mockRestore();
+          expect(await store.resourceNames.resolve(key, now)).toBeUndefined();
+        } finally {
+          spy.mockRestore();
           await store.close();
         }
       });

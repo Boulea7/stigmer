@@ -327,7 +327,7 @@ Input for creating or updating an Invitation.
   type={{
     name: { type: "string", description: "Resource name.", required: true },
     slug: { type: "string", description: "URL-friendly identifier." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
     labels: { type: "Record<string, string>", description: "Key-value labels." },
     role: { type: "IamRole", description: "The role granted to the identity account upon redemption.", typeDescriptionLink: "#iamrole", required: true },
     maxRedemptions: { type: "number", description: "Maximum number of times this invitation can be redeemed." },

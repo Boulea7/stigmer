@@ -522,12 +522,18 @@ function levelWord(level: ApiResourceVisibility): string {
     : ApiResourceVisibility[level];
 }
 
-/** Clause (iii)'s one sentence — the same whether the target is missing or not platform-visible. */
+/**
+ * Clause (iii)'s one sentence — the same whether the target is missing or
+ * not platform-visible, and whether the organization it names exists: the
+ * other organization is not named at all, because a name the edge resolved
+ * would come back as that organization's id and a name nobody holds as
+ * written, which would tell the writer which names exist.
+ */
 export function notAvailableReferenceMessage(
   entry: ReferenceTargetKind,
   ref: SpecReference,
 ): string {
-  return `referenced ${singular(entry)} '${ref.org}/${ref.slug}' is not available to this organization; another organization's resource can be referenced only when that organization shares it at platform visibility.`;
+  return `referenced ${singular(entry)} '${ref.slug}' of another organization is not available to this organization; another organization's resource can be referenced only when that organization shares it at platform visibility.`;
 }
 
 /** The writer clause's sentence: the target, and what the writer may attach instead. */
@@ -743,7 +749,38 @@ export async function checkReferences(
           : verdict,
     });
   }
-  return referenceRefusal(parent, verdicts);
+  return referenceRefusal(parent, await namedForPeople(store, parent, verdicts));
+}
+
+/**
+ * The verdicts with the writer's own organization named by its slug, for
+ * the refusal's copy: references are judged by id, but a person reads the
+ * sentence. Another organization is never named by a refusal at all
+ * (notAvailableReferenceMessage says why).
+ */
+async function namedForPeople<
+  V extends { readonly ref: SpecReference; readonly verdict: ReferenceVerdict },
+>(
+  store: Store,
+  parent: ReferenceParent,
+  verdicts: ReadonlyArray<V>,
+): Promise<ReadonlyArray<V>> {
+  // Only a refusal is read by a person; a write that passes reads nothing.
+  const refusesOwn = verdicts.some(
+    ({ ref, verdict }) => ref.org === parent.org && verdict.kind !== "ok",
+  );
+  if (parent.org === "" || !refusesOwn) {
+    return verdicts;
+  }
+  const slug = (
+    await store.resourceNames.current(ApiResourceKind[ApiResourceKind.organization], "", parent.org)
+  )?.name;
+  if (slug === undefined || slug === parent.org) {
+    return verdicts;
+  }
+  return verdicts.map((verdict) =>
+    verdict.ref.org === parent.org ? { ...verdict, ref: { ...verdict.ref, org: slug } } : verdict,
+  );
 }
 
 /** The references a stored row carries, for the escalation door; a chain passes one collector per place its row keeps them. */
@@ -800,12 +837,16 @@ export function newGuardReferenceFloorOnEscalationStep(
       const targets = await loadReferenceTargets(store, refs);
       const refusal = referenceRefusal(
         parent,
-        refs
-          .map((ref) => ({
-            ref,
-            verdict: checkReference(targets, parent, ref),
-          }))
-          .filter(({ verdict }) => verdict.kind === "below-floor"),
+        await namedForPeople(
+          store,
+          parent,
+          refs
+            .map((ref) => ({
+              ref,
+              verdict: checkReference(targets, parent, ref),
+            }))
+            .filter(({ verdict }) => verdict.kind === "below-floor"),
+        ),
       );
       if (refusal !== undefined) {
         throw refusal;

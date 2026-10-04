@@ -33,7 +33,6 @@ vi.mock("../../server-info.js", () => ({
   useServerInfo: () => serverInfo,
 }));
 vi.mock("../../organization/OrgProvider.js", () => ({
-  useActiveOrgSlug: () => "acme",
   useActiveOrgId: () => "org_acme",
 }));
 vi.mock("../../iam-policy/useCheckPermission.js", () => ({

@@ -1,3 +1,9 @@
+/**
+ * ResourceWorkbench lists a collection as a table, cards or rows: the search
+ * input is optional, a server that holds one organization hides the
+ * organization column, and the default card and row layouts name a row's
+ * organization by its slug.
+ */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, renderHook, screen, waitFor, cleanup } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -5,6 +11,7 @@ import type { ListResult } from "@stigmer/sdk";
 import { FetchCacheContext } from "../../internal/FetchCacheProvider";
 import { ResourceWorkbench } from "../components/ResourceWorkbench";
 import { useResourceCollection } from "../hooks/useResourceCollection";
+import { GLOBEX_ID, orgWrapper } from "../../organization/__tests__/org-fixture";
 
 // Whether the server holds one organization, as useSingleOrg reports it.
 let singleOrg: boolean | undefined = false;
@@ -160,5 +167,34 @@ describe("useResourceCollection row identity", () => {
     await waitFor(() => expect(result.current.items).toHaveLength(2));
     const rowIds = result.current.table!.getRowModel().rows.map((r) => r.id);
     expect(rowIds).toEqual(["res_1", "1"]);
+  });
+});
+
+describe("ResourceWorkbench default layouts name a row's organization by slug", () => {
+  const rows = [{ id: "agt_a", name: "Helper", slug: "helper", org: GLOBEX_ID, description: "" }];
+  const OrgsWrapper = orgWrapper();
+
+  function WithOrgs({ children }: { children: ReactNode }) {
+    return (
+      <Wrapper>
+        <OrgsWrapper>{children}</OrgsWrapper>
+      </Wrapper>
+    );
+  }
+
+  it.each([["cards"], ["list"]] as const)("in the %s layout", async (mode) => {
+    render(
+      <ResourceWorkbench
+        listFn={listFnReturning(rows)}
+        org={GLOBEX_ID}
+        viewModes={[mode]}
+        defaultViewMode={mode}
+      />,
+      { wrapper: WithOrgs },
+    );
+
+    await waitFor(() => expect(screen.getByText("Helper")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("globex")).toBeTruthy());
+    expect(screen.queryByText(GLOBEX_ID)).toBeNull();
   });
 });

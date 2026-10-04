@@ -16,7 +16,7 @@ const page = vi.hoisted(() => ({
   github: [] as string[],
 }));
 
-const SESSION = { metadata: { id: "ses_1", org: "acme" } };
+const SESSION = { metadata: { id: "ses_1", org: "org_acme" } };
 
 vi.mock("@stigmer/react", () => ({
   SessionViewer: (props: Record<string, unknown>) => {
@@ -32,8 +32,7 @@ vi.mock("@stigmer/react", () => ({
   useFollowSessionOrganization: (session: unknown) => {
     page.followed.push(session);
   },
-  useActiveOrgSlug: () => "acme",
-  useActiveOrgId: () => "acme",
+  useActiveOrgId: () => "org_acme",
   useAccountExecutionDefaults: () => undefined,
   useGitHubConnection: (org: string) => {
     page.github.push(org);
@@ -68,8 +67,8 @@ describe("web SessionPage", () => {
   it("gives the viewer, the share dialog and the GitHub connection the active organization", () => {
     render(<SessionPageInner id="ses_1" />);
 
-    expect(page.viewer.at(-1)?.org).toBe("acme");
-    expect((page.access.at(-1)?.resource as { org: string }).org).toBe("acme");
-    expect(page.github).toContain("acme");
+    expect(page.viewer.at(-1)?.org).toBe("org_acme");
+    expect((page.access.at(-1)?.resource as { org: string }).org).toBe("org_acme");
+    expect(page.github).toContain("org_acme");
   });
 });

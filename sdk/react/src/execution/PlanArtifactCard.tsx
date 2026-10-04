@@ -23,7 +23,7 @@ export interface PlanArtifactCardProps {
    */
   readonly title?: string;
   /**
-   * Organization slug. Required for the open-in-modal fallback (the shared
+   * Organization id (a slug is also accepted). Required for the open-in-modal fallback (the shared
    * {@link ArtifactPreviewModal} uses it for its detection/apply pipeline and
    * to fetch the content). When omitted, that fallback is hidden — the
    * prominent "Build" action and the download icon remain.

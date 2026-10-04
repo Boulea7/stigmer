@@ -6,10 +6,12 @@
 // are dynamically imported inside the action so `--help` stays fast.
 
 import type { Command } from "commander";
+import type { Message } from "@bufbuild/protobuf";
+import type { Stigmer } from "@stigmer/sdk";
 import { omitsOrganization } from "../client/single-org.js";
 import { ensureAuthenticated, resolveOrganization } from "../config/index.js";
 import { UsageError } from "../errors/index.js";
-import type { OutputFlags } from "../output/index.js";
+import type { OutputFlags, OutputFormat } from "../output/index.js";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { defaultRegistry, Verb } from "../registry/index.js";
 import { addReadFlags, globalOrg, readFormat } from "./shared.js";
@@ -75,7 +77,9 @@ async function runGet(type: string, reference: string, options: GetFlags, comman
     fetchResource(client.stigmer, info.kind, parsed),
     omitsOrganization(client.stigmer),
   ]);
-  process.stdout.write(renderResource(schema, message, readFormat(options), { hideOrg }));
+  const format = readFormat(options);
+  const orgLabel = await humanOrgLabel(client.stigmer, message, format, hideOrg);
+  process.stdout.write(renderResource(schema, message, format, { hideOrg, orgLabel }));
 }
 
 async function runGetExecution(reference: string, options: GetFlags, command: Command): Promise<void> {
@@ -95,7 +99,28 @@ async function runGetExecution(reference: string, options: GetFlags, command: Co
     getExecution(client.stigmer, reference),
     omitsOrganization(client.stigmer),
   ]);
-  process.stdout.write(renderResource(schema, message, readFormat(options), { hideOrg }));
+  const format = readFormat(options);
+  const orgLabel = await humanOrgLabel(client.stigmer, message, format, hideOrg);
+  process.stdout.write(renderResource(schema, message, format, { hideOrg, orgLabel }));
+}
+
+/**
+ * The organization's slug for the human field view, which names it in place
+ * of the id the resource carries; undefined for json and yaml, which print
+ * the resource exactly as the server answered, and when the Org line is
+ * hidden.
+ */
+async function humanOrgLabel(
+  stigmer: Stigmer,
+  message: Message,
+  format: OutputFormat,
+  hideOrg: boolean,
+): Promise<string | undefined> {
+  if (hideOrg || format === "json" || format === "yaml") return undefined;
+  const org = (message as { metadata?: { org?: string } }).metadata?.org ?? "";
+  if (org === "") return undefined;
+  const { organizationLabel } = await import("../client/organizations.js");
+  return organizationLabel(stigmer, org);
 }
 
 // Splits "org/slug" into its parts; a bare token uses the resolved org context.

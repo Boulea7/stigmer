@@ -227,7 +227,7 @@ All visual properties flow through `--stgm-*` design tokens.
     emptyState: { type: "ReactNode", description: "Shown when the list is empty. Defaults to \"No channel apps registered yet.\" The list holds only the apps the caller may view (the organization's admins, and anyone granted viewer on an app), so a host that knows the caller may not manage channel apps should say who does instead." },
     onEdit: { type: "(app: ChannelApp) => void", description: "Fired when the user wants to view/edit a channel app. When provided, rows become interactive with a pencil icon button." },
     onRefetchRef: { type: "(refetch: () => void) => void", description: "Re-expose refetch so parents can trigger a list refresh." },
-    org: { type: "string", description: "Organization slug to list channel apps for.", required: true },
+    org: { type: "string", description: "Organization id to list channel apps for (a slug is also accepted).", required: true },
   }}
 />
 
@@ -268,7 +268,7 @@ design tokens.
     consoleOrigin: { type: "string", description: "Console origin used to derive the OAuth redirect URL shown in the Slack setup guidance. Defaults to the current window's origin." },
     onCancel: { type: "() => void", description: "Fired when the user cancels creation." },
     onCreated: { type: "(app: ChannelApp, handoff: ChannelAppCreateHandoff) => void", description: "Fired with the newly created channel app on success. The handoff carries the once-visible secrets the detail panel shows for phase-two setup." },
-    org: { type: "string", description: "Organization slug — the channel app will be created in this org.", required: true },
+    org: { type: "string", description: "Organization id — the channel app will be created in this org (a slug is also accepted).", required: true },
   }}
 />
 

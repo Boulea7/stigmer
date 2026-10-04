@@ -100,7 +100,7 @@ class AgentShareClient:
 
 @dataclass
 class AgentShareInput:
-    """Input for creating or updating a AgentShare."""
+    """Input for creating or updating an AgentShare."""
 
     name: str
     org: str

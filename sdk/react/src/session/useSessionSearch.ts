@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import type { SearchResult } from "@stigmer/protos/ai/stigmer/search/v1/io_pb";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { useStigmer } from "../hooks.js";
-import { useActiveOrgSlug } from "../organization/OrgProvider.js";
+import { useActiveOrgId } from "../organization/OrgProvider.js";
 import { useFetch } from "../internal/useFetch.js";
 
 /** Options for {@link useSessionSearch}. */
@@ -83,7 +83,7 @@ export function useSessionSearch(
   options?: UseSessionSearchOptions,
 ): UseSessionSearchReturn {
   const stigmer = useStigmer();
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const pageSize = options?.pageSize ?? DEFAULT_PAGE_SIZE;
 
   const [page, setPage] = useState(1);

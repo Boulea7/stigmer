@@ -8,6 +8,7 @@ import {
   type ManifestDocument,
 } from "@stigmer/sdk";
 import { useStigmer } from "../hooks.js";
+import { findOrgByRef, useOptionalOrg } from "../organization/OrgProvider.js";
 import { toError } from "../internal/toError.js";
 
 /** Per-document apply lifecycle within one manifest. */
@@ -86,7 +87,7 @@ const VALIDATE_DEBOUNCE_MS = 500;
  * apply there (matching `stigmer apply` semantics — the org-mismatch
  * warning surfaces on the parsed document).
  *
- * @param org - Target organization slug for `metadata.org` injection.
+ * @param org - Target organization id (a slug is also accepted) for `metadata.org` injection.
  *
  * @example
  * ```tsx
@@ -114,6 +115,12 @@ export function useApplyManifest(org: string): UseApplyManifestReturn {
 
   const orgRef = useRef(org);
   orgRef.current = org;
+  // The target's other name (its slug for an id, its id for a slug), when
+  // the person is a member: a document naming it either way applies
+  // quietly, and one naming another organization either way warns.
+  const known = findOrgByRef(useOptionalOrg()?.orgs ?? [], org)?.metadata;
+  const orgNamesRef = useRef<readonly string[]>([]);
+  orgNamesRef.current = known === undefined ? [] : [known.id, known.slug].filter((name) => name !== "");
 
   const setContent = useCallback((value: string) => {
     setContentState(value);
@@ -161,7 +168,7 @@ export function useApplyManifest(org: string): UseApplyManifestReturn {
     const timer = setTimeout(async () => {
       let documents: ManifestDocument[];
       try {
-        documents = parseManifest(content, { org: orgRef.current });
+        documents = parseManifest(content, { org: orgRef.current, orgNames: orgNamesRef.current });
       } catch (err) {
         if (validateSeq.current === seq) {
           setEntries(null);

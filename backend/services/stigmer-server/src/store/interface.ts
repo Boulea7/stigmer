@@ -331,72 +331,122 @@ export interface SignalDedupeStore {
 }
 
 // =============================================================================
-// Organization slugs (the ledger of every slug an organization ever took)
+// Resource names (the names a resource answers to)
 // =============================================================================
 
-/**
- * One slug's line in the ledger. An organization's id is its slug, so this
- * is also the history of every organization id the store ever issued.
- */
-export interface OrganizationSlugEntry {
-  readonly slug: string;
-  /**
-   * RFC-3339 time the ledger first recorded the slug: the create's claim,
-   * or, for a slug that predates the ledger, the migration or retire that
-   * wrote it.
-   */
-  readonly claimedAt: string;
-  /** RFC-3339 time the organization holding it was deleted; "" while it is held. */
-  readonly retiredAt: string;
+/** Whether a name is what its resource is called now, or what it was called before a rename. */
+export type ResourceNameState = "current" | "previous";
+
+/** Where a name is unique: a kind, and the organization it is unique in ("" across the server). */
+export interface ResourceNameKey {
+  /** The kind's enum name, as the `resources` table's `kind` column holds it ("organization"). */
+  readonly kind: string;
+  /** The owning organization's id, or "" for a name unique across the server (an organization's own). */
+  readonly org: string;
+  readonly name: string;
 }
 
-/** A claim's outcome: won with its entry, or lost to the entry that holds the slug. */
-export type OrganizationSlugClaim =
-  | { readonly claimed: true; readonly entry: OrganizationSlugEntry }
-  | { readonly claimed: false; readonly entry: OrganizationSlugEntry };
+/**
+ * One name a resource answers to. A resource has one `current` name, its
+ * slug, and any `previous` names its renames left, each held until
+ * `expiresAt` so the old name keeps resolving to it and nobody else can
+ * take it meanwhile.
+ */
+export interface ResourceNameEntry extends ResourceNameKey {
+  /** The resource the name resolves to. */
+  readonly id: string;
+  readonly state: ResourceNameState;
+  /** RFC-3339 time the name was taken, or, for a previous name, the rename that left it. */
+  readonly claimedAt: string;
+  /** RFC-3339 time a previous name stops resolving and is free; "" for a current name and for one held for good. */
+  readonly expiresAt: string;
+}
+
+/** A claim's outcome: won with its entry, or lost to the entry that holds the name. */
+export type ResourceNameClaim =
+  | { readonly claimed: true; readonly entry: ResourceNameEntry }
+  | { readonly claimed: false; readonly entry: ResourceNameEntry };
 
 /**
- * The organization-slug ledger: a slug is claimed once, atomically, by the
- * create that takes it, and it is never released by the organization's
- * delete, which retires it instead. The organization row can go; its slug
- * stays taken for good, so nothing a deleted organization left behind
- * (rows that name it in `metadata.org`, an edition's rows kept by its id)
- * can ever pass to a new holder of the same slug.
- *
- * The ledger, not the organization row, decides "taken". A claim is the
- * create's uniqueness guarantee, which the row cannot give: `saveResource`
- * upserts, so two creates that both read "absent" would otherwise both
- * write, the second over the first.
- *
- * An unretired entry is a slug held by a live organization, or by a create
- * between its claim and its row; a retired entry is a slug whose
- * organization was deleted. A caller tells the two apart, never "no row"
- * alone, because a create in flight has a claim and no row yet.
+ * A rename's outcome, as a claim's. A won rename that took back one of the
+ * resource's own previous names carries that name as it stood before
+ * (`takenBack`), so a move back can restore it rather than let it go.
  */
-export interface OrganizationSlugStore {
+export type ResourceNameRenamed =
+  | {
+      readonly claimed: true;
+      readonly entry: ResourceNameEntry;
+      readonly takenBack?: ResourceNameEntry;
+    }
+  | { readonly claimed: false; readonly entry: ResourceNameEntry };
+
+/** One rename: `id`'s current name `from` becomes `to`. */
+export interface ResourceNameRename {
+  readonly kind: string;
+  readonly org: string;
+  readonly id: string;
+  readonly from: string;
+  readonly to: string;
   /**
-   * Claims a slug if no entry holds it, atomically: of concurrent claims,
-   * exactly one wins. A loser receives the entry that holds the slug,
-   * retired or not.
+   * When the names this rename demotes stop resolving; "" holds them for
+   * good. A name equal to `id` is held for good whatever this says: it is
+   * the id an earlier release filed the resource's rows under.
    */
-  claim(slug: string): Promise<OrganizationSlugClaim>;
+  readonly fromExpiresAt: string;
+  /** RFC-3339 now, the instant expiry is judged against. */
+  readonly now: string;
+}
+
+/**
+ * The names resources answer to, and which resource each resolves to.
+ * Only organizations write it today: their slugs are names here, unique
+ * across the server, while the organization is filed under its minted id.
+ *
+ * The table, not the resource row, decides "taken". A claim is a create's
+ * uniqueness guarantee, which the row cannot give: `saveResource` upserts,
+ * so two creates that both read "absent" would otherwise both write, the
+ * second over the first.
+ *
+ * Expiry is lazy: an expired previous name is ignored by `resolve` and
+ * removed by the write that takes it, so nothing sweeps. Every time is
+ * passed in as an RFC-3339 string, so a caller (and a test) decides "now".
+ */
+export interface ResourceNameStore {
+  /** The name's live entry at `now` (current, or previous and unexpired), or undefined when nothing holds it. */
+  resolve(key: ResourceNameKey, now: string): Promise<ResourceNameEntry | undefined>;
+  /** The current name `id` holds in the kind and scope, or undefined when it holds none. */
+  current(kind: string, org: string, id: string): Promise<ResourceNameEntry | undefined>;
   /**
-   * Marks the slug retired: sets `retiredAt` on its entry when it is
-   * empty, or records the slug already retired when no entry exists (an
-   * organization created before the ledger). Idempotent; a second retire
-   * keeps the first time.
+   * Takes the name as `id`'s current name when nothing holds it at `now`,
+   * atomically: of concurrent claims, exactly one wins, and an expired
+   * previous name is removed in the same write. A loser receives the entry
+   * that holds the name.
    */
-  retire(slug: string): Promise<void>;
+  claim(key: ResourceNameKey, id: string, now: string): Promise<ResourceNameClaim>;
   /**
-   * Frees a claim whose create failed before its organization was stored,
-   * so the caller's retry can claim again. Guarded: only the unretired
-   * entry carrying this exact `claimedAt` is removed, so a release can
-   * never free a retired slug or another create's claim. Anything else is
-   * a no-op.
+   * Moves `id`'s current name from `from` to `to` in one transaction: `to`
+   * becomes current (taken fresh, or taken back when it is one of `id`'s
+   * own previous names) and every other current name of `id`, `from`
+   * included, becomes previous until `fromExpiresAt`, so `id` is left with
+   * exactly one current name however renames interleave. Lost, with
+   * nothing changed, when another resource holds `to`.
    */
-  release(entry: OrganizationSlugEntry): Promise<void>;
-  /** The slug's entry, or undefined when no organization ever took it. */
-  find(slug: string): Promise<OrganizationSlugEntry | undefined>;
+  rename(rename: ResourceNameRename): Promise<ResourceNameRenamed>;
+  /**
+   * Undoes a rename whose resource write failed: `to` is let go, or, when
+   * the rename took it back (`takenBack`, from the rename's outcome),
+   * restored to that earlier state; and `from` is current again, unless a
+   * rename that overlapped this one has made its own name current since,
+   * which stands. Idempotent.
+   */
+  revertRename(rename: ResourceNameRename, takenBack?: ResourceNameEntry): Promise<void>;
+  /**
+   * Lets go of every name `id` holds in the kind and scope (its delete, or a
+   * create whose row never landed). A name equal to `id` is kept, as a
+   * previous name that never expires: a resource from an earlier release
+   * was filed under it. Idempotent.
+   */
+  release(kind: string, org: string, id: string): Promise<void>;
 }
 
 // =============================================================================
@@ -935,7 +985,7 @@ export interface Store {
 
   readonly bootstrapState: BootstrapStateStore;
   readonly signalDedupe: SignalDedupeStore;
-  readonly organizationSlugs: OrganizationSlugStore;
+  readonly resourceNames: ResourceNameStore;
   readonly oauthGrants: OAuthGrantStore;
   readonly pendingOAuthStates: PendingOAuthStateStore;
 

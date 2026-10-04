@@ -9,17 +9,21 @@ import "buf/validate/validate.proto";
 
 // Organization is the top-level container for all Stigmer resources.
 //
-// An Organization's metadata.id equals its metadata.slug: unlike every other
-// resource (which is assigned a generated prefixed id), the tenancy root is
-// addressed by its slug, which is globally unique and never reused, even
-// after the organization is deleted.
+// An Organization has a permanent id (org_<ulid>), minted when it is
+// created, and a slug: the unique name people type in URLs, manifests and
+// --org. Every resource the organization owns names it by id in
+// metadata.org, so renaming the slug moves nothing. Requests may name an
+// organization by either; the server answers with the id.
+//
+// An Organization belongs to no organization: its own metadata.org is
+// always empty.
 //
 // @internal
 // Similar to GitHub organizations, all agents, workflows, sessions, and other
 // resources are scoped under an organization. This enables multi-tenancy and
-// proper resource isolation. Child resources reference their owning org by slug
-// (metadata.org), which is why the org's id is set to its slug rather than a
-// minted org_<ulid> (see OrganizationCommandController create pipeline).
+// proper resource isolation. The slug changes only through
+// OrganizationCommandController.rename; a renamed slug keeps resolving to its
+// organization for a while, then is free for anyone to take.
 message Organization {
   // API version for this resource type.
   string api_version = 1 [(buf.validate.field).string.const = "tenancy.stigmer.ai/v1"];

@@ -40,7 +40,10 @@ import { loadConfig } from "../../../boot/config.js";
 import { composeServer } from "../../../boot/compose.js";
 import type { ComposedServer } from "../../../boot/compose.js";
 import { createLogger } from "../../../boot/logger.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -50,6 +53,9 @@ const silentLogger = createLogger({
 
 const REDIRECT_URI = "http://127.0.0.1:8234/auth/oauth/callback";
 const ORG = "acme";
+// The id the server mints for ORG: rows written straight to the store and
+// grants read from it name the organization by id; requests use the slug.
+let ORG_ID: string;
 
 // ---------------------------------------------------------------------------
 // A minimal mock authorization server: discovery + DCR + authorize
@@ -179,7 +185,8 @@ beforeAll(async () => {
   const transport: Transport = createGrpcTransport({
     baseUrl: `http://127.0.0.1:${port}`,
   });
-  await seedOrganizations(transport, [ORG]);
+  const organizations = await seedOrganizations(transport, [ORG]);
+  ORG_ID = organizationId(organizations, ORG);
   command = createClient(McpServerCommandController, transport);
   query = createClient(McpServerQueryController, transport);
 });
@@ -236,7 +243,7 @@ async function seedOAuthApp(
   const app = create(OAuthAppSchema, {
     apiVersion: "iam.stigmer.ai/v1",
     kind: "OAuthApp",
-    metadata: { id: `oap_${slug}`, name: slug, slug, org: ORG },
+    metadata: { id: `oap_${slug}`, name: slug, slug, org: ORG_ID },
     spec: {
       provider: "exampleco",
       clientId: "vendor-client-1",
@@ -540,7 +547,7 @@ describe("completeOAuthConnect → grant → disconnect (the full lifecycle)", (
       OAuthConnectionHealth.OAUTH_CONNECTION_HEALTH_HEALTHY,
     );
 
-    const grant = await server.store.oauthGrants.find("", id, ORG);
+    const grant = await server.store.oauthGrants.find("", id, ORG_ID);
     expect(grant?.refreshTokenEnvVar).toBe("EXAMPLE_TOKEN_REFRESH_TOKEN");
     const firstEnvId = grant?.environmentId ?? "";
     expect(firstEnvId).not.toBe("");
@@ -555,7 +562,7 @@ describe("completeOAuthConnect → grant → disconnect (the full lifecycle)", (
       state: again.state,
       authorizationCode: "auth-code-2",
     });
-    const regrant = await server.store.oauthGrants.find("", id, ORG);
+    const regrant = await server.store.oauthGrants.find("", id, ORG_ID);
     expect(regrant?.environmentId).toBe(firstEnvId);
 
     // Disconnect tears down grant + environment; a second disconnect is
@@ -565,7 +572,7 @@ describe("completeOAuthConnect → grant → disconnect (the full lifecycle)", (
       org: ORG,
     });
     expect(disconnected.disconnected).toBe(true);
-    expect(await server.store.oauthGrants.find("", id, ORG)).toBeUndefined();
+    expect(await server.store.oauthGrants.find("", id, ORG_ID)).toBeUndefined();
     const againDisconnected = await command.disconnectOAuth({
       resourceId: id,
       org: ORG,
@@ -623,7 +630,7 @@ describe("getOAuthGrantStatus", () => {
       identityAccountId: "",
       resourceId: "mcps_expired",
       resourceKind: "mcp_server",
-      orgId: ORG,
+      orgId: ORG_ID,
       // Expired well past the 60s buffer.
       accessTokenExpiresAt: Math.floor(Date.now() / 1000) - 3600,
       clientId: "c",
@@ -651,7 +658,7 @@ describe("getOAuthGrantStatus", () => {
       identityAccountId: "",
       resourceId: "mcps_expired_norefresh",
       resourceKind: "mcp_server",
-      orgId: ORG,
+      orgId: ORG_ID,
       accessTokenExpiresAt: Math.floor(Date.now() / 1000) - 3600,
       clientId: "c",
       authMethod: "mcp_oauth",

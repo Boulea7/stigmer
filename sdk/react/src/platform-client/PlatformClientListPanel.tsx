@@ -17,7 +17,7 @@ import { LoadingRegion } from "../internal/LoadingRegion.js";
 
 /** Props for {@link PlatformClientListPanel}. */
 export interface PlatformClientListPanelProps {
-  /** Organization slug whose platform clients should be listed. */
+  /** Id of the organization whose platform clients should be listed (a slug is also accepted). */
   readonly org: string;
   /** Fired when the user wants to edit a platform client. */
   readonly onEdit?: (pc: PlatformClient) => void;

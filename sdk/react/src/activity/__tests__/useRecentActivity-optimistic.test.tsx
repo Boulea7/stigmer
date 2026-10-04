@@ -6,7 +6,7 @@ import { FetchCacheContext } from "../../internal/FetchCacheProvider";
 import { useRecentActivity } from "../useRecentActivity";
 
 vi.mock("../../organization/OrgProvider", () => ({
-  useActiveOrgSlug: () => "test-org",
+  useActiveOrgId: () => "test-org",
 }));
 
 function createMockStigmer(overrides: {

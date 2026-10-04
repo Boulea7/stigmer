@@ -16,23 +16,22 @@
  * two creates racing at one below the limit can both pass. The open-source
  * edition does not race there on its usual path, because its one
  * organization is made at boot before the port binds
- * (boot/single-organization.ts). It can when it boots with none (its slug
- * retired, or a slug claim left with no row): two people creating one in
+ * (boot/single-organization.ts). It can when it boots with none (a store
+ * whose deletes raced down to none): two people creating one in
  * the console at once can both pass, leaving a store of two whose fill is
  * off until one is deleted.
  *
  * RefuseDeletingSingleOrganization runs in the delete chain under a
  * declared limit of 1, after the organization is loaded and before the
- * first write (RetireOrganizationSlug), and refuses when the store holds
- * that organization alone: deleting a server's only organization would leave
- * a server with no organization and a slug that is never taken again, so the
- * next boot would make another under a new slug. Refused, it writes nothing.
+ * first write, and refuses when the store holds that organization alone:
+ * deleting a server's only organization would leave everything it owned
+ * filed under an id no organization holds, and the next boot would make a
+ * new, empty one. Refused, it writes nothing.
  * A store that holds several (one from before the server held one) may
  * delete down to one, which is the way back to a server that fills it. The
  * count is read, not locked, as the limit's is: two deletes racing on a
  * store that holds two can both pass and leave none. The next boot then
- * makes the organization again, or, when the slug was retired, warns and
- * lets the console's onboarding make one, which the limit admits at zero.
+ * makes the organization again.
  *
  * Both reasons are wire contract, documented on OrganizationCommandController
  * create and delete.

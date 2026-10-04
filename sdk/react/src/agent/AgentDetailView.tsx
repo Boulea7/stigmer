@@ -36,6 +36,7 @@ import { AgentInstanceList } from "../agent-instance/AgentInstanceList.js";
 import { ManagedByPluginNotice } from "../plugin/ManagedByPluginNotice.js";
 import { useManagingPlugin } from "../plugin/useManagingPlugin.js";
 import { LoadingRegion } from "../internal/LoadingRegion.js";
+import { useOrgIdForRef, useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 const INSTRUCTIONS_COLLAPSED_HEIGHT = "12rem";
 
@@ -46,7 +47,7 @@ const DEPENDENCIES_TAB: TabItem = { id: "dependencies", label: "Dependencies" };
 
 /** Props for {@link AgentDetailView}. */
 export interface AgentDetailViewProps {
-  /** Organization slug that owns the agent. */
+  /** Id of the organization that owns the agent (a slug is also accepted). */
   readonly org: string;
   /** Agent slug (URL-friendly identifier unique within the org). */
   readonly slug: string;
@@ -150,7 +151,7 @@ export interface AgentDetailViewProps {
    */
   readonly buildShareUrl?: (org: string, slug: string) => string;
   /**
-   * The viewer's active organization slug, feeding the Instances tab: it
+   * The viewer's active organization id, feeding the Instances tab: it
    * scopes the instance list to this org's rows, so a member of several
    * orgs sees the current org context only, and an instance of a
    * platform-visible agent is created in the viewer's own org. Shares
@@ -246,6 +247,9 @@ export function AgentDetailView({
   className,
 }: AgentDetailViewProps) {
   const { agent, isLoading, error, refetch } = useAgent(org, slug);
+  // The agent's org is compared with stored references, which name orgs by
+  // id; the `org` prop may be a slug (a URL's), so it is mapped first.
+  const orgIdFor = useOrgIdForRef();
   const managing = useManagingPlugin(agent?.metadata?.labels);
   // A plugin's resource is the plugin's to redefine; the notice says so and no edit form is offered.
   const editable = editableProp && managing.plugin === null;
@@ -286,7 +290,7 @@ export function AgentDetailView({
 
   const { tree, isEmpty: noDeps } = useDependencyGraph({
     agentName: agent?.metadata?.name || agent?.metadata?.slug || slug,
-    agentOrg: agent?.metadata?.org || org,
+    agentOrg: agent?.metadata?.org || orgIdFor(org),
     spec: agent?.spec,
   });
 
@@ -364,7 +368,7 @@ export function AgentDetailView({
   const meta = agent.metadata;
   const spec = agent.spec;
   const specAudit = agent.status?.audit?.specAudit;
-  const agentOrg = meta?.org || org;
+  const agentOrg = meta?.org || orgIdFor(org);
 
   const headerMeta: ResourceHeaderMeta = {
     name: meta?.name || meta?.slug || "Untitled",
@@ -522,6 +526,7 @@ function AgentOverview({
   // another section's editor.
   const errorFor = (field: keyof import("@stigmer/sdk").AgentInput) =>
     saveError?.field === field ? saveError.message : undefined;
+  const slugForOrg = useOrgSlugForId();
   const handleInstructionsSave = useCallback(
     async (v: string) => saveField?.("instructions", v || undefined) ?? false,
     [saveField],
@@ -571,10 +576,10 @@ function AgentOverview({
         slug: u.mcpServerRef?.slug ?? "",
         label:
           u.mcpServerRef?.org && u.mcpServerRef.org !== agentOrg
-            ? `${u.mcpServerRef.org}/${u.mcpServerRef.slug}`
+            ? `${slugForOrg(u.mcpServerRef.org)}/${u.mcpServerRef.slug}`
             : u.mcpServerRef?.slug ?? "",
       })),
-    [spec?.mcpServerUsages, agentOrg],
+    [spec?.mcpServerUsages, agentOrg, slugForOrg],
   );
 
   const skillRefRows: ResourceRefRow[] = useMemo(
@@ -584,10 +589,10 @@ function AgentOverview({
         slug: ref.slug,
         label:
           ref.org && ref.org !== agentOrg
-            ? `${ref.org}/${ref.slug}`
+            ? `${slugForOrg(ref.org)}/${ref.slug}`
             : ref.slug,
       })),
-    [spec?.skillRefs, agentOrg],
+    [spec?.skillRefs, agentOrg, slugForOrg],
   );
 
   const envRows: KeyValueRow[] = useMemo(
@@ -819,6 +824,7 @@ function McpUsagesContent({
   readonly defaultOrg: string;
   readonly onMcpServerClick?: (ref: { org: string; slug: string }) => void;
 }) {
+  const slugForOrg = useOrgSlugForId();
   return (
     <div className="stg:flex stg:flex-col">
       {usages.map((usage, index) => {
@@ -828,7 +834,7 @@ function McpUsagesContent({
         const refOrg = ref.org || defaultOrg;
         const label =
           ref.org && ref.org !== defaultOrg
-            ? `${ref.org}/${ref.slug}`
+            ? `${slugForOrg(ref.org)}/${ref.slug}`
             : ref.slug;
         const toolCount = usage.enabledTools.length;
         const approvalCount = usage.toolApprovalOverrides.length;
@@ -888,13 +894,14 @@ function SkillsContent({
   readonly defaultOrg: string;
   readonly onSkillClick?: (ref: { org: string; slug: string }) => void;
 }) {
+  const slugForOrg = useOrgSlugForId();
   return (
     <div className="stg:flex stg:flex-col">
       {refs.map((ref, index) => {
         const refOrg = ref.org || defaultOrg;
         const label =
           ref.org && ref.org !== defaultOrg
-            ? `${ref.org}/${ref.slug}`
+            ? `${slugForOrg(ref.org)}/${ref.slug}`
             : ref.slug;
 
         const row = (
@@ -1172,6 +1179,7 @@ function SubAgentDetails({
 }: {
   readonly subAgent: SubAgent;
 }) {
+  const slugForOrg = useOrgSlugForId();
   return (
     <div className="stg:mb-1 stg:ml-7 stg:space-y-3 stg:border-l stg:border-border stg:pl-4 stg:pt-1">
       {sa.instructions && (
@@ -1222,7 +1230,7 @@ function SubAgentDetails({
               >
                 <SkillIcon className="stg:size-3 stg:shrink-0 stg:text-muted-foreground" />
                 <span>
-                  {ref.org ? `${ref.org}/${ref.slug}` : ref.slug}
+                  {ref.org ? `${slugForOrg(ref.org)}/${ref.slug}` : ref.slug}
                 </span>
               </div>
             ))}

@@ -1,9 +1,14 @@
 // Unit tests for the share-agent resource layer. The critical contract is
 // merge-preservation: `agentShare.apply` replaces the share's spec wholesale,
 // so a CLI toggle must never wipe console-configured origins, visitor
-// messages, credential bindings, or the audience.
+// messages, credential bindings, or the audience. A share from another
+// organization's context is refused naming both organizations by slug, and
+// only when the server says they differ: a lookup that fails for another
+// reason is reported as itself.
 
 import { create } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { AgentSchema, type Agent } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb";
 import { AgentShareAudience } from "@stigmer/protos/ai/stigmer/agentic/agentshare/v1/spec_pb";
 import { buildEmbedSnippet, type AgentShareInput, type Stigmer } from "@stigmer/sdk";
@@ -55,10 +60,20 @@ function makeShare(fixture: ShareFixture = {}) {
 // convention). Apply answers with the applied input merged over the existing
 // share (id assigned), mirroring the server's upsert. Rotation answers with
 // the share re-stamped with `rotatedToken`, mirroring fresh entropy.
+const CONSUMER_ID = "org_01jcccccccccccccccccccccccc";
+
+// The organizations the fake server names: acme from an earlier release
+// (id == slug) and consumer-org with a minted id, by either value.
+const ORGANIZATIONS: Record<string, { id: string; slug: string }> = {
+  acme: { id: "acme", slug: "acme" },
+  "consumer-org": { id: CONSUMER_ID, slug: "consumer-org" },
+  [CONSUMER_ID]: { id: CONSUMER_ID, slug: "consumer-org" },
+};
+
 function fakeClient(
   agent: Agent,
   share: ReturnType<typeof makeShare> | null,
-  opts: { failWith?: Error; rotatedToken?: string } = {},
+  opts: { failWith?: Error; rotatedToken?: string; organizationFault?: Error } = {},
 ) {
   const applies: AgentShareInput[] = [];
   let rotations = 0;
@@ -68,6 +83,16 @@ function fakeClient(
     platform: {
       async getServerInfo() {
         return { singleOrg: false };
+      },
+    },
+    // The server resolves an organization by id or slug, and refuses one
+    // it does not know as NotFound.
+    organization: {
+      async get(value: string) {
+        if (opts.organizationFault) throw opts.organizationFault;
+        const named = ORGANIZATIONS[value];
+        if (named === undefined) throw new ConnectError("organization not found", Code.NotFound);
+        return create(OrganizationSchema, { metadata: named });
       },
     },
     agent: {
@@ -350,6 +375,30 @@ describe("shareAgent output", () => {
     expect(result.hints.some((h) => h.includes("search engines"))).toBe(true);
   });
 
+  it("names the organization by its slug in what a person reads, while the link carries its id", async () => {
+    const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+    const agent = makeAgent();
+    agent.metadata!.org = ACME_ID;
+    const share = makeShare({ enabled: false });
+    share.metadata.org = ACME_ID;
+    const { client } = fakeClient(agent, share);
+    (client as unknown as { organization: unknown }).organization = {
+      async get(value: string) {
+        if (value !== ACME_ID && value !== "acme") throw new Error("not found");
+        return { metadata: { id: ACME_ID, slug: "acme" } };
+      },
+    };
+
+    const enabled = await shareAgent(client, "acme/support-agent", "acme", { enabled: true, ...CLOUD });
+    expect(enabled.hints.some((h) => h.includes("acme's credits"))).toBe(true);
+    expect(enabled.hints.some((h) => h.includes(ACME_ID))).toBe(false);
+    const link = enabled.sections.find((s) => s.title === "Public chat link");
+    expect(link?.items).toEqual([`https://app.stigmer.ai/chat/${ACME_ID}/support-agent`]);
+
+    const disabled = await shareAgent(client, "acme/support-agent", "acme", { enabled: false, ...CLOUD });
+    expect(disabled.hints).toContain("  stigmer share agent acme/support-agent");
+  });
+
   it("warns that a local link won't serve visitors (guest chat is Cloud-only)", async () => {
     const { client } = fakeClient(makeAgent(), makeShare({ enabled: false }));
 
@@ -494,6 +543,34 @@ describe("shareAgent from another organization's context", () => {
     expect((err as Error).message).toContain("install the plugin that carries it");
     expect((err as Error).message).toContain("--org acme");
     expect(classify(err)?.exitCode).toBe(ExitCode.Usage);
+    expect(applies).toHaveLength(0);
+  });
+
+  it("names the requested organization by slug when the context gives its id", async () => {
+    const { client } = fakeClient(makeAgent(), null);
+
+    const err = await shareAgent(client, "acme/support-agent", CONSUMER_ID, {
+      enabled: true,
+      ...CLOUD,
+    }).catch((e: unknown) => e);
+
+    expect((err as Error).message).toContain("lives in acme, not consumer-org");
+    expect((err as Error).message).not.toContain(CONSUMER_ID);
+  });
+
+  it("reports a failed organization lookup as itself, never as a share in another organization", async () => {
+    const { client, applies } = fakeClient(makeAgent(), makeShare({ enabled: false }), {
+      organizationFault: new ConnectError("backend unavailable", Code.Unavailable),
+    });
+
+    const err = await shareAgent(client, "acme/support-agent", "acme-by-another-name", {
+      enabled: true,
+      ...CLOUD,
+    }).catch((e: unknown) => e);
+
+    expect(err).not.toBeInstanceOf(UsageError);
+    expect((err as Error).message).toMatch(/backend unavailable/);
+    expect(classify(err)?.exitCode).toBe(ExitCode.Connection);
     expect(applies).toHaveLength(0);
   });
 });

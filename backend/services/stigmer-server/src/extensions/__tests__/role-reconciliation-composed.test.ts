@@ -111,9 +111,11 @@ describe("role reconciliation (composed server, OIDC with no unit Authorizer, th
 
   const founderId = accountIdFor(FOUNDER);
   const memberId = accountIdFor(MEMBER);
-  const expectedRows = [
-    `${founderId}:owner@${ORG}|by:${founderId}`,
-    `${memberId}:member@${ORG}|by:${memberId}`,
+  /** The organization's minted id, read from boot 1's create; every row names it. */
+  let orgId = "";
+  const expectedRows = (): ReadonlyArray<string> => [
+    `${founderId}:owner@${orgId}|by:${founderId}`,
+    `${memberId}:member@${orgId}|by:${memberId}`,
   ];
 
   beforeAll(async () => {
@@ -131,12 +133,17 @@ describe("role reconciliation (composed server, OIDC with no unit Authorizer, th
       IdentityAccountCommandController,
       asFounder(),
     ).provisionMyAccount({});
-    await createClient(OrganizationCommandController, asFounder()).create({
+    const organization = await createClient(
+      OrganizationCommandController,
+      asFounder(),
+    ).create({
       apiVersion: "tenancy.stigmer.ai/v1",
       kind: "Organization",
       metadata: { name: ORG, slug: ORG, org: "" },
       spec: { description: ORG },
     });
+    orgId = organization.metadata?.id ?? "";
+    expect(orgId).toMatch(/^org_[0-9a-z]{26}$/);
     await createClient(AgentCommandController, asFounder()).create({
       apiVersion: "agentic.stigmer.ai/v1",
       kind: "Agent",
@@ -152,7 +159,7 @@ describe("role reconciliation (composed server, OIDC with no unit Authorizer, th
       asMember(),
     ).provisionMyAccount({});
 
-    expect(await rolesIn(server.store)).toEqual(expectedRows);
+    expect(await rolesIn(server.store)).toEqual(expectedRows());
     expect(
       await server.store.bootstrapState.get(ROLES_RECONCILED_KEY),
     ).not.toBe("");
@@ -167,7 +174,7 @@ describe("role reconciliation (composed server, OIDC with no unit Authorizer, th
 
     await boot();
 
-    expect(await rolesIn(server.store)).toEqual(expectedRows);
+    expect(await rolesIn(server.store)).toEqual(expectedRows());
     expect(
       await server.store.bootstrapState.get(ROLES_RECONCILED_KEY),
     ).not.toBe("");
@@ -180,10 +187,10 @@ describe("role reconciliation (composed server, OIDC with no unit Authorizer, th
       asMember(),
     ).findMyOrganizations({});
     expect(founderOrgs.entries.map((entry) => entry.metadata?.id)).toEqual([
-      ORG,
+      orgId,
     ]);
     expect(memberOrgs.entries.map((entry) => entry.metadata?.id)).toEqual([
-      ORG,
+      orgId,
     ]);
   });
 

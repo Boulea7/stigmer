@@ -91,7 +91,11 @@ export interface ResourceHeaderMeta {
   readonly nameElement?: ReactNode;
   /** Resource ID (opaque string). */
   readonly id: string;
-  /** Organization slug that owns the resource. */
+  /**
+   * The organization that owns the resource, as its `metadata.org` names
+   * it (an id); the header shows the org's slug when it is one of the
+   * viewer's organizations.
+   */
   readonly org?: string;
   /** URL-friendly slug. */
   readonly slug?: string;

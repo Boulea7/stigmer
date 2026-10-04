@@ -6,7 +6,9 @@ import {
   McpServerConnectDialog,
   ApplyManifestDialog,
   useStigmer,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  OrgSlugText,
+  useOrgSlugForId,
   type WorkbenchColumnDef,
 } from "@stigmer/react";
 import type { SearchResult } from "@stigmer/protos/ai/stigmer/search/v1/io_pb";
@@ -34,7 +36,7 @@ const MCP_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
     id: "org",
     header: "Organization",
     cell: (item) => (
-      <span className="text-muted-foreground">{item.org}</span>
+      <OrgSlugText orgId={item.org} className="text-muted-foreground" />
     ),
     flex: 1,
   },
@@ -51,7 +53,8 @@ const MCP_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
 ];
 
 export default function McpServerListPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const stigmer = useStigmer();
   const navigate = useNavigate();
 
@@ -121,7 +124,7 @@ export default function McpServerListPage() {
           </Link>
         }
         onItemClick={(item) =>
-          navigate(`/library/mcp-servers/${item.org}/${item.slug}`)
+          navigate(`/library/mcp-servers/${slugForOrg(item.org)}/${item.slug}`)
         }
         renderItemAction={(item) => (
           <button
@@ -149,7 +152,7 @@ export default function McpServerListPage() {
           if (!connectTarget) return;
           const { org: targetOrg, slug } = connectTarget;
           setConnectTarget(null);
-          navigate(`/library/mcp-servers/${targetOrg}/${slug}`);
+          navigate(`/library/mcp-servers/${slugForOrg(targetOrg)}/${slug}`);
         }}
       />
 

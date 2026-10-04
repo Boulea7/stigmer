@@ -9,11 +9,13 @@ import {
   createScheduleColumns,
   createScheduleListFn,
   useStigmer,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  useOrgSlugForId,
 } from "@stigmer/react";
 
 export default function ScheduleListPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const stigmer = useStigmer();
   const navigate = useNavigate();
 
@@ -89,7 +91,7 @@ export default function ScheduleListPage() {
         emptyAction={newScheduleButton}
         onItemClick={(item) =>
           navigate(
-            `/library/schedules/${item.metadata?.org ?? ""}/${item.metadata?.slug ?? ""}`,
+            `/library/schedules/${slugForOrg(item.metadata?.org ?? "")}/${item.metadata?.slug ?? ""}`,
           )
         }
         aria-label="Schedule workbench"

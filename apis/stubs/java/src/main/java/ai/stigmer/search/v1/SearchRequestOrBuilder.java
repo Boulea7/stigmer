@@ -160,7 +160,7 @@ public interface SearchRequestOrBuilder extends
    * <pre>
    * Organization to scope the search.
    *
-   * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+   * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
    *
    * Behavior:
    * - Empty: Search all organizations the caller has access to
@@ -175,7 +175,7 @@ public interface SearchRequestOrBuilder extends
    * <pre>
    * Organization to scope the search.
    *
-   * Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+   * The organization's slug (e.g., "acme") or its id (org_&lt;ulid&gt;).
    *
    * Behavior:
    * - Empty: Search all organizations the caller has access to

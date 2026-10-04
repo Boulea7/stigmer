@@ -21,7 +21,7 @@ export interface ArtifactPreviewContentProps {
   readonly artifact: ExecutionArtifact;
   /** ID of the execution that produced this artifact. */
   readonly executionId: string;
-  /** Organization slug for the "Apply to [org]" / "Push Skill to [org]" CTA. */
+  /** Organization id for the "Apply to [org]" / "Push Skill to [org]" CTA (a slug is also accepted). */
   readonly org: string;
   /**
    * Whether the execution is in a terminal phase (completed, failed,
@@ -180,7 +180,7 @@ export interface ArtifactPreviewModalProps {
   readonly artifact: ExecutionArtifact;
   /** ID of the execution that produced this artifact. */
   readonly executionId: string;
-  /** Organization slug for the "Apply to [org]" / "Push Skill to [org]" CTA. */
+  /** Organization id for the "Apply to [org]" / "Push Skill to [org]" CTA (a slug is also accepted). */
   readonly org: string;
   /**
    * Whether the execution is in a terminal phase (completed, failed,

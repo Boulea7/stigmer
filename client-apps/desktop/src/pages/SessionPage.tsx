@@ -2,7 +2,6 @@ import { useParams } from "react-router-dom";
 import {
   SessionViewer,
   useAccountExecutionDefaults,
-  useActiveOrgSlug,
   useActiveOrgId,
   useFollowSessionOrganization,
   useSession,
@@ -29,7 +28,6 @@ function SessionPageInner({ id }: { id: string }) {
   // (stigmer/stigmer#1580).
   const { session } = useSession(id);
   useFollowSessionOrganization(session);
-  const org = useActiveOrgSlug();
   const orgId = useActiveOrgId();
   const browseLocalFolder = useNativeFolderPicker();
   const { enableGitHub, enableLocal } = useWorkspaceSources({ hasLocalPicker: true });
@@ -45,7 +43,7 @@ function SessionPageInner({ id }: { id: string }) {
     <div className="flex h-full w-full flex-col">
       <SessionViewer
         sessionId={id}
-        org={org}
+        org={orgId}
         accountDefaults={accountDefaults}
         enableGitHub={enableGitHub}
         enableLocal={enableLocal}

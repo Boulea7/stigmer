@@ -84,11 +84,7 @@ export function generateTSUpdateInputMapper(
   buf.push("    id: meta?.id || undefined,\n");
   buf.push('    name: meta?.name ?? "",\n');
   buf.push("    slug: meta?.slug || undefined,\n");
-  if (schema.resource === "organization") {
-    // An organization's own metadata.org may be unset; updates address the
-    // org by its slug in that case.
-    buf.push('    org: meta?.org || meta?.slug || "",\n');
-  } else if (!cfg.isOrgless) {
+  if (!cfg.isOrgless) {
     // An org-less kind's input has no org to carry over (its type is "").
     buf.push('    org: meta?.org ?? "",\n');
   }

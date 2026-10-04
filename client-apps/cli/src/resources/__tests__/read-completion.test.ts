@@ -4,7 +4,8 @@
 // Stands up a real Connect backend over h2c serving the controllers these paths
 // call, points an SDK node client at it, and drives the resource layer end to
 // end. Asserts the SDK wiring (request shapes, RPC routing) and the protojson
-// parity contract for json output.
+// parity contract for json output. Search results carry their organization by
+// id; the human table names it by slug.
 
 import { create, toJson } from "@bufbuild/protobuf";
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
@@ -18,6 +19,8 @@ import { SessionQueryController } from "@stigmer/protos/ai/stigmer/agentic/sessi
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { SearchResultSchema } from "@stigmer/protos/ai/stigmer/search/v1/io_pb";
 import { SearchService } from "@stigmer/protos/ai/stigmer/search/v1/query_pb";
+import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
+import { OrganizationQueryController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/query_pb";
 import { createNodeClient, normalizeEndpoint } from "@stigmer/sdk/node";
 import type { Stigmer } from "@stigmer/sdk";
 import { createServer as createHttp2Server, type Http2Server, type ServerHttp2Session } from "node:http2";
@@ -29,6 +32,8 @@ import { listResources } from "../list.js";
 import { renderResource } from "../render.js";
 import { searchResources } from "../search.js";
 import { getSessionUsageReport, renderSessionUsage } from "../usage.js";
+
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
 
 const knownExec = create(AgentExecutionSchema, {
   metadata: { id: "aex_1", org: "acme" },
@@ -46,8 +51,8 @@ const knownSearchResult = create(SearchResultSchema, {
   id: "wfl_1",
   name: "Deploy",
   slug: "deploy",
-  qualifiedSlug: "acme/deploy",
-  org: "acme",
+  qualifiedSlug: `${ACME_ID}/deploy`,
+  org: ACME_ID,
   description: "deploys things",
 });
 
@@ -80,6 +85,12 @@ beforeAll(async () => {
     router.service(SearchService, {
       search: () => ({ entries: [knownSearchResult], totalCount: 1, totalPages: 1 }),
     });
+    router.service(OrganizationQueryController, {
+      get: (req) => {
+        if (req.value !== ACME_ID) throw new ConnectError("organization not found", Code.NotFound);
+        return create(OrganizationSchema, { metadata: { id: ACME_ID, slug: "acme" } });
+      },
+    });
   };
   backend = createHttp2Server(connectNodeAdapter({ routes }));
   backend.on("session", (session) => {
@@ -109,13 +120,14 @@ describe("search integration", () => {
     expect(outcome.totalPages).toBe(1);
   });
 
-  it("renders a human table for search results", async () => {
+  it("renders a human table for search results, naming the organization by slug", async () => {
     const outcome = await searchResources(client, ApiResourceKind.workflow, "deploy", {
       org: "acme",
       page: 1,
       pageSize: 20,
     }, "table");
     expect(outcome.rendered).toContain("acme/deploy");
+    expect(outcome.rendered).not.toContain(ACME_ID);
   });
 });
 

@@ -119,7 +119,9 @@ private static final long serialVersionUID = 0L;
   /**
    * <pre>
    * Unique identifier of the resource
-   * This is the resource's ID field (e.g., ia-01HQUSER123, tm-01HQTEAM456)
+   * This is the resource's ID field (e.g., ida_01hqu..., tm_01hqt...). For an
+   * organization a request may give its slug instead; the server stores the
+   * id.
    * </pre>
    *
    * <code>string id = 2 [json_name = "id", (.buf.validate.field) = { ... }</code>
@@ -141,7 +143,9 @@ private static final long serialVersionUID = 0L;
   /**
    * <pre>
    * Unique identifier of the resource
-   * This is the resource's ID field (e.g., ia-01HQUSER123, tm-01HQTEAM456)
+   * This is the resource's ID field (e.g., ida_01hqu..., tm_01hqt...). For an
+   * organization a request may give its slug instead; the server stores the
+   * id.
    * </pre>
    *
    * <code>string id = 2 [json_name = "id", (.buf.validate.field) = { ... }</code>
@@ -689,7 +693,9 @@ private static final long serialVersionUID = 0L;
     /**
      * <pre>
      * Unique identifier of the resource
-     * This is the resource's ID field (e.g., ia-01HQUSER123, tm-01HQTEAM456)
+     * This is the resource's ID field (e.g., ida_01hqu..., tm_01hqt...). For an
+     * organization a request may give its slug instead; the server stores the
+     * id.
      * </pre>
      *
      * <code>string id = 2 [json_name = "id", (.buf.validate.field) = { ... }</code>
@@ -710,7 +716,9 @@ private static final long serialVersionUID = 0L;
     /**
      * <pre>
      * Unique identifier of the resource
-     * This is the resource's ID field (e.g., ia-01HQUSER123, tm-01HQTEAM456)
+     * This is the resource's ID field (e.g., ida_01hqu..., tm_01hqt...). For an
+     * organization a request may give its slug instead; the server stores the
+     * id.
      * </pre>
      *
      * <code>string id = 2 [json_name = "id", (.buf.validate.field) = { ... }</code>
@@ -732,7 +740,9 @@ private static final long serialVersionUID = 0L;
     /**
      * <pre>
      * Unique identifier of the resource
-     * This is the resource's ID field (e.g., ia-01HQUSER123, tm-01HQTEAM456)
+     * This is the resource's ID field (e.g., ida_01hqu..., tm_01hqt...). For an
+     * organization a request may give its slug instead; the server stores the
+     * id.
      * </pre>
      *
      * <code>string id = 2 [json_name = "id", (.buf.validate.field) = { ... }</code>
@@ -750,7 +760,9 @@ private static final long serialVersionUID = 0L;
     /**
      * <pre>
      * Unique identifier of the resource
-     * This is the resource's ID field (e.g., ia-01HQUSER123, tm-01HQTEAM456)
+     * This is the resource's ID field (e.g., ida_01hqu..., tm_01hqt...). For an
+     * organization a request may give its slug instead; the server stores the
+     * id.
      * </pre>
      *
      * <code>string id = 2 [json_name = "id", (.buf.validate.field) = { ... }</code>
@@ -765,7 +777,9 @@ private static final long serialVersionUID = 0L;
     /**
      * <pre>
      * Unique identifier of the resource
-     * This is the resource's ID field (e.g., ia-01HQUSER123, tm-01HQTEAM456)
+     * This is the resource's ID field (e.g., ida_01hqu..., tm_01hqt...). For an
+     * organization a request may give its slug instead; the server stores the
+     * id.
      * </pre>
      *
      * <code>string id = 2 [json_name = "id", (.buf.validate.field) = { ... }</code>

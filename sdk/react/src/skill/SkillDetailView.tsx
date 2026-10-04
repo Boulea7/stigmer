@@ -35,7 +35,7 @@ const VERSIONS_TAB: TabItem = { id: "versions", label: "Versions" };
 
 /** Props for {@link SkillDetailView}. */
 export interface SkillDetailViewProps {
-  /** Organization slug that owns the skill. */
+  /** Id of the organization that owns the skill (a slug is also accepted). */
   readonly org: string;
   /** Skill slug (URL-friendly identifier unique within the org). */
   readonly slug: string;

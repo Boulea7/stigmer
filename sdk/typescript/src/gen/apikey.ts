@@ -60,7 +60,7 @@ export class ApiKeyClient {
   }
 }
 
-/** Input for creating/updating a ApiKey. */
+/** Input for creating/updating an ApiKey. */
 export interface ApiKeyInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

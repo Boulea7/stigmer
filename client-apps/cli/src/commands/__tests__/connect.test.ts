@@ -11,9 +11,13 @@
 // test injects a config with no org by overriding `load()`, and the server's
 // answer through a stand-in client the real guard asks; everything else stays real. The
 // guard runs before the push, so every case is deterministic and offline.
+// The result names the server's organization by slug where the caller can
+// see it, in place of the id the server stores.
 
+import { create } from "@bufbuild/protobuf";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Stigmer } from "@stigmer/sdk";
+import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import type { Config } from "../../config/index.js";
 import { classify, ExitCode } from "../../errors/index.js";
 import { buildProgram } from "../../program.js";
@@ -42,14 +46,38 @@ vi.mock("../../client/single-org.js", async (importOriginal) => {
   };
 });
 
+// The organization id the connected server is filed under; unset, it is the
+// slug `stigmer`, an organization from an earlier release whose id is its slug.
+let serverOrg = "stigmer";
+
+// When set, the client's organization get answers through this instead of
+// reaching a backend (which none of these tests has, so the label falls back).
+let organizationGet: ((value: string) => Promise<unknown>) | undefined;
+
+vi.mock("../../backend.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../backend.js")>();
+  return {
+    ...actual,
+    connectBackend: (...args: Parameters<typeof actual.connectBackend>) => {
+      const real = actual.connectBackend(...args);
+      const get = organizationGet;
+      return get === undefined
+        ? real
+        : { ...real, stigmer: { organization: { get } } as unknown as Stigmer };
+    },
+  };
+});
+
 // A connect that settles, so the success rendering runs: the server's name and
 // its organization as the backend returned them.
 vi.mock("../../resources/connect/connect.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../resources/connect/connect.js")>();
-  const server = { metadata: { name: "orders", org: "stigmer" }, spec: {} };
   return {
     ...actual,
-    connectMcpServer: async () => ({ server, capabilities: undefined, updated: server }),
+    connectMcpServer: async () => {
+      const server = { metadata: { name: "orders", org: serverOrg }, spec: {} };
+      return { server, capabilities: undefined, updated: server };
+    },
   };
 });
 
@@ -121,6 +149,8 @@ let savedApiKey: string | undefined;
 beforeEach(() => {
   configOverride = undefined;
   singleOrg = false;
+  serverOrg = "stigmer";
+  organizationGet = undefined;
   savedOrg = process.env.STIGMER_ORG;
   savedApiKey = process.env.STIGMER_API_KEY;
   delete process.env.STIGMER_ORG;
@@ -156,6 +186,20 @@ describe("connect mcp-server org guard", () => {
     process.env.STIGMER_ORG = "stigmer";
     const outcome = await runConnect("mcp_test");
     expect(outcome.stdout).toContain("MCP Server: stigmer/orders");
+  });
+
+  it("names the server's organization by slug where the server stores its id", async () => {
+    const id = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+    configOverride = cloudConfigWithoutOrg();
+    process.env.STIGMER_ORG = "acme";
+    serverOrg = id;
+    organizationGet = async (value) => {
+      if (value !== id) throw new Error("organization not found");
+      return create(OrganizationSchema, { metadata: { id, slug: "acme" } });
+    };
+    const outcome = await runConnect("mcp_test");
+    expect(outcome.stdout).toContain("MCP Server: acme/orders");
+    expect(outcome.stdout).not.toContain(id);
   });
 
   it("does not apply the org guard in dry-run mode (offline dry-run stays usable)", async () => {

@@ -1221,7 +1221,7 @@ Input for creating or updating a Workflow Execution.
   type={{
     name: { type: "string", description: "Resource name.", required: true },
     slug: { type: "string", description: "URL-friendly identifier." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
     labels: { type: "Record<string, string>", description: "Key-value labels." },
     workflowInstanceId: { type: "string", description: "ID of the WorkflowInstance to execute." },
     workflowId: { type: "string", description: "ID of the Workflow template to execute (alternative to workflow_instance_id)." },

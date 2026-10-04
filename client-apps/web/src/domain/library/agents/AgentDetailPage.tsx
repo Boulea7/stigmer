@@ -16,7 +16,7 @@ import {
   useExportResource,
   ConfirmDialog,
   useBreadcrumbOverride,
-  useActiveOrgSlug,
+  useActiveOrgId,
   type AdditionalTab,
   type DetailAction,
 } from "@stigmer/react";
@@ -54,7 +54,8 @@ export function AgentDetailPageInner({ org, slug }: AgentDetailPageInnerProps) {
   const { setLabel } = useBreadcrumbOverride();
   // The viewer's own org scopes the Instances tab: an instance of a
   // platform-visible agent is created in the viewer's org, not the agent's.
-  const viewerOrg = useActiveOrgSlug();
+  // By id, the way the server names every org.
+  const viewerOrg = useActiveOrgId();
   const { navigateToDetail } = useLibraryNavigation();
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [resourceName, setResourceName] = useState<string>("Agent");

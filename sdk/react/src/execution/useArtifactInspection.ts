@@ -13,6 +13,7 @@ import {
   type ApplyResourceResult,
 } from "../library/useApplyResource.js";
 import { useCopyFeedback } from "../internal/useCopyFeedback.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Options for {@link useArtifactInspection}. */
 export interface UseArtifactInspectionOptions {
@@ -106,6 +107,7 @@ export function useArtifactInspection(
   org: string,
   options?: UseArtifactInspectionOptions,
 ): ArtifactInspection {
+  const slugForOrg = useOrgSlugForId();
   const isDirectory = artifact.kind === ExecutionArtifactKind.DIRECTORY;
   const canFetchContent = !isDirectory && isTextArtifact(artifact);
 
@@ -148,9 +150,9 @@ export function useArtifactInspection(
 
   let ctaLabel: string | null = null;
   if (yamlDetection.detected) {
-    ctaLabel = `Apply to ${org}`;
+    ctaLabel = `Apply to ${slugForOrg(org)}`;
   } else if (skillDetection.detected) {
-    ctaLabel = `Push Skill to ${org}`;
+    ctaLabel = `Push Skill to ${slugForOrg(org)}`;
   }
 
   // --- Apply / Push ---------------------------------------------------------

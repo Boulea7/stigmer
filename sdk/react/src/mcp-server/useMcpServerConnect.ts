@@ -31,7 +31,7 @@ export interface UseMcpServerConnectReturn {
    * for a one-time connect whose values the caller supplies whole.
    *
    * @param mcpServerId - System-generated ID of the MCP server (metadata.id).
-   * @param org - The caller's active organization slug. Required for
+   * @param org - The caller's active organization id (a slug is also accepted). Required for
    *   OAuth grant lookup and personal environment resolution.
    * @param runtimeEnv - Optional one-time values for this connect.
    * @returns The updated McpServer with populated status.discovered_capabilities

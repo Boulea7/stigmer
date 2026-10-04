@@ -10,12 +10,12 @@ import {
   useMcpServerCount,
   usePluginCount,
   useWorkflowCount,
-  useActiveOrgSlug,
   ResourceCountCard,
+  useActiveOrgId,
 } from "@stigmer/react";
 
 export default function LibraryLanding() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const navigate = useNavigate();
   // Apply YAML here can create any kind, so a bump recounts every card.
   const [refetchToken, refreshCounts] = useReducer((n: number) => n + 1, 0);

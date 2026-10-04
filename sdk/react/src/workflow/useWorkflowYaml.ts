@@ -24,7 +24,7 @@ export interface UseWorkflowYamlReturn {
  * Composes {@link useWorkflow} with {@link serializeWorkflowYaml} to
  * provide a memoized YAML string ready for editor rendering.
  *
- * @param org - Organization slug, or `null` to skip fetching.
+ * @param org - Organization id (a slug is also accepted), or `null` to skip fetching.
  * @param slug - Workflow slug, or `null` to skip fetching.
  */
 export function useWorkflowYaml(

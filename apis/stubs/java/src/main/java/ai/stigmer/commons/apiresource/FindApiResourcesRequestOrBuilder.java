@@ -12,7 +12,7 @@ public interface FindApiResourcesRequestOrBuilder extends
 
   /**
    * <pre>
-   * Organization ID to filter by
+   * Organization to filter by, by id or slug
    * </pre>
    *
    * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>
@@ -21,7 +21,7 @@ public interface FindApiResourcesRequestOrBuilder extends
   java.lang.String getOrg();
   /**
    * <pre>
-   * Organization ID to filter by
+   * Organization to filter by, by id or slug
    * </pre>
    *
    * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>

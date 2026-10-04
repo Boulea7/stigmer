@@ -134,7 +134,7 @@ function useOrgInvitations(org: string | null): UseOrgInvitationsReturn
 
 <TypeTable
   type={{
-    org: { type: "string | null", description: "Organization slug, or `null` to skip fetching.", required: true },
+    org: { type: "string | null", description: "Organization id (a slug is also accepted), or `null` to skip fetching.", required: true },
   }}
 />
 
@@ -302,7 +302,7 @@ All visual properties flow through `--stgm-*` design tokens.
   type={{
     buildInviteUrl: { type: "(token: string) => string", description: "Build the full invite URL from a token.  Platform builders override this when their invite route differs from the default `/invite/<token>` path or runs on a different domain." },
     className: { type: "string", description: "Additional CSS class names for the root container." },
-    org: { type: "string", description: "Organization slug whose invitations to manage.", required: true },
+    org: { type: "string", description: "Id of the organization whose invitations to manage (a slug is also accepted).", required: true },
   }}
 />
 

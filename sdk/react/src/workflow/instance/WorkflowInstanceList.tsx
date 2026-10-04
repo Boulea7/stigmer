@@ -21,13 +21,13 @@ export interface WorkflowInstanceListProps {
   /** The default instance ID (from workflow.status.defaultInstanceId) — filtered out of the list. */
   readonly defaultInstanceId?: string;
   /**
-   * The WORKFLOW's organization slug (needed for environment resolution
+   * The WORKFLOW's organization id (a slug is also accepted; needed for environment resolution
    * and the create flow). Not the list scope — that is `viewerOrg`,
    * which differs from `org` when viewing another org's workflow.
    */
   readonly org: string;
   /**
-   * The viewer's active organization slug. Scopes the list to this
+   * The viewer's active organization id (a slug is also accepted). Scopes the list to this
    * org's instances of the workflow, so a member of several orgs sees
    * exactly the current org context's instances. Omit to default to
    * the workflow's own org.

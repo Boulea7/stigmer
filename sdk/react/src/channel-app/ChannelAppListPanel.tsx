@@ -15,7 +15,7 @@ import { LoadingRegion } from "../internal/LoadingRegion.js";
 
 /** Props for {@link ChannelAppListPanel}. */
 export interface ChannelAppListPanelProps {
-  /** Organization slug to list channel apps for. */
+  /** Organization id to list channel apps for (a slug is also accepted). */
   readonly org: string;
   /**
    * Fired when the user wants to view/edit a channel app.

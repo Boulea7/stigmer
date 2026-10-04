@@ -19,7 +19,7 @@ Run through this list before applying an Organization YAML with `stigmer org app
 - [ ] `metadata.slug` contains only lowercase letters, numbers, and hyphens
 - [ ] `metadata.slug` starts with a lowercase letter
 - [ ] `metadata.slug` has no underscores or uppercase letters
-- [ ] `metadata.slug` has never belonged to an organization, a deleted one included: a slug is never reused
+- [ ] `metadata.slug` is not another organization's slug, or one another organization was renamed away from in the last 30 days
 
 ### Management Mode
 
@@ -130,13 +130,14 @@ stigmer org apply org-now-platform-managed.yaml
 
 ### Attempting to change the slug after creation
 
-`metadata.slug` is immutable. Including a different slug in an update will fail or create a new organization depending on how the operation resolves the identity.
+An update or apply ignores a different `metadata.slug`; the slug changes only through `rename`, which owners may call. An apply that names the organization only by a new slug finds no organization under it and creates a second one, so carry the organization's `metadata.id` (as `get -o yaml` prints it) when editing a manifest: the CLI's `apply` then sends the new slug through `rename` for you.
 
 ```yaml
-# Dangerous — if the org was created with slug: acme-corp,
-# changing to acme here may create a duplicate or fail
+# Renames acme-corp to acme: the id names the organization,
+# and the CLI follows the apply with a rename
 metadata:
-  slug: acme  # was acme-corp at creation
+  id: org_01j9w3k7m2x4n6p8q0r2s4t6v8
+  slug: acme  # was acme-corp
 ```
 
 Always use `stigmer org get <slug>` to confirm the existing slug before updating.
@@ -181,9 +182,9 @@ spec:
 
 Deleting an organization is irreversible. Its members lose access to
 everything under it: agents, workflows, MCP servers, skills, sessions and
-executions. Its slug is reserved for good, so no organization can be created
-with it again, the same organization included; a create of that slug is
-refused with `ORGANIZATION_SLUG_RESERVED`.
+executions. Its slug is released: a later organization may take it, and
+that organization reaches nothing the deleted one owned, because every
+resource names its organization by id.
 
 On a server that holds one organization, the open-source edition, that
 organization cannot be deleted at all: the delete is refused with

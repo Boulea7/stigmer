@@ -36,7 +36,7 @@ export interface ChannelAppCreateHandoff {
 
 /** Props for {@link CreateChannelAppForm}. */
 export interface CreateChannelAppFormProps {
-  /** Organization slug — the channel app will be created in this org. */
+  /** Organization id — the channel app will be created in this org (a slug is also accepted). */
   readonly org: string;
   /**
    * Console origin used to derive the OAuth redirect URL shown in the

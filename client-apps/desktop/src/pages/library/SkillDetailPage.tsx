@@ -8,11 +8,13 @@ import {
   ConfirmDialog,
   useBreadcrumbOverride,
   type DetailAction,
+  useOrgSlugForId,
 } from "@stigmer/react";
 
 export default function SkillDetailPage() {
   const { org, slug } = useParams<{ org: string; slug: string }>();
   const navigate = useNavigate();
+  const slugForOrg = useOrgSlugForId();
   const { setLabel } = useBreadcrumbOverride();
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [resourceName, setResourceName] = useState<string>("Skill");
@@ -100,7 +102,7 @@ export default function SkillDetailPage() {
         slug={slug}
         editable
         onResourceLoad={handleResourceLoad}
-        onPluginClick={({ org: o, slug: s }) => navigate(`/library/plugins/${o}/${s}`)}
+        onPluginClick={({ org: o, slug: s }) => navigate(`/library/plugins/${slugForOrg(o)}/${s}`)}
         actions={actions}
       />
       <ConfirmDialog

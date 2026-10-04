@@ -6,8 +6,11 @@
  *
  * The load-bearing pins the conformance suite does NOT cover (its
  * negatives are NF/UI/IA only):
- *   - duplicate create rejected GLOBALLY BY ID, even across differing
- *     metadata.org (the silent-overwrite hole CheckOrgDuplicate closes);
+ *   - an organization's id is minted (org_<ulid>) and its slug is its
+ *     name, never its id;
+ *   - a duplicate slug is refused globally, and a create that names an
+ *     organization of its own (a non-empty metadata.org) is refused, since
+ *     an organization belongs to none;
  *   - the byte-pinned AlreadyExists copy;
  *   - getByExternalOrgId answers Unimplemented from the PARTIAL service
  *     registration (validated here before conformance relies on it).
@@ -93,27 +96,35 @@ async function grpcCode(run: () => Promise<unknown>): Promise<ConnectError> {
   }
 }
 
-describe("organization create (id == slug)", () => {
-  it("sets id equal to the derived slug and stamps the created audit", async () => {
+describe("organization create (minted id, slug as name)", () => {
+  it("mints an org_ id distinct from the derived slug and stamps the created audit", async () => {
     const created = await command.create(orgInput("Alpha Corp"));
-    expect(created.metadata?.id).toBe("alpha-corp");
+    expect(created.metadata?.id).toMatch(/^org_[0-9a-z]{26}$/);
     expect(created.metadata?.slug).toBe("alpha-corp");
+    expect(created.metadata?.org).toBe("");
     expect(created.status?.audit?.specAudit?.event).toBe("created");
     expect(created.status?.audit?.specAudit?.createdBy?.id).toBe("system");
   });
 
-  it("rejects a duplicate slug GLOBALLY by id — even with a different metadata.org", async () => {
+  it("rejects a duplicate slug globally", async () => {
     await command.create(orgInput("Dup Target"));
 
-    // The generic org-scoped check would MISS this (different org) and the
-    // upsert-by-id store would then silently overwrite — the exact hole
-    // CheckOrgDuplicate's global-by-id lookup closes.
-    const error = await grpcCode(() =>
-      command.create(orgInput("Dup Target", { org: "some-other-org" })),
-    );
+    const error = await grpcCode(() => command.create(orgInput("Dup Target")));
     expect(error.code).toBe(Code.AlreadyExists);
     expect(error.rawMessage).toBe(
       "Organization already exists: slug 'dup-target'",
+    );
+  });
+
+  it("refuses a create that names an organization of its own", async () => {
+    // An organization belongs to no organization, so a non-empty
+    // metadata.org is bad input rather than a second scope to check.
+    const error = await grpcCode(() =>
+      command.create(orgInput("Owned Org", { org: "some-other-org" })),
+    );
+    expect(error.code).toBe(Code.InvalidArgument);
+    expect(error.rawMessage).toBe(
+      "an organization belongs to no organization: metadata.org must be empty",
     );
   });
 

@@ -136,16 +136,21 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  async function newOrganization(): Promise<string> {
+  /**
+   * A fresh organization: its slug, which a wire request may name it by
+   * (the serving chain resolves it), and its minted id, which a stored
+   * policy and every in-process call name it by.
+   */
+  async function newOrganization(): Promise<{ slug: string; id: string }> {
     seq += 1;
     const slug = `roles-org-${seq}`;
-    await organizations.create({
+    const created = await organizations.create({
       apiVersion: "tenancy.stigmer.ai/v1",
       kind: "Organization",
       metadata: { name: slug, slug, org: "" },
       spec: { description: "created by the iampolicy domain test" },
     });
-    return slug;
+    return { slug, id: created.metadata?.id ?? "" };
   }
 
   /** A second account, created the way the platform creates one (in-process). */
@@ -167,7 +172,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
 
   describe("the creator owns the organization (the built-in role lifecycle)", () => {
     it("lists the operator as owner with display fields, and counts one principal", async () => {
-      const org = await newOrganization();
+      const org = (await newOrganization()).slug;
 
       const access = await query.listResourceAccessByPrincipal({
         resource: create(ApiResourceRefSchema, {
@@ -191,7 +196,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     });
 
     it("deleting the organization cleans its rows", async () => {
-      const org = await newOrganization();
+      const { slug: org, id: orgId } = await newOrganization();
       await organizations.delete({ value: org });
       // The wire now refuses a count of an Organization that is gone
       // (stigmer#1163), so the rows are counted by the server itself: the
@@ -208,7 +213,9 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
         IamPolicyQueryController,
         server.inProcessTransport,
       ).getPrincipalsCount({
-        org: org,
+        // In-process callers name the organization by id: the rows were
+        // filed under it, and nothing resolves a slug off the wire.
+        org: orgId,
         principalKind: "identity_account",
       });
       expect(count.count).toBe(0);
@@ -217,14 +224,19 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
 
   describe("grants on the organization", () => {
     it("create is idempotent by derived id and stamps the proto's apiVersion", async () => {
-      const org = await newOrganization();
+      const { slug: org, id: orgId } = await newOrganization();
       const bob = await newAccount();
       const spec = orgRole(bob, "member", org);
 
       const first = await command.create(spec);
       const second = await command.create(spec);
 
-      expect(first.metadata?.id).toBe(policyIdFor(spec));
+      // The request names the organization by slug; the stored grant and
+      // the id derived from it name it by its minted id.
+      expect(first.spec?.resource?.id).toBe(orgId);
+      expect(first.metadata?.id).toBe(
+        policyIdFor(orgRole(bob, "member", orgId)),
+      );
       expect(first.apiVersion).toBe(IAM_POLICY_API_VERSION);
       expect(second.metadata?.id).toBe(first.metadata?.id);
       expect(
@@ -238,7 +250,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     });
 
     it("a role change is delete then create, and the access list follows", async () => {
-      const org = await newOrganization();
+      const { slug: org, id: orgId } = await newOrganization();
       const bob = await newAccount();
       await command.create(orgRole(bob, "member", org));
 
@@ -246,7 +258,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
       await command.create(orgRole(bob, "admin", org));
 
       expect(deleted.metadata?.id).toBe(
-        policyIdFor(orgRole(bob, "member", org)),
+        policyIdFor(orgRole(bob, "member", orgId)),
       );
       const roles = await query.getPrincipalResourceRoles({
         principal: create(ApiResourceRefSchema, {
@@ -262,7 +274,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     });
 
     it("every kind_meta role of the organization is grantable; a role it does not list is INVALID_ARGUMENT with the cloud's copy", async () => {
-      const org = await newOrganization();
+      const org = (await newOrganization()).slug;
       const bob = await newAccount();
       for (const role of ["owner", "admin", "member", "viewer"]) {
         await command.create(orgRole(bob, role, org));
@@ -282,8 +294,8 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     });
 
     it("revokeOrgAccess empties the account's rows on that organization only", async () => {
-      const org = await newOrganization();
-      const other = await newOrganization();
+      const org = (await newOrganization()).slug;
+      const other = (await newOrganization()).slug;
       const bob = await newAccount();
       await command.create(orgRole(bob, "admin", org));
       await command.create(orgRole(bob, "viewer", org));
@@ -319,7 +331,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     });
 
     it("delete of an absent triple answers the default instance (Java's contract)", async () => {
-      const org = await newOrganization();
+      const org = (await newOrganization()).slug;
       const deleted = await command.delete(
         orgRole("ida_nobody", "member", org),
       );
@@ -327,7 +339,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     });
 
     it("get answers the row by id and the byte-pinned NOT_FOUND copy for an unknown id", async () => {
-      const org = await newOrganization();
+      const org = (await newOrganization()).slug;
       const bob = await newAccount();
       const created = await command.create(orgRole(bob, "member", org));
       const got = await query.get({ value: created.metadata?.id ?? "" });
@@ -379,7 +391,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
 
   describe("the three system RPCs", () => {
     it("are PERMISSION_DENIED for a wire user, with the annotation's copy", async () => {
-      const org = await newOrganization();
+      const org = (await newOrganization()).slug;
       const structural = triple(
         { kind: "organization", id: org },
         "organization",
@@ -412,7 +424,8 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     });
 
     it("serve the platform's own pipeline on the in-process transport, structural relations included", async () => {
-      const org = await newOrganization();
+      // The in-process transport resolves no slug: the platform passes ids.
+      const org = (await newOrganization()).id;
       const structural = triple(
         { kind: "organization", id: org },
         "organization",
@@ -456,7 +469,7 @@ describe("iampolicy domain (composed server, trusted-local posture)", () => {
     });
 
     it("can_grant_access outside the grant scope answers false; on an organization it is the Authorizer's answer", async () => {
-      const org = await newOrganization();
+      const org = (await newOrganization()).slug;
       const onAgent = await query.checkMyPermission({
         resource: create(ApiResourceRefSchema, {
           kind: "agent",

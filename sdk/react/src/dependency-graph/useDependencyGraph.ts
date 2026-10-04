@@ -7,6 +7,7 @@ import type {
   UseDependencyGraphOptions,
   UseDependencyGraphReturn,
 } from "./types.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /**
  * Pure transformation hook that converts an `AgentSpec` into a
@@ -37,6 +38,8 @@ export function useDependencyGraph({
   agentOrg,
   spec,
 }: UseDependencyGraphOptions): UseDependencyGraphReturn {
+  // References name their org by id; a qualified label reads its slug.
+  const slugForOrg = useOrgSlugForId();
   return useMemo(() => {
     if (!spec) return { tree: null, isEmpty: true };
 
@@ -64,7 +67,7 @@ export function useDependencyGraph({
           label: ref.slug,
           qualifiedLabel:
             ref.org && ref.org !== agentOrg
-              ? `${ref.org}/${ref.slug}`
+              ? `${slugForOrg(ref.org)}/${ref.slug}`
               : undefined,
           metadata: {
             tools:
@@ -85,7 +88,7 @@ export function useDependencyGraph({
         label: ref.slug,
         qualifiedLabel:
           ref.org && ref.org !== agentOrg
-            ? `${ref.org}/${ref.slug}`
+            ? `${slugForOrg(ref.org)}/${ref.slug}`
             : undefined,
         children: [],
         ref: { org: ref.org || agentOrg, slug: ref.slug },
@@ -121,7 +124,7 @@ export function useDependencyGraph({
           label: ref.slug,
           qualifiedLabel:
             ref.org && ref.org !== agentOrg
-              ? `${ref.org}/${ref.slug}`
+              ? `${slugForOrg(ref.org)}/${ref.slug}`
               : undefined,
           children: [],
           ref: { org: ref.org || agentOrg, slug: ref.slug },
@@ -156,5 +159,5 @@ export function useDependencyGraph({
       tree: { root, nodeCount },
       isEmpty: false,
     };
-  }, [agentName, agentOrg, spec]);
+  }, [agentName, agentOrg, spec, slugForOrg]);
 }

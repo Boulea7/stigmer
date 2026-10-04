@@ -65,7 +65,10 @@ import {
 } from "../../pipeline/interceptors/auth.js";
 import type { ListReadScope } from "../list-read-scope.js";
 import type { ServerExtension } from "../registry.js";
-import { seedOrganizations } from "../../domain/organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../domain/organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -73,10 +76,23 @@ const silentLogger = createLogger({
   write: () => {},
 });
 
+/**
+ * Another organization's id, never created on this server: rows filed
+ * under it are the "other org" every lane must keep out of acme's answers.
+ * Stored rows name their organization by id, so this is id-shaped too.
+ */
+const RIVAL_ORG_ID = "org_01hzzzzzzzzzzzzzzzzzzzzzzz";
+
 describe("list read scope (composed server, fake scope)", () => {
   let server: ComposedServer;
   let dir: string;
   let transport: Transport;
+  /**
+   * acme's minted id. Rows written straight to the store and in-process
+   * requests carry it; requests over the port name acme by slug, which the
+   * serving chain resolves.
+   */
+  let acmeId: string;
 
   /**
    * The switchable fake: "keep" narrows to `allowed` (both verbs, the
@@ -131,14 +147,17 @@ describe("list read scope (composed server, fake scope)", () => {
     });
     const port = await server.start();
     transport = createGrpcTransport({ baseUrl: `http://127.0.0.1:${port}` });
-    await seedOrganizations(transport, ["acme"]);
+    acmeId = organizationId(
+      await seedOrganizations(transport, ["acme"]),
+      "acme",
+    );
 
     // Two rows per kind — one the scope will keep, one it must hide.
     // Seeded through the store: the write path is not under test.
     for (const [id, org] of [
-      ["ses_mine", "acme"],
-      ["ses_foreign", "acme"],
-    ] as const) {
+      ["ses_mine", acmeId],
+      ["ses_foreign", acmeId],
+    ]) {
       await server.store.saveResource(
         ApiResourceKind.session,
         id,
@@ -167,7 +186,7 @@ describe("list read scope (composed server, fake scope)", () => {
         create(AgentExecutionSchema, {
           apiVersion: "agentic.stigmer.ai/v1",
           kind: "AgentExecution",
-          metadata: { id, name: id, org: "acme" },
+          metadata: { id, name: id, org: acmeId },
           spec: { sessionId: "ses_mine" },
           status: {
             audit: {
@@ -179,10 +198,10 @@ describe("list read scope (composed server, fake scope)", () => {
       );
     }
     for (const [id, org] of [
-      ["wfe_mine", "acme"],
-      ["wfe_other_org", "rival"],
-      ["wfe_foreign", "acme"],
-    ] as const) {
+      ["wfe_mine", acmeId],
+      ["wfe_other_org", RIVAL_ORG_ID],
+      ["wfe_foreign", acmeId],
+    ]) {
       await server.store.saveResource(
         ApiResourceKind.workflow_execution,
         id,
@@ -208,15 +227,15 @@ describe("list read scope (composed server, fake scope)", () => {
         create(ApiKeySchema, {
           apiVersion: "iam.stigmer.ai/v1",
           kind: "ApiKey",
-          metadata: { id, name: id, org: "acme" },
+          metadata: { id, name: id, org: acmeId },
         }),
       );
     }
     for (const [id, org] of [
-      ["chap_mine", "acme"],
-      ["chap_foreign", "acme"],
-      ["chap_other_org", "rival"],
-    ] as const) {
+      ["chap_mine", acmeId],
+      ["chap_foreign", acmeId],
+      ["chap_other_org", RIVAL_ORG_ID],
+    ]) {
       await server.store.saveResource(
         ApiResourceKind.channel_app,
         id,
@@ -237,14 +256,14 @@ describe("list read scope (composed server, fake scope)", () => {
         create(AgentSchema, {
           apiVersion: "agentic.stigmer.ai/v1",
           kind: "Agent",
-          metadata: { id, name: `scopedagent ${id}`, org: "acme" },
+          metadata: { id, name: `scopedagent ${id}`, org: acmeId },
         }),
       );
       await server.store.upsertSearchIndex(ApiResourceKind.agent, id, {
         name: `scopedagent ${id}`,
         description: "",
         tags: "",
-        org: "acme",
+        org: acmeId,
         visibility: "visibility_private",
         createdAt: 1_700_000_000,
       });
@@ -394,7 +413,8 @@ describe("list read scope (composed server, fake scope)", () => {
         WorkflowExecutionQueryController,
         server.inProcessTransport,
       );
-      const acme = await query.list({ org: "acme" });
+      // In-process: server code passes the id, which nothing resolves.
+      const acme = await query.list({ org: acmeId });
       expect(acme.entries.map((e) => e.metadata?.id).sort()).toEqual([
         "wfe_foreign",
         "wfe_mine",

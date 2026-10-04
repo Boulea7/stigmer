@@ -12,7 +12,10 @@ import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/
 import { useStigmer } from "../hooks.js";
 import { toError } from "../internal/toError.js";
 import { usePersonalEnvironment } from "../environment/usePersonalEnvironment.js";
-import { buildPersonalInstanceInput } from "../agent-instance/buildPersonalInstanceInput.js";
+import {
+  buildPersonalInstanceInput,
+  personalInstanceAgentLabel,
+} from "../agent-instance/buildPersonalInstanceInput.js";
 import { diffEnv } from "../environment/diffEnv.js";
 import {
   agentSetupReducer,
@@ -100,6 +103,16 @@ function typedDeclarations(
 }
 
 /**
+ * The personal instance among a label query's answers that serves
+ * `agentId`. The label names the agent by slug, which two agents in
+ * different organizations share (an organization's `reviewer` and the
+ * platform's), so an answer is taken only when it binds this agent.
+ */
+function personalInstanceFor(items: readonly AgentInstance[], agentId: string): AgentInstance | undefined {
+  return items.find((instance) => instance.spec?.agentId === agentId);
+}
+
+/**
  * Re-checks for an existing personal instance immediately before
  * creating one. Narrows the race window when multiple clients
  * (tabs, double-clicks) attempt to create simultaneously.
@@ -126,8 +139,9 @@ async function findOrCreatePersonalInstance(
     }),
   );
 
-  if (recheck.items.length > 0) {
-    return recheck.items[0];
+  const existing = personalInstanceFor(recheck.items, agentId);
+  if (existing !== undefined) {
+    return existing;
   }
 
   return stigmer.agentInstance.create(
@@ -281,7 +295,7 @@ export interface UseAgentSetupReturn {
  *
  * Pass `null` as `org` to disable all operations (stable no-op).
  *
- * @param org - Organization slug. Pass `null` to disable.
+ * @param org - Organization id (a slug is also accepted). Pass `null` to disable.
  * @param poolKeys - Optional set of env-var keys already available
  *   from the session env pool (manual secrets, one-time env vars from
  *   other components). When provided, agents whose `env` keys
@@ -377,7 +391,9 @@ export function useAgentSetup(
         }
 
         // Agent has env declarations — check for existing personal instance.
-        const agentLabel = `${ref.org}/${ref.slug}`;
+        // The label the create below gives it: the active organization's id
+        // and the agent's slug, never the reference's own (possibly a slug) org.
+        const agentLabel = personalInstanceAgentLabel(org, ref.slug);
         const instanceList = await stigmer.agentInstance.list(
           create(ListAgentInstancesRequestSchema, {
             org,
@@ -388,10 +404,11 @@ export function useAgentSetup(
           }),
         );
 
-        if (instanceList.items.length > 0) {
+        const saved = personalInstanceFor(instanceList.items, agent.metadata!.id);
+        if (saved !== undefined) {
           const resolution: AgentResolution = {
             mode: "saved",
-            instanceId: instanceList.items[0].metadata!.id,
+            instanceId: saved.metadata!.id,
           };
           dispatch({
             type: "RESOLVE_READY",
@@ -584,7 +601,7 @@ export function useAgentSetup(
           kind: ApiResourceKind.environment,
         };
 
-        const agentLabel = `${agentRef.org}/${agentRef.slug}`;
+        const agentLabel = personalInstanceAgentLabel(org, agentRef.slug);
         const instance = await findOrCreatePersonalInstance(stigmer, {
           org,
           agentId,

@@ -12,6 +12,16 @@ export interface PersonalInstanceParams {
 }
 
 /**
+ * The `stigmer.ai/for-agent` label a personal instance of `agentSlug` carries
+ * in `org`, the organization the instance lives in (its id). Every lookup of a
+ * personal instance builds its label here, so a lookup and the create it
+ * guards always agree.
+ */
+export function personalInstanceAgentLabel(org: string, agentSlug: string): string {
+  return `${org}/${agentSlug}`;
+}
+
+/**
  * Builds the {@link AgentInstanceInput} for creating a personal agent
  * instance. Centralizes the naming convention, unique slug generation,
  * and label assignment so that every call site produces consistent
@@ -33,7 +43,7 @@ export function buildPersonalInstanceInput(
     agentId,
     labels: {
       [PERSONAL_LABEL]: "true",
-      [FOR_AGENT_LABEL]: `${org}/${agentSlug}`,
+      [FOR_AGENT_LABEL]: personalInstanceAgentLabel(org, agentSlug),
     },
     environmentRefs: [environmentRef],
   };

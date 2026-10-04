@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { MemoryListPanel } from "../memory/MemoryListPanel.js";
-import { useActiveOrgSlug } from "../organization/OrgProvider.js";
+import { useActiveOrgId } from "../organization/OrgProvider.js";
 
 /**
  * Settings section listing everything the platform remembers about the
@@ -16,7 +16,7 @@ import { useActiveOrgSlug } from "../organization/OrgProvider.js";
  */
 export function MemorySection() {
   const headingId = useId();
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
 
   return (
     <section aria-labelledby={headingId}>

@@ -45,8 +45,26 @@ Key properties:
 
 | Field             | Purpose                                                                                                                                          |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `slug`            | URL-friendly identifier, unique across the platform                                                                                              |
+| `id`              | The permanent id Stigmer gives the Organization when it is made (`org_…`). Everything the Organization owns is filed under it                    |
+| `slug`            | The name you type in URLs, manifests and `--org`, unique across the platform. An owner can change it                                             |
 | `management_mode` | `self_managed` (you operate the org directly) or `platform_managed` (an external platform creates and operates the org via an Identity Provider) |
+
+### Ids and slugs
+
+Wherever you name an Organization (`org: acme` in a manifest, `--org acme` on
+the CLI, a console URL) you can give its slug or its id; Stigmer answers with
+the id. Because every resource is filed under the id, an owner can rename an
+Organization and nothing moves: its agents, members and secrets stay where they
+are. The old slug keeps leading to the Organization for 30 days, and nobody else
+can take it meanwhile; after that it is free. A deleted Organization's slug is
+free at once, and an Organization made later under the same slug reaches nothing
+the deleted one owned.
+
+Renaming is its own operation, open to the Organization's owners: in the
+console, the Organization's settings; with the CLI, apply the Organization's
+manifest with its `id` and the new `slug` (the manifest
+`stigmer get organization <slug> -o yaml` prints has both). An ordinary update
+never changes the slug.
 
 ### Per edition
 
@@ -259,7 +277,8 @@ reference that fails either check is refused with the field and the reason
 named, rather than failing later at run time.
 
 This keeps resource definitions portable — they reference resources by name, not
-by internal IDs.
+by internal IDs. Stigmer stores a reference's Organization by id, so a stored
+reference keeps pointing at its Organization across a rename.
 
 ## What's next
 

@@ -25,10 +25,9 @@ export function MembersSection() {
   );
   const idpAvailable = useResourceAvailable(ApiResourceKind.identity_provider);
   const org = activeOrg?.metadata?.id ?? "";
-  const orgSlug = activeOrg?.metadata?.slug ?? "";
 
   const { identityProviders } = useIdentityProviderList(
-    idpAvailable && orgSlug ? orgSlug : null,
+    idpAvailable && org ? org : null,
   );
 
   const hasJitProviders = identityProviders.some(

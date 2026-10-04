@@ -13,7 +13,7 @@ import { useExecutionNavigation } from "@/domain/workflow/execution-navigation";
 
 export function DashboardPage() {
   const { activeOrg } = useOrg();
-  const org = activeOrg?.metadata?.slug ?? "";
+  const org = activeOrg?.metadata?.id ?? "";
   const { navigateToExecution } = useExecutionNavigation();
 
   const { summary: workflowSummary, isLoading: workflowSummaryLoading } =

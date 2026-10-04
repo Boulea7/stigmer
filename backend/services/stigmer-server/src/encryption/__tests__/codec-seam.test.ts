@@ -309,11 +309,22 @@ describe("reencrypt (the sweep's one upgrade door)", () => {
 });
 
 describe("EncryptionScope (the Java record's validation invariants)", () => {
-  it("derives org-<slug> tenancy and the platform tenant", () => {
-    const org = EncryptionScope.forOrganization("acme-corp");
-    expect(org.tenantSegment).toBe("org-acme-corp");
-    expect(org.kekKeyName()).toBe("org-acme-corp");
-    expect(org.isLocated()).toBe(false);
+  it("derives org-<id> tenancy, for a minted id and an older slug-shaped one, and the platform tenant", () => {
+    const minted = EncryptionScope.forOrganization("org_01jaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(minted.tenantSegment).toBe("org-org_01jaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(minted.kekKeyName()).toBe("org-org_01jaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(minted.isLocated()).toBe(false);
+
+    // An organization made before ids were minted keeps the id it was
+    // given, its first slug, and the key it has always had.
+    const older = EncryptionScope.forOrganization("acme-corp");
+    expect(older.tenantSegment).toBe("org-acme-corp");
+
+    // Even an older organization whose id is "platform" never shares the
+    // platform's key.
+    expect(EncryptionScope.forOrganization("platform").tenantSegment).toBe(
+      "org-platform",
+    );
 
     const platform = EncryptionScope.forPlatformResource(
       "cursoraccount",
@@ -323,10 +334,20 @@ describe("EncryptionScope (the Java record's validation invariants)", () => {
     expect(platform.isLocated()).toBe(true);
   });
 
-  it("rejects invalid org slugs (the metadata.proto contract, verbatim)", () => {
-    for (const bad of ["", "A", "a", "-x", "x-", "org platform", "Ürg"]) {
+  it("rejects anything that is not an organization id", () => {
+    for (const bad of [
+      "",
+      "A",
+      "a",
+      "-x",
+      "x-",
+      "org platform",
+      "Ürg",
+      "org_short",
+      "org_01JAAAAAAAAAAAAAAAAAAAAAAA",
+    ]) {
       expect(() => EncryptionScope.forOrganization(bad)).toThrow(
-        "encryption scope requires a valid org slug",
+        "encryption scope requires an organization id",
       );
     }
   });

@@ -3,8 +3,9 @@
  * composed exactly as the shipped entry composes it (editions/open-source.ts)
  * in the trusted-local posture, over the wire:
  *
- *   - the first start makes `stigmer`, owned by the operator through the
- *     role lifecycle, and records it under SINGLE_ORG_KEY;
+ *   - the first start makes `stigmer` under a minted id, owned by the
+ *     operator through the role lifecycle, and records that id under
+ *     SINGLE_ORG_KEY;
  *   - getServerInfo answers `single_org: true`;
  *   - a request that names no organization acts in it, and one that names an
  *     organization that does not exist is still refused by name;
@@ -56,6 +57,7 @@ import {
   ORGANIZATION_LIMIT_REACHED,
   SINGLE_ORG_KEY,
 } from "../limit.js";
+import { organizationNameKey } from "../names.js";
 
 const OPERATOR_EMAIL = "operator@example.com";
 
@@ -134,6 +136,9 @@ describe("the open-source edition's one organization (composed as main.ts compos
   let organizationQuery: Client<typeof OrganizationQueryController>;
   let agents: Client<typeof AgentCommandController>;
   let platform: Client<typeof PlatformQueryController>;
+  // The id the first start minted for `stigmer`, read once the server
+  // listens; every stored value and record names the organization by it.
+  let stigmerId: string;
 
   function ownersOf(org: string): ReadonlyArray<string> {
     return [...policies.rows.values()]
@@ -153,6 +158,9 @@ describe("the open-source edition's one organization (composed as main.ts compos
     ({ organizations, organizationQuery, agents, platform } = clientsAt(
       await server.start(),
     ));
+    stigmerId =
+      (await organizationQuery.findMyOrganizations({})).entries[0]?.metadata
+        ?.id ?? "";
   });
 
   afterAll(async () => {
@@ -163,15 +171,17 @@ describe("the open-source edition's one organization (composed as main.ts compos
 
   it("the first start makes `stigmer`, owned by the operator, and records it", async () => {
     const mine = await organizationQuery.findMyOrganizations({});
-    expect(mine.entries.map((org) => org.metadata?.id)).toEqual(["stigmer"]);
+    expect(mine.entries.map((org) => org.metadata?.slug)).toEqual(["stigmer"]);
+    expect(stigmerId).toMatch(/^org_[0-9a-z]{26}$/);
     const made = mine.entries[0];
+    expect(made?.metadata?.id).toBe(stigmerId);
     expect(made?.metadata?.org).toBe("");
-    expect(ownersOf("stigmer")).toHaveLength(1);
+    expect(ownersOf(stigmerId)).toHaveLength(1);
     expect(made?.status?.audit?.specAudit?.createdBy?.id).toBe(
-      ownersOf("stigmer")[0],
+      ownersOf(stigmerId)[0],
     );
     expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(
-      "stigmer",
+      stigmerId,
     );
   });
 
@@ -181,7 +191,7 @@ describe("the open-source edition's one organization (composed as main.ts compos
 
   it("a request that names no organization acts in the one; an unknown one is refused by name", async () => {
     const agent = await agents.create(agentInput("Helper"));
-    expect(agent.metadata?.org).toBe("stigmer");
+    expect(agent.metadata?.org).toBe(stigmerId);
 
     const refusal = await grpcError(() =>
       agents.create(agentInput("Elsewhere", "no-such-org")),
@@ -204,7 +214,12 @@ describe("the open-source edition's one organization (composed as main.ts compos
     expect(
       await server.store.listResources(ApiResourceKind.organization),
     ).toHaveLength(1);
-    expect(await server.store.organizationSlugs.find("second")).toBeUndefined();
+    expect(
+      await server.store.resourceNames.resolve(
+        organizationNameKey("second"),
+        new Date().toISOString(),
+      ),
+    ).toBeUndefined();
 
     const duplicate = await grpcError(() =>
       organizations.create(organizationInput("stigmer")),
@@ -212,7 +227,9 @@ describe("the open-source edition's one organization (composed as main.ts compos
     expect(duplicate.code).toBe(Code.AlreadyExists);
   });
 
-  it("deleting the one is refused before any write: the organization stays and its slug is not retired", async () => {
+  it("deleting the one is refused before any write: the organization stays and keeps its name", async () => {
+    // Named by slug: the serving chain resolves it to the id the refusal
+    // carries.
     const refusal = await grpcError(() =>
       organizations.delete({ value: "stigmer" }),
     );
@@ -221,15 +238,20 @@ describe("the open-source edition's one organization (composed as main.ts compos
       "this server's only organization cannot be deleted",
     );
     expect(refusal.findDetails(ErrorInfoSchema)).toMatchObject([
-      { reason: ORGANIZATION_IS_SINGLE, metadata: { org: "stigmer" } },
+      { reason: ORGANIZATION_IS_SINGLE, metadata: { org: stigmerId } },
     ]);
     expect(
       (await organizationQuery.findMyOrganizations({})).entries,
     ).toHaveLength(1);
     expect(
-      (await server.store.organizationSlugs.find("stigmer"))?.retiredAt,
-    ).toBe("");
-    expect(ownersOf("stigmer")).toHaveLength(1);
+      (
+        await server.store.resourceNames.resolve(
+          organizationNameKey("stigmer"),
+          new Date().toISOString(),
+        )
+      )?.state,
+    ).toBe("current");
+    expect(ownersOf(stigmerId)).toHaveLength(1);
   });
 
   it("deleting an organization that does not exist is still NotFound", async () => {
@@ -250,9 +272,9 @@ describe("the open-source edition's one organization (composed as main.ts compos
       (await organizationQuery.findMyOrganizations({})).entries.map(
         (org) => org.metadata?.id,
       ),
-    ).toEqual(["stigmer"]);
+    ).toEqual([stigmerId]);
     expect((await agents.create(agentInput("Again"))).metadata?.org).toBe(
-      "stigmer",
+      stigmerId,
     );
     expect((await platform.getServerInfo({})).singleOrg).toBe(true);
   });

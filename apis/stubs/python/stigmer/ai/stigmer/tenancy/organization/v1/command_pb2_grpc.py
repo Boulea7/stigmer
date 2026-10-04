@@ -2,6 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
+from ai.stigmer.commons.apiresource import io_pb2 as ai_dot_stigmer_dot_commons_dot_apiresource_dot_io__pb2
 from ai.stigmer.tenancy.organization.v1 import api_pb2 as ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2
 from ai.stigmer.tenancy.organization.v1 import io_pb2 as ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_io__pb2
 
@@ -31,6 +32,11 @@ class OrganizationCommandControllerStub(object):
                 request_serializer=ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.SerializeToString,
                 response_deserializer=ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.FromString,
                 _registered_method=True)
+        self.rename = channel.unary_unary(
+                '/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/rename',
+                request_serializer=ai_dot_stigmer_dot_commons_dot_apiresource_dot_io__pb2.RenameInput.SerializeToString,
+                response_deserializer=ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.FromString,
+                _registered_method=True)
         self.delete = channel.unary_unary(
                 '/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/delete',
                 request_serializer=ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_io__pb2.OrganizationId.SerializeToString,
@@ -55,15 +61,18 @@ class OrganizationCommandControllerServicer(object):
     def create(self, request, context):
         """Create an organization.
 
-        An organization's slug is its id, and it is the organization's for good:
-        a slug any organization has ever held, one since deleted included, is
-        never taken again. A create of a held slug is refused with
-        ALREADY_EXISTS; a create of a slug whose organization was deleted is
+        The server mints the organization's id (org_<ulid>); metadata.org must be
+        empty, because an organization belongs to no organization (one that names
+        the organization itself, by its own id or slug, is cleared). A slug held by
+        another organization is refused with ALREADY_EXISTS; a slug another
+        organization was renamed away from, and which still resolves to it, is
         refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
         (domain "stigmer.ai"):
 
-        - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-        and a slug is never reused. Metadata: slug.
+        - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+        until a recent rename, and it still resolves there; or an
+        organization from an earlier release was filed under it, which keeps
+        it reserved for good, deleted or not. Metadata: slug.
 
         On Stigmer Cloud, creating a platform-managed organization is a plan
         feature of its integrator. An integrator whose plan lacks it is refused
@@ -89,14 +98,32 @@ class OrganizationCommandControllerServicer(object):
 
     def update(self, request, context):
         """Update an existing organization.
+
+        The slug is not changed by an update (it is ignored, as for every
+        kind); rename changes it.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def rename(self, request, context):
+        """Rename an organization: change its slug, the name people type.
+
+        Nothing the organization owns moves, because every resource names it by
+        id. The old slug keeps resolving to the organization for 30 days, during
+        which no other organization can take it and this one can take it back;
+        then it is released. A slug another organization holds is refused with
+        ALREADY_EXISTS, and one another organization was recently renamed away
+        from with ORGANIZATION_SLUG_RESERVED (see create).
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def delete(self, request, context):
-        """Delete an organization. Its slug stays reserved: no organization can be
-        created with it again.
+        """Delete an organization. Its slug is released once the organization is
+        gone: a later organization may take it, and sees nothing the deleted one
+        owned, because every resource names its organization by id.
 
         A server that holds one organization (GetServerInfoOutput.single_org's
         composition) refuses to delete it with FAILED_PRECONDITION carrying a
@@ -126,6 +153,11 @@ def add_OrganizationCommandControllerServicer_to_server(servicer, server):
             'update': grpc.unary_unary_rpc_method_handler(
                     servicer.update,
                     request_deserializer=ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.FromString,
+                    response_serializer=ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.SerializeToString,
+            ),
+            'rename': grpc.unary_unary_rpc_method_handler(
+                    servicer.rename,
+                    request_deserializer=ai_dot_stigmer_dot_commons_dot_apiresource_dot_io__pb2.RenameInput.FromString,
                     response_serializer=ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.SerializeToString,
             ),
             'delete': grpc.unary_unary_rpc_method_handler(
@@ -215,6 +247,33 @@ class OrganizationCommandController(object):
             target,
             '/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/update',
             ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.SerializeToString,
+            ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def rename(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/rename',
+            ai_dot_stigmer_dot_commons_dot_apiresource_dot_io__pb2.RenameInput.SerializeToString,
             ai_dot_stigmer_dot_tenancy_dot_organization_dot_v1_dot_api__pb2.Organization.FromString,
             options,
             channel_credentials,

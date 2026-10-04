@@ -2,12 +2,12 @@
 // Domain: tenancy / organization.
 //
 // Drives OrganizationCommandController + OrganizationQueryController through the
-// raw proto stubs. Covers CRUD round-trips, a deleted organization's slug
-// never taken again (ALREADY_EXISTS with ORGANIZATION_SLUG_RESERVED), list
-// pagination, and the capability-gated RPCs that differ between local OSS
-// and cloud (findMyOrganizations filtering, getByExternalOrgId availability).
+// raw proto stubs. Covers CRUD round-trips, list pagination, and the
+// capability-gated RPCs that differ between local OSS and cloud
+// (findMyOrganizations filtering, getByExternalOrgId availability). An
+// organization's permanent id, its renamable slug and what a later holder of
+// a released slug can reach are organization-identity.conformance.test.ts's.
 import { Code } from "@connectrpc/connect";
-import { ErrorInfoSchema } from "@stigmer/protos/google/rpc/error_details_pb";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { expectGrpcCode } from "../contract/errors";
 import type { ConformanceClients } from "../harness/clients";
@@ -44,8 +44,8 @@ afterAll(async () => {
   await target?.teardown();
 });
 
-// Organizations are the top-level tenant, so they carry no parent org; the slug
-// (derived from name) is their unique key.
+// Organizations are the top-level tenant, so they carry no parent org; the
+// server mints their id, and the slug (derived from name) is a unique name.
 // An organization the caller creates and therefore owns; deleted at the end
 // of the arm. `using` defaults to the primary caller; the enforcing-lane arm
 // hands the lane's founder, whose server the rows must live on.
@@ -65,13 +65,12 @@ async function countOrganizations(): Promise<number> {
 }
 
 describe("Organization conformance", () => {
-  it("[rpc:OrganizationCommandController.create] create sets id equal to slug and records a created audit event", async () => {
+  it("[rpc:OrganizationCommandController.create] create mints an org_ id apart from the slug and records a created audit event", async () => {
     const created = await createOrg(uniqueName("org"));
 
-    // Organization is the one resource whose id is its slug (the globally unique
-    // tenancy root is addressed by slug, not a minted id). This holds uniformly
-    // across local and cloud targets.
-    expect(created.metadata?.id, "org id should equal its slug").toBe(created.metadata?.slug);
+    expect(created.metadata?.id, "the server mints the organization's id").toMatch(/^org_[0-9a-z]{26}$/);
+    expect(created.metadata?.id).not.toBe(created.metadata?.slug);
+    expect(created.metadata?.org, "an organization belongs to no organization").toBe("");
     expect(created.status?.audit?.specAudit?.event).toBe("created");
   });
 
@@ -94,7 +93,7 @@ describe("Organization conformance", () => {
     expect(second.status?.audit?.specAudit?.event).toBe("updated");
   });
 
-  it("[rpc:OrganizationCommandController.update] update preserves id and slug but allows renaming", async () => {
+  it("[rpc:OrganizationCommandController.update] update preserves id and slug but allows a new display name", async () => {
     const created = await createOrg(uniqueName("org"));
     const { id, slug } = created.metadata!;
 
@@ -124,36 +123,6 @@ describe("Organization conformance", () => {
 
     await clients.organizationCommand.delete({ value: id });
     await expectGrpcCode(() => clients.organizationQuery.get({ value: id }), Code.NotFound, "get after delete");
-  });
-
-  it("[rpc:OrganizationCommandController.create] a deleted organization's slug is never taken again", async () => {
-    const slug = uniqueName("org");
-    const created = await clients.organizationCommand.create({
-      apiVersion: API_VERSION,
-      kind: KIND,
-      metadata: { name: slug, slug },
-    });
-    await clients.organizationCommand.delete({ value: created.metadata!.id });
-
-    const refused = await expectGrpcCode(
-      () =>
-        clients.organizationCommand.create({
-          apiVersion: API_VERSION,
-          kind: KIND,
-          metadata: { name: slug, slug },
-        }),
-      Code.AlreadyExists,
-      "create of a deleted organization's slug",
-    );
-    const [reason] = refused.findDetails(ErrorInfoSchema);
-    expect(reason?.reason, "the refusal says the slug is reserved").toBe("ORGANIZATION_SLUG_RESERVED");
-    expect(reason?.domain).toBe("stigmer.ai");
-    expect(reason?.metadata).toEqual({ slug });
-    await expectGrpcCode(
-      () => clients.organizationQuery.get({ value: slug }),
-      Code.NotFound,
-      "get after the refused create",
-    );
   });
 
   // find enumerates every organization regardless of caller — a single-tenant

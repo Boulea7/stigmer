@@ -40,15 +40,17 @@ export function useFollowSessionOrganization(session: Session | null): void {
 
   const sessionId = session?.metadata?.id ?? "";
   const sessionOrg = session?.metadata?.org ?? "";
-  const activeSlug = activeOrg?.metadata?.slug ?? "";
+  // A stored session names its organization by id, so the id is what it is
+  // compared with.
+  const activeId = activeOrg?.metadata?.id ?? "";
 
   useEffect(() => {
-    if (sessionId === "" || sessionOrg === "" || isLoading || activeSlug === "")
+    if (sessionId === "" || sessionOrg === "" || isLoading || activeId === "")
       return;
     if (followedSessionRef.current === sessionId) return;
     followedSessionRef.current = sessionId;
-    if (sessionOrg === activeSlug) return;
-    const target = orgs.find((org) => org.metadata?.slug === sessionOrg);
+    if (sessionOrg === activeId) return;
+    const target = orgs.find((org) => org.metadata?.id === sessionOrg);
     if (target !== undefined) setActiveOrg(target);
-  }, [sessionId, sessionOrg, activeSlug, isLoading, orgs, setActiveOrg]);
+  }, [sessionId, sessionOrg, activeId, isLoading, orgs, setActiveOrg]);
 }

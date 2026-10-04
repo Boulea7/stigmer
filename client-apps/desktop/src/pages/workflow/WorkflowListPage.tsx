@@ -6,7 +6,9 @@ import {
   ResourceWorkbench,
   ActionMenu,
   useStigmer,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  OrgSlugText,
+  useOrgSlugForId,
   useConfirmAction,
   ConfirmDialog,
   toast,
@@ -32,7 +34,7 @@ const WORKFLOW_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
     id: "org",
     header: "Organization",
     cell: (item) => (
-      <span className="text-muted-foreground">{item.org}</span>
+      <OrgSlugText orgId={item.org} className="text-muted-foreground" />
     ),
     flex: 1,
   },
@@ -49,7 +51,8 @@ const WORKFLOW_COLUMNS: WorkbenchColumnDef<SearchResult>[] = [
 ];
 
 export default function WorkflowListPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const stigmer = useStigmer();
   const navigate = useNavigate();
   const { confirmState, confirm, handleConfirm, handleCancel } =
@@ -119,7 +122,7 @@ export default function WorkflowListPage() {
         emptyTitle="No workflows yet"
         emptyDescription="Workflows define multi-step orchestration for agents. Use the Create button above to get started."
         onItemClick={(item) =>
-          navigate(`/library/workflows/${item.org}/${item.slug}`)
+          navigate(`/library/workflows/${slugForOrg(item.org)}/${item.slug}`)
         }
         renderItemAction={(item) => (
           <div onClick={(e) => e.stopPropagation()}>
@@ -133,7 +136,7 @@ export default function WorkflowListPage() {
                 <ActionMenu.Item
                   icon={<ExternalLink className="size-4" />}
                   onSelect={() =>
-                    navigate(`/library/workflows/${item.org}/${item.slug}`)
+                    navigate(`/library/workflows/${slugForOrg(item.org)}/${item.slug}`)
                   }
                 >
                   View details
@@ -141,7 +144,7 @@ export default function WorkflowListPage() {
                 <ActionMenu.Item
                   icon={<Copy className="size-4" />}
                   onSelect={() => {
-                    navigator.clipboard.writeText(`${item.org}/${item.slug}`);
+                    navigator.clipboard.writeText(`${slugForOrg(item.org)}/${item.slug}`);
                     toast.success("Copied workflow reference");
                   }}
                 >

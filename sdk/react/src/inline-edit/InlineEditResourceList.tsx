@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@stigmer/theme";
 import type { InlineEditBaseProps, ResourceRefRow } from "./types.js";
+import { useOrgIdForRef, useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Props for {@link InlineEditResourceList}. */
 export interface InlineEditResourceListProps extends InlineEditBaseProps {
@@ -26,7 +27,10 @@ export interface InlineEditResourceListProps extends InlineEditBaseProps {
   readonly editing?: boolean;
   /** Called when editing state changes (controlled mode). */
   readonly onEditingChange?: (editing: boolean) => void;
-  /** Default org to pre-fill in the generic add form. */
+  /**
+   * Default org for the generic add form: the org a reference typed without
+   * one belongs to. Pass the org's id; the form shows its slug.
+   */
   readonly defaultOrg?: string;
 }
 
@@ -69,7 +73,12 @@ export function InlineEditResourceList({
   const [showPicker, setShowPicker] = useState(false);
   const [showGenericAdd, setShowGenericAdd] = useState(false);
   const [addSlug, setAddSlug] = useState("");
-  const [addOrg, setAddOrg] = useState(defaultOrg);
+  // Stored references name their org by id while a person reads and types
+  // slugs: the form shows the default org's slug, and every reference is
+  // compared, and added, by the id of the org it names.
+  const slugForOrg = useOrgSlugForId();
+  const orgIdFor = useOrgIdForRef();
+  const [addOrg, setAddOrg] = useState(() => slugForOrg(defaultOrg));
 
   const handleEdit = useCallback(() => {
     setDraft([...value]);
@@ -98,14 +107,20 @@ export function InlineEditResourceList({
     setDraft((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const addItem = useCallback((ref: ResourceRefRow) => {
-    setDraft((prev) => {
-      const exists = prev.some((r) => r.org === ref.org && r.slug === ref.slug);
-      if (exists) return prev;
-      return [...prev, ref];
-    });
-    setShowPicker(false);
-  }, []);
+  const addItem = useCallback(
+    (ref: ResourceRefRow) => {
+      setDraft((prev) => {
+        const refOrg = orgIdFor(ref.org);
+        const exists = prev.some(
+          (r) => orgIdFor(r.org) === refOrg && r.slug === ref.slug,
+        );
+        if (exists) return prev;
+        return [...prev, ref];
+      });
+      setShowPicker(false);
+    },
+    [orgIdFor],
+  );
 
   if (disabled || !isEditing) {
     return (
@@ -201,7 +216,7 @@ export function InlineEditResourceList({
             placeholder="slug"
             onKeyDown={(e) => {
               if (e.key === "Enter" && addSlug.trim()) {
-                addItem({ org: addOrg.trim() || defaultOrg, slug: addSlug.trim(), label: addSlug.trim() });
+                addItem({ org: orgIdFor(addOrg.trim()) || defaultOrg, slug: addSlug.trim(), label: addSlug.trim() });
                 setAddSlug("");
                 setShowGenericAdd(false);
               } else if (e.key === "Escape") {
@@ -218,7 +233,7 @@ export function InlineEditResourceList({
             type="button"
             onClick={() => {
               if (addSlug.trim()) {
-                addItem({ org: addOrg.trim() || defaultOrg, slug: addSlug.trim(), label: addSlug.trim() });
+                addItem({ org: orgIdFor(addOrg.trim()) || defaultOrg, slug: addSlug.trim(), label: addSlug.trim() });
                 setAddSlug("");
                 setShowGenericAdd(false);
               }

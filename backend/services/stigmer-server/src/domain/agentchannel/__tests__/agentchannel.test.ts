@@ -61,7 +61,10 @@ import {
   providerImmutableMessage,
   sameOrgInvariantMessage,
 } from "../constants.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -70,7 +73,12 @@ const silentLogger = createLogger({
 });
 
 const API_VERSION = "agentic.stigmer.ai/v1";
+// Requests name the organizations by slug, which the serving chain turns
+// into the minted id; rows written straight to the store and what the
+// server answers carry the id.
 const ORG = "channel-test-org";
+let ORG_ID: string;
+let OTHER_ORG_ID: string;
 
 let server: ComposedServer;
 let channels: Client<typeof AgentChannelCommandController>;
@@ -107,7 +115,7 @@ beforeAll(async () => {
   const transport: Transport = createGrpcTransport({
     baseUrl: `http://127.0.0.1:${port}`,
   });
-  await seedOrganizations(transport, [
+  const organizationIds = await seedOrganizations(transport, [
     ORG,
     "acme",
     "channel-other-org",
@@ -115,6 +123,8 @@ beforeAll(async () => {
     "channel-apply-org",
     "channel-list-org",
   ]);
+  ORG_ID = organizationId(organizationIds, ORG);
+  OTHER_ORG_ID = organizationId(organizationIds, "channel-other-org");
   channels = createClient(AgentChannelCommandController, transport);
   query = createClient(AgentChannelQueryController, transport);
   agents = createClient(AgentCommandController, transport);
@@ -154,7 +164,7 @@ async function seedReferencedRows(): Promise<void> {
           id: `env_${slug}`,
           name: slug,
           slug,
-          org: ORG,
+          org: ORG_ID,
           visibility: ApiResourceVisibility.visibility_org,
         },
       }),
@@ -181,7 +191,7 @@ async function seedReferencedRows(): Promise<void> {
           id: `chapp_${slug}`,
           name: slug,
           slug,
-          org: ORG,
+          org: ORG_ID,
           visibility: ApiResourceVisibility.visibility_org,
         },
       }),
@@ -415,7 +425,7 @@ describe("agentchannel create", () => {
 
     const err = await grpcError(() => channels.create(ch));
     expect(err.code).toBe(Code.FailedPrecondition);
-    expect(err.rawMessage).toBe(sameOrgInvariantMessage("channel-other-org"));
+    expect(err.rawMessage).toBe(sameOrgInvariantMessage(OTHER_ORG_ID));
   });
 
   it("cross-org refusal precedes the agent load — no slug probing", async () => {
@@ -622,7 +632,7 @@ describe("environment_refs (channel-bound credentials)", () => {
     ];
     const created = await channels.create(withRefs);
     expect(created.spec?.environmentRefs).toHaveLength(2);
-    expect(created.spec?.environmentRefs[0]?.org).toBe(ORG);
+    expect(created.spec?.environmentRefs[0]?.org).toBe(ORG_ID);
     expect(created.spec?.environmentRefs[0]?.slug).toBe("github-credentials");
     expect(created.spec?.environmentRefs[1]?.slug).toBe("search-credentials");
 

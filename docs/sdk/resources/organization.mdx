@@ -56,6 +56,7 @@ Organization organization = client.organizations().get("org_01j5q3k7m8r2s4tnz2hf
 | [`create`](#create) | Create an organization. |
 | [`update`](#update) | Update an existing organization. |
 | [`delete`](#delete) | Delete an organization. |
+| [`rename`](#rename) | Rename an organization: change its slug, the name people type. |
 
 ### get
 
@@ -230,7 +231,6 @@ Its create arm is refused as create is, ORGANIZATION_LIMIT_REACHED included.
 ```typescript
 const organization = await stigmer.organization.apply({
   name: "my-organization",
-  org: "acme",
   slug: "...",
   labels: {},
   description: "...",
@@ -247,7 +247,6 @@ const organization = await stigmer.organization.apply({
 ```go
 organization, err := client.Organization.Apply(ctx, &stigmer.OrganizationInput{
   Name:                "my-organization",
-  Org:                 "acme",
   Slug:                "...",
   Labels:              map[string]string{},
   Description:         "...",
@@ -264,7 +263,6 @@ organization, err := client.Organization.Apply(ctx, &stigmer.OrganizationInput{
 ```python
 organization = client.organizations.apply(OrganizationInput(
     name="my-organization",
-    org="acme",
     slug="...",
     labels={},
     description="...",
@@ -281,7 +279,6 @@ organization = client.organizations.apply(OrganizationInput(
 ```java
 Organization organization = client.organizations().apply(OrganizationInput.builder()
     .name("my-organization")
-    .org("acme")
     .slug("...")
     .labels(Map.of())
     .description("...")
@@ -304,9 +301,9 @@ Organization organization = client.organizations().apply(OrganizationInput.build
 
 Create an organization.
 
-An organization's slug is its id, and it is the organization's for good: a slug any organization has ever held, one since deleted included, is never taken again. A create of a held slug is refused with ALREADY_EXISTS; a create of a slug whose organization was deleted is refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail (domain "stigmer.ai"):
+The server mints the organization's id (org_&lt;ulid&gt;); metadata.org must be empty, because an organization belongs to no organization (one that names the organization itself, by its own id or slug, is cleared). A slug held by another organization is refused with ALREADY_EXISTS; a slug another organization was renamed away from, and which still resolves to it, is refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail (domain "stigmer.ai"):
 
-- ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug, and a slug is never reused. Metadata: slug.
+- ORGANIZATION_SLUG_RESERVED — another organization held the slug until a recent rename, and it still resolves there; or an organization from an earlier release was filed under it, which keeps it reserved for good, deleted or not. Metadata: slug.
 
 On Stigmer Cloud, creating a platform-managed organization is a plan feature of its integrator. An integrator whose plan lacks it is refused with FAILED_PRECONDITION carrying a google.rpc.ErrorInfo detail (domain "stigmer.ai"):
 
@@ -321,7 +318,6 @@ A server composed to hold a limited number of organizations (the open-source edi
 ```typescript
 const organization = await stigmer.organization.create({
   name: "my-organization",
-  org: "acme",
   slug: "...",
   labels: {},
   description: "...",
@@ -338,7 +334,6 @@ const organization = await stigmer.organization.create({
 ```go
 organization, err := client.Organization.Create(ctx, &stigmer.OrganizationInput{
   Name:                "my-organization",
-  Org:                 "acme",
   Slug:                "...",
   Labels:              map[string]string{},
   Description:         "...",
@@ -355,7 +350,6 @@ organization, err := client.Organization.Create(ctx, &stigmer.OrganizationInput{
 ```python
 organization = client.organizations.create(OrganizationInput(
     name="my-organization",
-    org="acme",
     slug="...",
     labels={},
     description="...",
@@ -372,7 +366,6 @@ organization = client.organizations.create(OrganizationInput(
 ```java
 Organization organization = client.organizations().create(OrganizationInput.builder()
     .name("my-organization")
-    .org("acme")
     .slug("...")
     .labels(Map.of())
     .description("...")
@@ -395,12 +388,13 @@ Organization organization = client.organizations().create(OrganizationInput.buil
 
 Update an existing organization.
 
+The slug is not changed by an update (it is ignored, as for every kind); rename changes it.
+
 <SDKTabs>
 <Tab value="TypeScript">
 ```typescript
 const organization = await stigmer.organization.update({
   name: "my-organization",
-  org: "acme",
   slug: "...",
   labels: {},
   description: "...",
@@ -417,7 +411,6 @@ const organization = await stigmer.organization.update({
 ```go
 organization, err := client.Organization.Update(ctx, &stigmer.OrganizationInput{
   Name:                "my-organization",
-  Org:                 "acme",
   Slug:                "...",
   Labels:              map[string]string{},
   Description:         "...",
@@ -434,7 +427,6 @@ organization, err := client.Organization.Update(ctx, &stigmer.OrganizationInput{
 ```python
 organization = client.organizations.update(OrganizationInput(
     name="my-organization",
-    org="acme",
     slug="...",
     labels={},
     description="...",
@@ -451,7 +443,6 @@ organization = client.organizations.update(OrganizationInput(
 ```java
 Organization organization = client.organizations().update(OrganizationInput.builder()
     .name("my-organization")
-    .org("acme")
     .slug("...")
     .labels(Map.of())
     .description("...")
@@ -472,7 +463,7 @@ Organization organization = client.organizations().update(OrganizationInput.buil
 
 ### delete
 
-Delete an organization. Its slug stays reserved: no organization can be created with it again.
+Delete an organization. Its slug is released once the organization is gone: a later organization may take it, and sees nothing the deleted one owned, because every resource names its organization by id.
 
 A server that holds one organization (GetServerInfoOutput.single_org's composition) refuses to delete it with FAILED_PRECONDITION carrying a google.rpc.ErrorInfo detail (domain "stigmer.ai"), before anything is written:
 
@@ -509,6 +500,51 @@ Organization organization = client.organizations().delete(id);
 
 **Returns**: [`Organization`](#organization)
 
+### rename
+
+Rename an organization: change its slug, the name people type.
+
+Nothing the organization owns moves, because every resource names it by id. The old slug keeps resolving to the organization for 30 days, during which no other organization can take it and this one can take it back; then it is released. A slug another organization holds is refused with ALREADY_EXISTS, and one another organization was recently renamed away from with ORGANIZATION_SLUG_RESERVED (see create).
+
+<SDKTabs>
+<Tab value="TypeScript">
+```typescript
+const organization = await stigmer.organization.rename({
+  resourceId: "...",
+  slug: "...",
+});
+```
+</Tab>
+<Tab value="Go">
+```go
+organization, err := client.Organization.Rename(ctx, &stigmer.RenameInput{
+  ResourceId: "...",
+  Slug:       "...",
+})
+```
+</Tab>
+<Tab value="Python">
+```python
+organization = client.organizations.rename(RenameInput(
+    resource_id="...",
+    slug="...",
+))
+```
+</Tab>
+<Tab value="Java">
+```java
+Organization organization = client.organizations().rename(RenameInput.builder()
+    .resourceId("...")
+    .slug("...")
+    .build());
+```
+</Tab>
+</SDKTabs>
+
+**Parameters**: [`RenameInput`](#renameinput)
+
+**Returns**: [`Organization`](#organization)
+
 ## Types
 
 ### OrganizationInput
@@ -519,7 +555,6 @@ Input for creating or updating an Organization.
   type={{
     name: { type: "string", description: "Resource name.", required: true },
     slug: { type: "string", description: "URL-friendly identifier." },
-    org: { type: "string", description: "Organization slug.", required: true },
     labels: { type: "Record<string, string>", description: "Key-value labels." },
     description: { type: "string", description: "Human-readable description of the organization." },
     logoUrl: { type: "string", description: "Public URL for the organization logo." },
@@ -537,7 +572,7 @@ Generic reference to any API resource by org and slug.
 
 <TypeTable
   type={{
-    org: { type: "string", description: "Organization that owns the referenced resource." },
+    org: { type: "string", description: "Organization that owns the referenced resource, by slug or id." },
     kind: { type: "ApiResourceKind", description: "Kind of the referenced resource (e.g., SKILL, AGENT, MCP_SERVER).", typeDescriptionLink: "/docs/sdk/resources/commons#apiresourcekind" },
     slug: { type: "string", description: "Resource slug (user-friendly identifier, unique within org).", required: true },
     version: { type: "string", description: "Version of the resource (optional, only applicable to versioned resources like Skills)." },
@@ -555,13 +590,24 @@ OrganizationPreferences holds organization-declared defaults that apply to every
   }}
 />
 
+### RenameInput
+
+Input for renaming any API resource: changing its slug.
+
+<TypeTable
+  type={{
+    resourceId: { type: "string", description: "ID of the resource being renamed.", required: true },
+    slug: { type: "string", description: "The new slug.", required: true },
+  }}
+/>
+
 ### FindApiResourcesRequest
 
 Input for find (list) operations with pagination.
 
 <TypeTable
   type={{
-    org: { type: "string", description: "Organization ID to filter by.", required: true },
+    org: { type: "string", description: "Organization to filter by, by id or slug.", required: true },
     kind: { type: "string", description: "API resource kind (optional filter)." },
     page: { type: "PageInfoInput", description: "Pagination info." },
     pageNumber: { type: "number", description: "Page number (1-indexed) - deprecated, use page.num." },

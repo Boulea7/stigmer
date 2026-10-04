@@ -12,11 +12,11 @@ import {
   createScheduleColumns,
   createScheduleListFn,
   useStigmer,
-  useActiveOrgSlug,
+  useActiveOrgId,
 } from "@stigmer/react";
 
 export function ScheduleListPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const stigmer = useStigmer();
   const { navigateToDetail } = useLibraryNavigation();
 

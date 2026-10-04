@@ -43,6 +43,8 @@ vi.mock("@stigmer/react", async () => {
       return null;
     },
     useActiveOrgId: () => "org_acme",
+    // The person's organizations: org_acme reads "acme" in a URL.
+    useOrgSlugForId: () => (id: string) => (id === "org_acme" ? "acme" : id),
     useResolveAgentExecutionSession: (id: string | null) => {
       page.resolving.push(id);
       return { sessionId: id ? page.sessionFor.get(id) : undefined, isLoading: false };

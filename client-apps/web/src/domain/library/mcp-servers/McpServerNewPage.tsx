@@ -7,7 +7,8 @@ import {
   CreationPicker,
   ApplyManifestDialog,
   MCP_SERVER_TEMPLATES,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  useOrgSlugForId,
   useBreadcrumbOverride,
 } from "@stigmer/react";
 import type { CreationPath } from "@stigmer/react";
@@ -29,7 +30,8 @@ type PageState =
  * with optional pre-filled data. Import opens the `ApplyManifestDialog`.
  */
 export function McpServerNewPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const router = useRouter();
   const { setLabel } = useBreadcrumbOverride();
 
@@ -59,9 +61,9 @@ export function McpServerNewPage() {
 
   const handleWizardComplete = useCallback(
     (result: { org: string; slug: string }) => {
-      router.push(`/library/mcp-servers/${result.org}/${result.slug}`);
+      router.push(`/library/mcp-servers/${slugForOrg(result.org)}/${result.slug}`);
     },
-    [router],
+    [router, slugForOrg],
   );
 
   const handleCancel = useCallback(() => {
