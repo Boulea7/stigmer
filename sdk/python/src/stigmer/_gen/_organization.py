@@ -82,10 +82,10 @@ class OrganizationClient:
 
 @dataclass
 class OrganizationInput:
-    """Input for creating or updating a Organization."""
+    """Input for creating or updating an Organization."""
 
     name: str
-    # Always empty: a Organization belongs to no organization.
+    # Always empty: an Organization belongs to no organization.
     org: str = ""
     id: str | None = None
     slug: str | None = None

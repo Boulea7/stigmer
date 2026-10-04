@@ -1,7 +1,8 @@
 /**
  * SkillPicker shows each search result's organization by its slug, while a
- * picked reference keeps the id the result's org is stored by. The search
- * hook is stubbed; the organization list is the mounted OrgProvider's.
+ * picked reference keeps the id the result's org is stored by, and a skill
+ * already selected by its org's slug is not offered again by its id. The
+ * search hook is stubbed; the organization list is the mounted OrgProvider's.
  */
 import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
@@ -55,5 +56,19 @@ describe("SkillPicker organizations", () => {
     expect(onChange).toHaveBeenCalledWith([
       { org: GLOBEX_ID, slug: "triage-guide", kind: ApiResourceKind.skill },
     ]);
+  });
+
+  it("does not offer a skill already selected by its org's slug", async () => {
+    render(
+      <SkillPicker
+        org={GLOBEX_ID}
+        value={[{ org: "globex", slug: "triage-guide", kind: ApiResourceKind.skill }]}
+        onChange={vi.fn()}
+      />,
+      { wrapper: orgWrapper({}, undefined, true) },
+    );
+
+    expect(await screen.findByText("Selected")).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /Triage guide/ })).toBeNull();
   });
 });

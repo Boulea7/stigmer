@@ -16,7 +16,7 @@ import { useExecutionTarget } from "../execution-target-context.js";
 
 /** Shared fields present in both variants of {@link CreateSessionInput}. */
 export interface SharedSessionFields {
-  /** Organization slug for the new session. */
+  /** Organization id for the new session (a slug is also accepted). */
   readonly org: string;
   /** Workspace source entries to attach to the session. */
   readonly workspaceEntries?: WorkspaceEntryInput[];

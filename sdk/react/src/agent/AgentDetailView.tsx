@@ -47,7 +47,7 @@ const DEPENDENCIES_TAB: TabItem = { id: "dependencies", label: "Dependencies" };
 
 /** Props for {@link AgentDetailView}. */
 export interface AgentDetailViewProps {
-  /** Organization slug that owns the agent. */
+  /** Id of the organization that owns the agent (a slug is also accepted). */
   readonly org: string;
   /** Agent slug (URL-friendly identifier unique within the org). */
   readonly slug: string;

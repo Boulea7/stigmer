@@ -13,7 +13,7 @@ import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 
 /** Props for {@link CreateEnvironmentForm}. */
 export interface CreateEnvironmentFormProps {
-  /** Organization slug. Used as the `org` field when creating the environment. */
+  /** Organization id (a slug is also accepted). Used as the `org` field when creating the environment. */
   readonly org: string;
   /** Fired with the newly created environment after a successful creation. */
   readonly onCreated?: (env: Environment) => void;

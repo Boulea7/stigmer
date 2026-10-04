@@ -146,7 +146,7 @@ export interface SessionViewerProps {
   /** Session ID to load and display. */
   readonly sessionId: string;
   /**
-   * Organization slug to act in until the session has loaded. After that
+   * Organization id to act in until the session has loaded (a slug is also accepted). After that
    * the viewer acts in the session's own organization (`session.metadata.org`),
    * whatever this prop says: a turn in a session belongs to that session's
    * organization.

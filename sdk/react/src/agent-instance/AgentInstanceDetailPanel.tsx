@@ -21,7 +21,7 @@ import { useEnvironmentList } from "../environment/useEnvironmentList.js";
 export interface AgentInstanceDetailPanelProps {
   /** The instance to display. */
   readonly instance: AgentInstance;
-  /** Organization slug. */
+  /** Organization id (a slug is also accepted). */
   readonly org: string;
   /** Called when the panel should close. */
   readonly onClose: () => void;

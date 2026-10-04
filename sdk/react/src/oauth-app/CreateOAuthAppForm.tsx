@@ -17,7 +17,7 @@ import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 
 /** Props for {@link CreateOAuthAppForm}. */
 export interface CreateOAuthAppFormProps {
-  /** Organization slug — the OAuth app will be created in this org. */
+  /** Organization id — the OAuth app will be created in this org (a slug is also accepted). */
   readonly org: string;
   /** Fired with the newly created OAuth app on success. */
   readonly onCreated?: (app: OAuthApp) => void;

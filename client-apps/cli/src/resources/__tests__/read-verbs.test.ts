@@ -4,7 +4,8 @@
 // CLI calls, points an SDK node client at it, and drives the resource layer
 // (fetchResource / listResources) end to end. Asserts the rendered JSON matches
 // the backend's protojson (the parity contract) and that backend RPC errors map
-// to the right CLI exit code via classify().
+// to the right CLI exit code via classify(). Resources carry their organization
+// by id, as the server stores it; the human tables name it by slug.
 
 import { create, toJson } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -41,30 +42,35 @@ import { fetchResource } from "../get.js";
 import { listResources } from "../list.js";
 import { renderResource } from "../render.js";
 
+// The organization every fixture belongs to: filed under a minted id, named acme.
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+// An organization the caller cannot see, which output names as given.
+const HIDDEN_ORG_ID = "org_01jccccccccccccccccccccccc";
+
 const knownAgent = create(AgentSchema, {
   apiVersion: "agentic.stigmer.ai/v1",
   kind: "Agent",
-  metadata: { name: "Reviewer", slug: "reviewer", org: "acme", id: "agt_1" },
+  metadata: { name: "Reviewer", slug: "reviewer", org: ACME_ID, id: "agt_1" },
   spec: { description: "reviews code" },
 });
 
 const knownInstance = create(AgentInstanceSchema, {
   apiVersion: "agentic.stigmer.ai/v1",
   kind: "AgentInstance",
-  metadata: { name: "reviewer-default", slug: "reviewer-default", org: "acme", id: "ain_1" },
+  metadata: { name: "reviewer-default", slug: "reviewer-default", org: ACME_ID, id: "ain_1" },
   spec: { agentId: "agt_1", description: "Default instance (auto-created, no custom configuration)" },
 });
 
 const knownOrg = create(OrganizationSchema, {
   apiVersion: "tenancy.stigmer.ai/v1",
   kind: "Organization",
-  metadata: { name: "Acme", slug: "acme", org: "acme", id: "acme" },
+  metadata: { name: "Acme", slug: "acme", org: ACME_ID, id: ACME_ID },
 });
 
 const knownApiKey = create(ApiKeySchema, {
   apiVersion: "iam.stigmer.ai/v1",
   kind: "ApiKey",
-  metadata: { name: "ci", org: "acme", id: "key_1" },
+  metadata: { name: "ci", org: ACME_ID, id: "key_1" },
   spec: { fingerprint: "abcd", neverExpires: true },
 });
 
@@ -89,7 +95,7 @@ const secondOrg = create(OrganizationSchema, {
 const secondApiKey = create(ApiKeySchema, {
   apiVersion: "iam.stigmer.ai/v1",
   kind: "ApiKey",
-  metadata: { name: "local-dev", org: "acme", id: "key_2" },
+  metadata: { name: "local-dev", org: ACME_ID, id: "key_2" },
   spec: { fingerprint: "ef01", neverExpires: true },
 });
 
@@ -98,9 +104,31 @@ const knownSearchResult = create(SearchResultSchema, {
   id: "agt_1",
   name: "Reviewer",
   slug: "reviewer",
-  qualifiedSlug: "acme/reviewer",
-  org: "acme",
+  qualifiedSlug: `${ACME_ID}/reviewer`,
+  org: ACME_ID,
   description: "reviews code",
+});
+
+// A result in an organization the caller cannot see, and one whose qualified
+// slug does not lead with its org: both print as the server gave them.
+const hiddenSearchResult = create(SearchResultSchema, {
+  kind: ApiResourceKind.agent,
+  id: "agt_2",
+  name: "Linter",
+  slug: "linter",
+  qualifiedSlug: `${HIDDEN_ORG_ID}/linter`,
+  org: HIDDEN_ORG_ID,
+  description: "lints code",
+});
+
+const unqualifiedSearchResult = create(SearchResultSchema, {
+  kind: ApiResourceKind.agent,
+  id: "agt_3",
+  name: "Formatter",
+  slug: "formatter",
+  qualifiedSlug: "formatter",
+  org: ACME_ID,
+  description: "formats code",
 });
 
 // Three more kinds — wired into get-bindings and list alongside
@@ -109,7 +137,7 @@ const knownSearchResult = create(SearchResultSchema, {
 const knownEnvironment = create(EnvironmentSchema, {
   apiVersion: "agentic.stigmer.ai/v1",
   kind: "Environment",
-  metadata: { name: "clinic-patient-db", slug: "clinic-patient-db", org: "acme", id: "env_1" },
+  metadata: { name: "clinic-patient-db", slug: "clinic-patient-db", org: ACME_ID, id: "env_1" },
 });
 
 const knownEnvironmentSearchResult = create(SearchResultSchema, {
@@ -117,8 +145,8 @@ const knownEnvironmentSearchResult = create(SearchResultSchema, {
   id: "env_1",
   name: "clinic-patient-db",
   slug: "clinic-patient-db",
-  qualifiedSlug: "acme/clinic-patient-db",
-  org: "acme",
+  qualifiedSlug: `${ACME_ID}/clinic-patient-db`,
+  org: ACME_ID,
   description: "clinic patient database credentials",
 });
 
@@ -127,10 +155,10 @@ const knownEnvironmentSearchResult = create(SearchResultSchema, {
 const knownChannel = create(AgentChannelSchema, {
   apiVersion: "agentic.stigmer.ai/v1",
   kind: "AgentChannel",
-  metadata: { name: "clinic-patient-whatsapp", slug: "clinic-patient-whatsapp", org: "acme", id: "ach_1" },
+  metadata: { name: "clinic-patient-whatsapp", slug: "clinic-patient-whatsapp", org: ACME_ID, id: "ach_1" },
   spec: {
     enabled: true,
-    agentRef: { kind: ApiResourceKind.agent, org: "acme", slug: "clinic-assistant" },
+    agentRef: { kind: ApiResourceKind.agent, org: ACME_ID, slug: "clinic-assistant" },
     providerConfig: { case: "whatsapp", value: { phoneNumberId: "106540352242922" } },
   },
   status: { installState: AgentChannelInstallState.installed },
@@ -141,7 +169,7 @@ const knownChannel = create(AgentChannelSchema, {
 const knownChannelApp = create(ChannelAppSchema, {
   apiVersion: "agentic.stigmer.ai/v1",
   kind: "ChannelApp",
-  metadata: { name: "clinic-meta-app", slug: "clinic-meta-app", org: "acme", id: "chapp_1" },
+  metadata: { name: "clinic-meta-app", slug: "clinic-meta-app", org: ACME_ID, id: "chapp_1" },
   spec: {
     providerConfig: {
       case: "whatsapp",
@@ -161,7 +189,7 @@ const knownChannelApp = create(ChannelAppSchema, {
 const secondChannelApp = create(ChannelAppSchema, {
   apiVersion: "agentic.stigmer.ai/v1",
   kind: "ChannelApp",
-  metadata: { name: "clinic-slack-app", slug: "clinic-slack-app", org: "acme", id: "chapp_2" },
+  metadata: { name: "clinic-slack-app", slug: "clinic-slack-app", org: ACME_ID, id: "chapp_2" },
   spec: {
     providerConfig: {
       case: "slack",
@@ -178,14 +206,14 @@ const secondChannelApp = create(ChannelAppSchema, {
 const pausedSchedule = create(ScheduleSchema, {
   apiVersion: "agentic.stigmer.ai/v1",
   kind: "Schedule",
-  metadata: { name: "daily-fee-reminders", slug: "daily-fee-reminders", org: "acme", id: "sch_1" },
+  metadata: { name: "daily-fee-reminders", slug: "daily-fee-reminders", org: ACME_ID, id: "sch_1" },
   spec: {
     cron: "0 9 * * *",
     timeZone: "Asia/Kolkata",
     enabled: true,
     target: {
       case: "agent",
-      value: { agentRef: { kind: ApiResourceKind.agent, org: "acme", slug: "clinic-assistant" } },
+      value: { agentRef: { kind: ApiResourceKind.agent, org: ACME_ID, slug: "clinic-assistant" } },
     },
   },
   status: { pausedReason: "5 consecutive failed runs", consecutiveFailures: 5 },
@@ -196,20 +224,22 @@ const pausedSchedule = create(ScheduleSchema, {
 const disabledSchedule = create(ScheduleSchema, {
   apiVersion: "agentic.stigmer.ai/v1",
   kind: "Schedule",
-  metadata: { name: "weekly-digest", slug: "weekly-digest", org: "acme", id: "sch_2" },
+  metadata: { name: "weekly-digest", slug: "weekly-digest", org: ACME_ID, id: "sch_2" },
   spec: {
     cron: "30 6 * * 1",
     timeZone: "UTC",
     enabled: false,
     target: {
       case: "agent",
-      value: { agentRef: { kind: ApiResourceKind.agent, org: "acme", slug: "reviewer" } },
+      value: { agentRef: { kind: ApiResourceKind.agent, org: ACME_ID, slug: "reviewer" } },
     },
   },
 });
 
 let backend: Http2Server;
 let client: Stigmer;
+// Every value the organization get was asked for, so a test can count lookups.
+const orgGets: string[] = [];
 const openSessions = new Set<ServerHttp2Session>();
 
 beforeAll(async () => {
@@ -245,13 +275,19 @@ beforeAll(async () => {
         if (req.kinds.length === 1 && req.kinds[0] === ApiResourceKind.environment) {
           return { entries: [knownEnvironmentSearchResult], totalCount: 1, totalPages: 1 };
         }
-        return { entries: [knownSearchResult], totalCount: 1, totalPages: 1 };
+        return {
+          entries: [knownSearchResult, hiddenSearchResult, unqualifiedSearchResult],
+          totalCount: 3,
+          totalPages: 1,
+        };
       },
     });
     router.service(OrganizationQueryController, {
       findMyOrganizations: () => ({ entries: [knownOrg, secondOrg] }),
       // The server resolves an earlier slug and an id to the organization.
       get: (req) => {
+        orgGets.push(req.value);
+        if (req.value === ACME_ID || req.value === "acme") return knownOrg;
         if (req.value !== "globex-old" && req.value !== renamedOrg.metadata?.id) {
           throw new ConnectError("organization not found", Code.NotFound);
         }
@@ -494,9 +530,15 @@ describe("get integration", () => {
 });
 
 describe("list integration", () => {
-  it("lists agents via the search service as JSON", async () => {
+  it("lists agents via the search service as JSON, the organization ids as the wire carries them", async () => {
+    orgGets.length = 0;
     const out = await listResources(client, ApiResourceKind.agent, "acme", 50, "json");
-    expect(JSON.parse(out)).toEqual([toJson(SearchResultSchema, knownSearchResult, { useProtoFieldName: true })]);
+    expect(JSON.parse(out)).toEqual(
+      [knownSearchResult, hiddenSearchResult, unqualifiedSearchResult].map((entry) =>
+        toJson(SearchResultSchema, entry, { useProtoFieldName: true }),
+      ),
+    );
+    expect(orgGets).toEqual([]);
   });
 
   it("lists organizations via findMyOrganizations as JSON", async () => {
@@ -525,10 +567,17 @@ describe("list integration", () => {
     expect(JSON.parse(out)).toEqual([toJson(ApiKeySchema, knownApiKey, { useProtoFieldName: true })]);
   });
 
-  it("renders a human table for search-backed lists", async () => {
+  it("renders a human table for search-backed lists, naming each organization by slug once", async () => {
+    orgGets.length = 0;
     const out = await listResources(client, ApiResourceKind.agent, "acme", 50, "table");
     expect(out).toContain("NAME");
     expect(out).toContain("acme/reviewer");
+    expect(out).not.toContain(`${ACME_ID}/reviewer`);
+    // One the caller cannot see, and one not led by its org, print as given.
+    expect(out).toContain(`${HIDDEN_ORG_ID}/linter`);
+    expect(out.split("\n").find((line) => line.includes("formats code"))).toMatch(/^formatter\s/);
+    // Two rows name acme: one lookup per distinct organization, never per row.
+    expect([...orgGets].sort()).toEqual([ACME_ID, HIDDEN_ORG_ID]);
   });
 
   it("lists agent instances via the dedicated list RPC as JSON", async () => {
@@ -566,7 +615,8 @@ describe("list integration", () => {
     expect(out).toContain("PROVIDER");
     expect(out).toContain("STATE");
     expect(out).toContain("ENABLED");
-    expect(out).toContain("acme/clinic-assistant"); // agent_ref as org/slug
+    expect(out).toContain("acme/clinic-assistant"); // agent_ref as org/slug, the org by slug
+    expect(out).not.toContain(ACME_ID);
     expect(out).toContain("whatsapp"); // derived from the provider oneof
     expect(out).toContain("installed"); // status.install_state
     expect(out).toContain("true"); // spec.enabled
@@ -596,7 +646,11 @@ describe("list integration", () => {
   });
 
   it("lists schedules as a table keeping the owner switch and the platform latch distinct", async () => {
+    orgGets.length = 0;
     const out = await listResources(client, ApiResourceKind.schedule, "acme", 50, "table");
+    // Both targets name acme by id: one lookup, and the table prints the slug.
+    expect(orgGets).toEqual([ACME_ID]);
+    expect(out).not.toContain(ACME_ID);
     for (const header of ["ID", "SLUG", "TARGET", "CRON", "TZ", "ENABLED", "STATE"]) {
       expect(out).toContain(header);
     }
@@ -612,6 +666,7 @@ describe("list integration", () => {
     // Owner-disabled with an empty status: derived state is "active" (no
     // platform latch), and the absent timestamps render nothing bogus.
     const disabledRow = rows.find((line) => line.includes("sch_2"));
+    expect(disabledRow).toContain("acme/reviewer");
     expect(disabledRow).toContain("false");
     expect(disabledRow).toContain("active");
     expect(disabledRow).not.toContain("paused");

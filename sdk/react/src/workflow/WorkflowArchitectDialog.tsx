@@ -17,11 +17,11 @@ export interface WorkflowArchitectDialogProps {
   readonly open: boolean;
   /** Called when the dialog should close (cancel, backdrop click, Escape). */
   readonly onOpenChange: (open: boolean) => void;
-  /** Organization slug for generation context and workflow creation. */
+  /** Organization id for generation context and workflow creation (a slug is also accepted). */
   readonly org: string;
   /**
    * Called after the workflow is created successfully.
-   * Receives the org slug and workflow slug for navigation.
+   * Receives the workflow's organization id (as stored) and its slug for navigation.
    */
   readonly onSuccess: (org: string, slug: string) => void;
   /**

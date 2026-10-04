@@ -4,8 +4,10 @@
 // manifest declares a different level the core lands it through
 // updateVisibility (or warns when the kind has no such door), and when an
 // organization manifest carries its id and a different slug, through rename.
+// Visibility lands first, so a refused rename reports what landed with it.
 // And the org-mismatch warning: an organization is named by id or slug, so
-// two different strings are asked about before they are called different.
+// two different strings are asked about before they are called different,
+// and the warning names each by slug.
 // And the Organization handler's rename binding, which the follow-up drives.
 
 import { create, type Message } from "@bufbuild/protobuf";
@@ -184,11 +186,55 @@ describe("applyMessage declared-slug follow-up", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("fails loudly when the rename is refused, naming the partial state", async () => {
+  it("fails loudly when the rename is refused, naming the partial state and how to finish", async () => {
     const { handler } = organizationHandler(organization("acme"), () => Promise.reject(new Error("the slug is taken")));
 
     await expect(applyMessage(controller, handler, organization("taken"), "", false)).rejects.toThrow(
-      /spec applied, but the manifest's slug change was rejected: the slug is taken/,
+      /Organization spec applied, but the manifest's slug change was rejected: the slug is taken\. The slug stays 'acme'; choose another slug and apply again\./,
+    );
+  });
+
+  it("lands a declared visibility before a refused rename, and the refusal says both landed", async () => {
+    const visibilityCalls: UpdateVisibilityInput[] = [];
+    const renameCalls: RenameInput[] = [];
+    const stored = create(AgentSchema, {
+      metadata: { id: "agent-1", slug: "reviewer", org: "acme", visibility: ApiResourceVisibility.visibility_org },
+    });
+    const handler: ApplyHandler = {
+      kind: ApiResourceKind.agent,
+      displayName: "Agent",
+      schema: AgentSchema,
+      applyOrder: 3,
+      apply: () => Promise.resolve(stored),
+      updateVisibility: (_c, input) => {
+        visibilityCalls.push(input);
+        return Promise.resolve(agent(ApiResourceVisibility.visibility_platform));
+      },
+      rename: (_c, input) => {
+        renameCalls.push(input);
+        return Promise.reject(new Error("the slug is taken"));
+      },
+    };
+    const manifest = create(AgentSchema, {
+      metadata: { id: "agent-1", slug: "taken", org: "acme", visibility: ApiResourceVisibility.visibility_platform },
+    });
+
+    await expect(applyMessage(controller, handler, manifest, "acme", false)).rejects.toThrow(
+      /Agent spec and visibility applied, but the manifest's slug change was rejected: the slug is taken\. The slug stays 'reviewer'; choose another slug and apply again\./,
+    );
+    expect(visibilityCalls).toHaveLength(1);
+    expect(visibilityCalls[0].visibility).toBe(ApiResourceVisibility.visibility_platform);
+    expect(renameCalls).toHaveLength(1);
+  });
+
+  it("carries the visibility warning into a refused rename for a kind without the visibility door", async () => {
+    const { handler } = organizationHandler(organization("acme"), () => Promise.reject(new Error("the slug is taken")));
+    const manifest = create(OrganizationSchema, {
+      metadata: { id: ACME_ID, name: "Acme", slug: "taken", visibility: ApiResourceVisibility.visibility_platform },
+    });
+
+    await expect(applyMessage(controller, handler, manifest, "", false)).rejects.toThrow(
+      /Organization spec applied \(Organization visibility cannot be changed declaratively.*\), but the manifest's slug change was rejected/,
     );
   });
 });
@@ -259,6 +305,23 @@ describe("applyMessage org-mismatch warning", () => {
       true,
     );
     expect(outcome.warning).toMatch(/resource org 'acme' differs from target org 'hidden'; using 'acme'/);
+  });
+
+  it("names both organizations by slug where the manifest and the target give ids", async () => {
+    const GLOBEX_ID = "org_01jbbbbbbbbbbbbbbbbbbbbbbb";
+    const slugs: Record<string, string> = { [ACME_ID]: "acme", [GLOBEX_ID]: "globex" };
+    const answering = (() => ({
+      get: ({ value }: { value: string }) =>
+        slugs[value] === undefined
+          ? Promise.reject(new Error("not found"))
+          : Promise.resolve(organization(slugs[value], value)),
+    })) as unknown as ControllerFn;
+    const { handler } = handlerWith({ applyReturns: agent(ApiResourceVisibility.visibility_org) });
+    const manifest = create(AgentSchema, { metadata: { id: "agent-1", name: "a", org: ACME_ID } });
+
+    const outcome = await applyMessage(answering, handler, manifest, GLOBEX_ID, true);
+
+    expect(outcome.warning).toBe("resource org 'acme' differs from target org 'globex'; using 'acme'");
   });
 });
 

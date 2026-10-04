@@ -60,7 +60,7 @@ export class InvitationClient {
   }
 }
 
-/** Input for creating/updating a Invitation. */
+/** Input for creating/updating an Invitation. */
 export interface InvitationInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

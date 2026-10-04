@@ -26,7 +26,7 @@ import type { SessionRunConfig } from "./run-config.js";
 
 /** Props for {@link NewSessionViewer}. */
 export interface NewSessionViewerProps {
-  /** Organization slug. Required for session creation. */
+  /** Organization id (a slug is also accepted). Required for session creation. */
   readonly org: string;
   /** Called after the session and first execution are created. */
   readonly onSessionCreated: (sessionId: string) => void;

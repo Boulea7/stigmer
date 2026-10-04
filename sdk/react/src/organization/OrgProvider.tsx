@@ -46,10 +46,13 @@ const STORAGE_KEY = "stigmer:activeOrg";
 // id persisted removes it.
 const LEGACY_SLUG_STORAGE_KEY = "stigmer:activeOrgSlug";
 
-/** The remembered org: its id, or the slug an earlier release remembered. */
+/**
+ * The remembered org: its id, or the slug an earlier release remembered.
+ * An empty value remembers nothing, so it falls through like an absent one.
+ */
 function readPersistedOrgRef(): string | null {
   try {
-    return localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_SLUG_STORAGE_KEY);
+    return localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_SLUG_STORAGE_KEY);
   } catch {
     return null;
   }

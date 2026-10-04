@@ -14,7 +14,7 @@ export interface UseSessionListOptions {
   /** Optional tag filter. */
   tags?: string[];
   /**
-   * Organization slug to list the sessions of. When omitted, the list spans
+   * Organization id to list the sessions of (a slug is also accepted). When omitted, the list spans
    * every organization the caller can view. Console pages should pass the
    * active org (`useActiveOrgId()`).
    */

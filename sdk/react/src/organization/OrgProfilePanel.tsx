@@ -7,6 +7,7 @@ import type { Organization } from "@stigmer/protos/ai/stigmer/tenancy/organizati
 import { useOrganization } from "./useOrganization.js";
 import { useUpdateOrganization } from "./useUpdateOrganization.js";
 import { useRenameOrganization } from "./useRenameOrganization.js";
+import { useOptionalOrg } from "./OrgProvider.js";
 import { useSingleOrg } from "../server-info.js";
 import { useIdentityProviderList } from "../identity-provider/useIdentityProviderList.js";
 import { IDENTITY_PROVIDERS_MANAGED_BY_ADMINS } from "../identity-provider/copy.js";
@@ -47,6 +48,9 @@ export interface OrgProfilePanelProps {
  * The organization's owners (`can_delete` on it) can also rename it: the
  * slug becomes an editable field whose Rename action calls
  * `organization.rename()` and fires `onUpdated` with the renamed resource.
+ * Inside an {@link OrgProvider}, a rename also refreshes the provider's
+ * organizations, so every slug it shows follows, and the active
+ * organization stays selected.
  * The field is never shown on a server that holds one organization, where
  * the organization is not named anywhere.
  *
@@ -74,6 +78,7 @@ export function OrgProfilePanel({
     error: fetchError,
     refetch,
   } = useOrganization(org || null);
+  const orgContext = useOptionalOrg();
 
   const {
     update,
@@ -230,6 +235,9 @@ export function OrgProfilePanel({
             currentSlug={serverSlug}
             onRenamed={(renamed) => {
               refetch();
+              // Re-selecting the active org by its id, which a rename leaves
+              // alone, so renaming another organization switches nothing.
+              orgContext?.refresh(orgContext.activeOrg?.metadata?.id);
               onUpdated?.(renamed);
             }}
           />

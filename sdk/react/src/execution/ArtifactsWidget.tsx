@@ -25,7 +25,7 @@ export interface ArtifactsWidgetProps {
    * artifacts.
    */
   readonly executions: readonly AgentExecution[];
-  /** Organization slug for the "Apply to [org]" CTA in the preview modal. */
+  /** Organization id for the "Apply to [org]" CTA in the preview modal (a slug is also accepted). */
   readonly org: string;
   /**
    * Called after a resource is successfully applied or a skill package

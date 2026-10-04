@@ -66,7 +66,7 @@ export class ExecutionContextClient {
   }
 }
 
-/** Input for creating/updating a ExecutionContext. */
+/** Input for creating/updating an ExecutionContext. */
 export interface ExecutionContextInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

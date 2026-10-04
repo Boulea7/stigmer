@@ -32,7 +32,7 @@ export interface UseOrgInvitationsReturn {
  * Requires `can_view_access` permission on the organization —
  * only admins and owners can list invitation links.
  *
- * @param org - Organization slug, or `null` to skip fetching.
+ * @param org - Organization id (a slug is also accepted), or `null` to skip fetching.
  *
  * @example
  * ```tsx

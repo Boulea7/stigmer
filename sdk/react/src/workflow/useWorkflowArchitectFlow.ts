@@ -40,11 +40,11 @@ export type ArchitectPhase =
 
 /** Options for {@link useWorkflowArchitectFlow}. */
 export interface UseWorkflowArchitectFlowOptions {
-  /** Organization slug — used for session, execution, and workflow creation. */
+  /** Organization id — used for session, execution, and workflow creation (a slug is also accepted). */
   readonly org: string;
   /**
    * Called after the workflow is created successfully.
-   * Receives the org slug and workflow slug for navigation.
+   * Receives the workflow's organization id (as stored) and its slug for navigation.
    */
   readonly onSuccess: (org: string, slug: string) => void;
   /**

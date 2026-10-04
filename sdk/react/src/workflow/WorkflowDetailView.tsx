@@ -44,7 +44,7 @@ const DESCRIPTION_COLLAPSED_HEIGHT = "8rem";
 
 /** Props for {@link WorkflowDetailView}. */
 export interface WorkflowDetailViewProps {
-  /** Organization slug that owns the workflow. */
+  /** Id of the organization that owns the workflow (a slug is also accepted). */
   readonly org: string;
   /** Workflow slug (URL-friendly identifier unique within the org). */
   readonly slug: string;
@@ -77,7 +77,7 @@ export interface WorkflowDetailViewProps {
    */
   readonly onExecutionClick?: (executionId: string) => void;
   /**
-   * The viewer's active organization slug, feeding the Instances tab:
+   * The viewer's active organization id (a slug is also accepted), feeding the Instances tab:
    * it scopes the list to this org's instances of the workflow, so a
    * member of several orgs sees the current org context only. Omit to
    * default to the workflow's own org.

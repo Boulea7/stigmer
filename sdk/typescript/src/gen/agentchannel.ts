@@ -174,7 +174,7 @@ export class AgentChannelClient {
   }
 }
 
-/** Input for creating/updating a AgentChannel. */
+/** Input for creating/updating an AgentChannel. */
 export interface AgentChannelInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

@@ -11,7 +11,7 @@ import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 
 /** Props for {@link CreatePlatformClientForm}. */
 export interface CreatePlatformClientFormProps {
-  /** Organization slug — the PlatformClient will be created in this org. */
+  /** Organization id — the PlatformClient will be created in this org (a slug is also accepted). */
   readonly org: string;
   /**
    * Fired with the full {@link PlatformClientCreateResponse} on

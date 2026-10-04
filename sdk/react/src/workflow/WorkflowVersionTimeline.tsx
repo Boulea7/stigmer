@@ -13,7 +13,7 @@ import { LoadingRegion } from "../internal/LoadingRegion.js";
 export interface WorkflowVersionTimelineProps {
   /** Workflow resource ID (used for keying, not fetching). */
   readonly workflowId: string;
-  /** Organization slug for fetching versions. */
+  /** Organization id for fetching versions (a slug is also accepted). */
   readonly org: string;
   /** Workflow slug for fetching versions. */
   readonly slug: string;

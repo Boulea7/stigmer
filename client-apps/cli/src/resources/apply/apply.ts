@@ -144,8 +144,11 @@ export async function applyMessage(
   }
 
   const applied = await handler.apply(controller, message);
-  await applyDeclaredSlug(controller, handler, message, applied);
+  // Visibility lands before the slug: a refused rename stops the command,
+  // so everything else the manifest asked for has landed by then, and the
+  // refusal reports it.
   const visibilityWarning = await applyDeclaredVisibility(controller, handler, message, applied);
+  await applyDeclaredSlug(controller, handler, message, applied, visibilityWarning);
   const warning = combineWarnings(orgWarning, visibilityWarning);
   const result = buildApplyResult(handler, applied, created);
   if (handler.kind === ApiResourceKind.mcp_server) {
@@ -215,13 +218,16 @@ async function applyDeclaredVisibility(
  * followed up. Only kinds with the RPC are driven, and only when the
  * manifest names the id: without it the slug is how apply finds the
  * resource, so a new slug means a new resource. A refusal (the slug is
- * taken) fails the command after the spec has landed, and the error says so.
+ * taken) fails the command after the spec and any declared visibility have
+ * landed; the error says what landed, carries the visibility follow-up's
+ * warning, and says how to finish.
  */
 async function applyDeclaredSlug(
   controller: ControllerFn,
   handler: ApplyHandler,
   message: Message,
   applied: Message,
+  visibilityWarning: string | undefined,
 ): Promise<void> {
   const declared = metaOf(message);
   const appliedMeta = metaOf(applied);
@@ -242,8 +248,14 @@ async function applyDeclaredSlug(
     );
     appliedMeta.slug = metaOf(renamed)?.slug ?? declared.slug;
   } catch (err) {
+    const visibilityLanded =
+      declared.visibility !== ApiResourceVisibility.api_resource_visibility_unspecified &&
+      appliedMeta.visibility === declared.visibility;
+    const landed = visibilityLanded ? "spec and visibility" : "spec";
+    const warning = visibilityWarning === undefined ? "" : ` (${visibilityWarning})`;
     throw new UsageError(
-      `${handler.displayName} spec applied, but the manifest's slug change was rejected: ${(err as Error).message}`,
+      `${handler.displayName} ${landed} applied${warning}, but the manifest's slug change was rejected: ` +
+        `${(err as Error).message}. The slug stays '${appliedMeta.slug}'; choose another slug and apply again.`,
     );
   }
 }
@@ -266,7 +278,8 @@ function metaOf(message: Message): ApiResourceMetadata | undefined {
 // the document specifies a *different* org, return a warning (Go warns but
 // honors the document's value — we do the same). An organization is named
 // by its id or its slug, so two different strings are asked about before
-// they are called different organizations.
+// they are called different organizations, and the warning names each by
+// its slug where the caller can see it.
 async function injectOrg(
   controller: ControllerFn,
   message: Message,
@@ -282,26 +295,29 @@ async function injectOrg(
     holder.metadata.org = org;
     return undefined;
   }
-  if (
-    holder.metadata.org !== org &&
-    !(await sameOrganization(controller, holder.metadata.org, org))
-  ) {
-    return `resource org '${holder.metadata.org}' differs from target org '${org}'; using '${holder.metadata.org}'`;
-  }
-  return undefined;
+  if (holder.metadata.org === org) return undefined;
+  const [declared, target] = await Promise.all([
+    organizationNamed(controller, holder.metadata.org),
+    organizationNamed(controller, org),
+  ]);
+  if (declared !== undefined && declared.id === target?.id) return undefined;
+  const declaredLabel = declared?.slug || holder.metadata.org;
+  const targetLabel = target?.slug || org;
+  return `resource org '${declaredLabel}' differs from target org '${targetLabel}'; using '${declaredLabel}'`;
 }
 
-/** Whether two organization values (ids or slugs) name one organization, as the server resolves them. */
-async function sameOrganization(controller: ControllerFn, a: string, b: string): Promise<boolean> {
-  const idOf = async (value: string): Promise<string | undefined> => {
-    try {
-      return (await controller(OrganizationQueryController).get({ value })).metadata?.id;
-    } catch {
-      return undefined;
-    }
-  };
-  const [first, second] = await Promise.all([idOf(a), idOf(b)]);
-  return first !== undefined && first !== "" && first === second;
+/** The organization a value (id or slug) names, as the server resolves it; undefined when the caller cannot see one. */
+async function organizationNamed(
+  controller: ControllerFn,
+  value: string,
+): Promise<{ readonly id: string; readonly slug: string } | undefined> {
+  try {
+    const metadata = (await controller(OrganizationQueryController).get({ value })).metadata;
+    const id = metadata?.id ?? "";
+    return id === "" ? undefined : { id, slug: metadata?.slug ?? "" };
+  } catch {
+    return undefined;
+  }
 }
 
 function buildApplyResult(handler: ApplyHandler, applied: Message, created: boolean): CommandResult {

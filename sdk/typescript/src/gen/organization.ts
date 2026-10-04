@@ -81,7 +81,7 @@ export class OrganizationClient {
   }
 }
 
-/** Input for creating/updating a Organization. */
+/** Input for creating/updating an Organization. */
 export interface OrganizationInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set
@@ -93,7 +93,7 @@ export interface OrganizationInput {
   name: string;
   slug?: string;
   /**
-   * Always empty: a Organization belongs to no organization, so
+   * Always empty: an Organization belongs to no organization, so
    * `metadata.org` stays unset. Omit it.
    */
   org?: "";

@@ -19,7 +19,7 @@ export const TEAM_DESCRIPTION_MAX_LENGTH = 500;
 
 /** Props for {@link CreateTeamForm}. */
 export interface CreateTeamFormProps {
-  /** Organization slug the team is created in. */
+  /** Id of the organization the team is created in (a slug is also accepted). */
   readonly org: string;
   /** Fired with the created team. */
   readonly onCreated?: (team: Team) => void;

@@ -1,7 +1,8 @@
 /**
  * McpServerPicker shows each search result's organization by its slug, while
- * a picked reference keeps the id the result's org is stored by. The search
- * hook is stubbed; the organization list is the mounted OrgProvider's.
+ * a picked reference keeps the id the result's org is stored by, and a server
+ * already selected by its org's slug is not offered again by its id. The
+ * search hook is stubbed; the organization list is the mounted OrgProvider's.
  */
 import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
@@ -55,5 +56,19 @@ describe("McpServerPicker organizations", () => {
     expect(onChange).toHaveBeenCalledWith([
       { mcpServerRef: { org: GLOBEX_ID, slug: "github", kind: ApiResourceKind.mcp_server } },
     ]);
+  });
+
+  it("does not offer a server already selected by its org's slug", async () => {
+    render(
+      <McpServerPicker
+        org={GLOBEX_ID}
+        value={[{ mcpServerRef: { org: "globex", slug: "github", kind: ApiResourceKind.mcp_server } }]}
+        onChange={vi.fn()}
+      />,
+      { wrapper: orgWrapper({}, undefined, true) },
+    );
+
+    expect(await screen.findByRole("button", { name: "Remove github" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /GitHub/ })).toBeNull();
   });
 });

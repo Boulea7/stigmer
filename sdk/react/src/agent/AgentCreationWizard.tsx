@@ -17,7 +17,7 @@ import type { AgentWizardData } from "./steps/types.js";
 
 /** Result passed to `onComplete` after successful agent creation. */
 export interface AgentCreationResult {
-  /** Organization slug of the created agent. */
+  /** The created agent's organization, by the id it is stored under. */
   readonly org: string;
   /** Agent slug (for URL construction). */
   readonly slug: string;

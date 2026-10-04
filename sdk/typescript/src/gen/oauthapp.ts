@@ -72,7 +72,7 @@ export class OAuthAppClient {
   }
 }
 
-/** Input for creating/updating a OAuthApp. */
+/** Input for creating/updating an OAuthApp. */
 export interface OAuthAppInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

@@ -7,7 +7,7 @@ import { useStigmer } from "../hooks.js";
 import { useFetch } from "../internal/useFetch.js";
 
 export interface UsePendingApprovalsOptions {
-  /** Organization slug. When empty, the hook does not fetch. */
+  /** Organization id (a slug is also accepted). When empty, the hook does not fetch. */
   readonly org: string | null | undefined;
   /** Maximum results per page. @default 20 */
   readonly pageSize?: number;

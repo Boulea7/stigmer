@@ -2,7 +2,8 @@
  * OrgProfilePanel: the profile save keeps every spec field it does not
  * edit, the identity-provider summary's empty state follows the caller's
  * rights, and the slug is renamable by owners only, and never on a server
- * that holds one organization.
+ * that holds one organization. A rename inside an OrgProvider refreshes its
+ * organizations and keeps the active one selected.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -16,6 +17,7 @@ import type { OrganizationInput } from "@stigmer/sdk";
 import { StigmerContext } from "../../context";
 import { DeploymentModeContext } from "../../deployment-mode";
 import { OrgProfilePanel } from "../OrgProfilePanel";
+import { OrgProvider, useOrg } from "../OrgProvider";
 
 /**
  * Regression suite for the full-spec-replace wipe bug:
@@ -262,6 +264,83 @@ describe("OrgProfilePanel rename", () => {
 
     expect((await screen.findByRole("alert")).textContent).toBeTruthy();
     expect(screen.getByLabelText("Slug")).toHaveProperty("value", "acme-labs");
+  });
+
+  describe("inside an OrgProvider, with no onUpdated", () => {
+    const GLOBEX_ID = "org_01jbbbbbbbbbbbbbbbbbbbbbbb";
+    const GLOBEX: Organization = create(OrganizationSchema, {
+      metadata: { id: GLOBEX_ID, name: "Globex", slug: "globex" },
+    });
+
+    /** Names the provider's active organization and every slug it lists. */
+    function ProviderProbe() {
+      const { activeOrg, orgs } = useOrg();
+      return (
+        <p data-testid="provider">
+          {`${activeOrg?.metadata?.slug ?? ""}:${orgs.map((o) => o.metadata?.slug).join(",")}`}
+        </p>
+      );
+    }
+
+    function renderInProvider(panelOrg: string) {
+      // The person's organizations before the rename, then after it.
+      const findMyOrganizations = vi
+        .fn()
+        .mockResolvedValueOnce({ entries: [ORG, GLOBEX] })
+        .mockResolvedValue({ entries: [RENAMED, GLOBEX] });
+      const client = {
+        organization: {
+          get: vi.fn(async () => (panelOrg === ACME_ID ? ORG : GLOBEX)),
+          update: vi.fn(async () => ORG),
+          rename: vi.fn(async () => (panelOrg === ACME_ID ? RENAMED : GLOBEX)),
+          findMyOrganizations,
+        },
+        iamPolicy: { checkMyPermission: vi.fn(async () => ({ isAuthorized: true })) },
+        platform: { getServerInfo: vi.fn(async () => ({ singleOrg: false })) },
+      };
+      render(
+        <StigmerContext.Provider value={client as never}>
+          <DeploymentModeContext.Provider value="local">
+            <OrgProvider>
+              <ProviderProbe />
+              <OrgProfilePanel org={panelOrg} />
+            </OrgProvider>
+          </DeploymentModeContext.Provider>
+        </StigmerContext.Provider>,
+      );
+      return { findMyOrganizations };
+    }
+
+    async function renameTo(slug: string, from: string) {
+      const field = await screen.findByLabelText("Slug");
+      await waitFor(() => expect(field).toHaveProperty("value", from));
+      fireEvent.change(field, { target: { value: slug } });
+      fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    }
+
+    it("refreshes the provider's organizations, so the switcher's slug follows the rename", async () => {
+      const { findMyOrganizations } = renderInProvider(ACME_ID);
+      await waitFor(() => expect(screen.getByTestId("provider").textContent).toBe("acme:acme,globex"));
+
+      await renameTo("acme-labs", "acme");
+
+      await waitFor(() => expect(findMyOrganizations).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(screen.getByTestId("provider").textContent).toBe("acme-labs:acme-labs,globex"),
+      );
+    });
+
+    it("keeps the active organization selected when it renames another", async () => {
+      const { findMyOrganizations } = renderInProvider(GLOBEX_ID);
+      await waitFor(() => expect(screen.getByTestId("provider").textContent).toBe("acme:acme,globex"));
+
+      await renameTo("globex-labs", "globex");
+
+      await waitFor(() => expect(findMyOrganizations).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(screen.getByTestId("provider").textContent).toBe("acme-labs:acme-labs,globex"),
+      );
+    });
   });
 
   it("renames nothing on Enter while the slug is unchanged or blank", async () => {

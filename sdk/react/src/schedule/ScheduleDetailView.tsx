@@ -83,7 +83,7 @@ import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Props for {@link ScheduleDetailView}. */
 export interface ScheduleDetailViewProps {
-  /** Organization slug. */
+  /** Organization id (a slug is also accepted). */
   readonly org: string;
   /** Schedule slug. */
   readonly slug: string;

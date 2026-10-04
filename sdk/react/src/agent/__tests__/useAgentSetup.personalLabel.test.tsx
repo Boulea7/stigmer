@@ -6,7 +6,9 @@
  * link's `?agent=acme/reviewer`). Pinned: the lookup's label equals the
  * builder's, an agent with a saved instance resolves to it instead of
  * asking for its variables again, and saving the variables re-checks and
- * creates under that one label.
+ * creates under that one label. The label names the agent by slug, which an
+ * organization's agent and the platform's can share, so a found instance is
+ * taken only when it binds the agent being resolved.
  */
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -22,7 +24,7 @@ import { EnvironmentCommandController } from "@stigmer/protos/ai/stigmer/agentic
 import { EnvironmentSchema } from "@stigmer/protos/ai/stigmer/agentic/environment/v1/api_pb";
 import { AgentInstanceListSchema } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/io_pb";
 import { AgentInstanceSchema } from "@stigmer/protos/ai/stigmer/agentic/agentinstance/v1/api_pb";
-import { AgentSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb";
+import { type Agent, AgentSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/api_pb";
 import { AgentSpecSchema } from "@stigmer/protos/ai/stigmer/agentic/agent/v1/spec_pb";
 import { EnvVarDeclarationSchema } from "@stigmer/protos/ai/stigmer/agentic/environment/v1/spec_pb";
 import { EnvironmentQueryController } from "@stigmer/protos/ai/stigmer/agentic/environment/v1/query_pb";
@@ -43,8 +45,33 @@ afterEach(cleanup);
 const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
 const FOR_AGENT = "stigmer.ai/for-agent";
 
-/** A client whose saved personal instance (when `saved`) answers only the label the builder gives it. */
-function client(asked: Record<string, string>[], created: Record<string, string>[] = [], saved = true) {
+/** The organization's own `reviewer`, the agent the saved instance binds. */
+const ACME_REVIEWER = create(AgentSchema, {
+  metadata: create(ApiResourceMetadataSchema, { id: "agt_1", org: ACME_ID, slug: "reviewer", name: "Reviewer" }),
+  spec: create(AgentSpecSchema, {
+    env: { API_TOKEN: create(EnvVarDeclarationSchema, { isSecret: true, description: "API token" }) },
+  }),
+});
+
+/** The platform's `reviewer`: the same slug in another organization, with no saved instance. */
+const PLATFORM_REVIEWER = create(AgentSchema, {
+  metadata: create(ApiResourceMetadataSchema, { id: "agt_platform", org: "stigmer", slug: "reviewer", name: "Reviewer" }),
+  spec: ACME_REVIEWER.spec,
+});
+
+/**
+ * A client whose saved personal instance (when `saved`) binds the acme
+ * reviewer and answers only the label the builder gives it, from the
+ * `savedFrom`th list on (a tab that saved it in between); its agent get
+ * answers `agent`.
+ */
+function client(
+  asked: Record<string, string>[],
+  created: Record<string, string>[] = [],
+  saved = true,
+  agent: Agent = ACME_REVIEWER,
+  savedFrom = 1,
+) {
   const existing = buildPersonalInstanceInput({
     org: ACME_ID,
     agentId: "agt_1",
@@ -55,22 +82,20 @@ function client(asked: Record<string, string>[], created: Record<string, string>
     baseUrl: "/",
     getAccessToken: () => "t",
     customTransport: createRouterTransport(({ service }) => {
-      service(AgentQueryController, {
-        getByReference: () =>
-          create(AgentSchema, {
-            metadata: create(ApiResourceMetadataSchema, { id: "agt_1", org: ACME_ID, slug: "reviewer", name: "Reviewer" }),
-            spec: create(AgentSpecSchema, {
-              env: { API_TOKEN: create(EnvVarDeclarationSchema, { isSecret: true, description: "API token" }) },
-            }),
-          }),
-      });
+      service(AgentQueryController, { getByReference: () => agent });
       service(AgentInstanceQueryController, {
         list: (request) => {
           asked.push({ ...request.labels });
-          const matches = saved && request.labels[FOR_AGENT] === existing.labels?.[FOR_AGENT];
+          const matches =
+            saved && asked.length >= savedFrom && request.labels[FOR_AGENT] === existing.labels?.[FOR_AGENT];
           return create(AgentInstanceListSchema, {
             items: matches
-              ? [create(AgentInstanceSchema, { metadata: create(ApiResourceMetadataSchema, { id: "ain_saved", org: ACME_ID }) })]
+              ? [
+                  create(AgentInstanceSchema, {
+                    metadata: create(ApiResourceMetadataSchema, { id: "ain_saved", org: ACME_ID }),
+                    spec: { agentId: "agt_1" },
+                  }),
+                ]
               : [],
           });
         },
@@ -78,7 +103,7 @@ function client(asked: Record<string, string>[], created: Record<string, string>
       service(EnvironmentQueryController, { list: () => create(EnvironmentListSchema, { items: [] }) });
       service(AgentInstanceCommandController, {
         create: (instance) => {
-          created.push({ ...instance.metadata?.labels });
+          created.push({ ...instance.metadata?.labels, agentId: instance.spec?.agentId ?? "" });
           return create(AgentInstanceSchema, { metadata: create(ApiResourceMetadataSchema, { id: "ain_new", org: ACME_ID }) });
         },
       });
@@ -150,5 +175,56 @@ describe("useAgentSetup's personal-instance label", () => {
     expect(asked.map((labels) => labels[FOR_AGENT])).toEqual([label, label]);
     expect(created.map((labels) => labels[FOR_AGENT])).toEqual([label]);
     expect(result.current.state.status).toBe("ready");
+  });
+
+  it("takes the instance another tab saved for the agent between the lookup and the save, creating none", async () => {
+    const asked: Record<string, string>[] = [];
+    const created: Record<string, string>[] = [];
+    const { result } = renderHook(() => useAgentSetup(ACME_ID), {
+      wrapper: wrapper(client(asked, created, true, ACME_REVIEWER, 2)),
+    });
+
+    await act(async () => {
+      await result.current.resolveAgent({ org: "acme", slug: "reviewer" });
+    });
+    expect(result.current.state.status).toBe("needsEnvVars");
+    await waitFor(async () => {
+      await act(async () => {
+        await result.current.submitEnvVars({ API_TOKEN: { value: "t", isSecret: true } }, { saveForFuture: true });
+      });
+    });
+
+    expect(created).toEqual([]);
+    expect(result.current.state.status).toBe("ready");
+    if (result.current.state.status === "ready") {
+      expect(result.current.state.resolution).toEqual({ mode: "saved", instanceId: "ain_saved" });
+    }
+  });
+
+  it("never answers another agent's saved instance for a same-slug agent in another organization", async () => {
+    const asked: Record<string, string>[] = [];
+    const created: Record<string, string>[] = [];
+    const { result } = renderHook(() => useAgentSetup(ACME_ID), {
+      wrapper: wrapper(client(asked, created, true, PLATFORM_REVIEWER)),
+    });
+
+    // The label query answers the acme reviewer's instance; it binds another agent.
+    await act(async () => {
+      await result.current.resolveAgent({ org: "stigmer", slug: "reviewer" });
+    });
+    expect(asked.map((labels) => labels[FOR_AGENT])).toEqual([`${ACME_ID}/reviewer`]);
+    expect(result.current.state.status).toBe("needsEnvVars");
+
+    // Saving re-checks under the same label and creates one for the platform agent.
+    await waitFor(async () => {
+      await act(async () => {
+        await result.current.submitEnvVars({ API_TOKEN: { value: "t", isSecret: true } }, { saveForFuture: true });
+      });
+    });
+    expect(created.map((labels) => labels.agentId)).toEqual(["agt_platform"]);
+    expect(result.current.state.status).toBe("ready");
+    if (result.current.state.status === "ready") {
+      expect(result.current.state.resolution).toEqual({ mode: "saved", instanceId: "ain_new" });
+    }
   });
 });

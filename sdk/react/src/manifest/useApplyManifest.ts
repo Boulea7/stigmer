@@ -87,7 +87,7 @@ const VALIDATE_DEBOUNCE_MS = 500;
  * apply there (matching `stigmer apply` semantics — the org-mismatch
  * warning surfaces on the parsed document).
  *
- * @param org - Target organization slug for `metadata.org` injection.
+ * @param org - Target organization id (a slug is also accepted) for `metadata.org` injection.
  *
  * @example
  * ```tsx

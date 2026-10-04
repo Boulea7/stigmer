@@ -35,7 +35,7 @@ import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 /** Props for {@link ScheduleForm}. */
 export interface ScheduleFormProps {
   /**
-   * Organization slug. Schedules are org-local: the server requires the
+   * Organization id (a slug is also accepted). Schedules are org-local: the server requires the
    * target agent to live in this same org, which is the org the agent
    * picker searches.
    */

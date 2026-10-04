@@ -18,7 +18,7 @@ export type RunWorkflowFieldErrors = Record<string, string>;
 
 /** Options for {@link useRunWorkflowFlow}. */
 export interface UseRunWorkflowFlowOptions {
-  /** Organization slug that owns the workflow. */
+  /** Id of the organization that owns the workflow (a slug is also accepted). */
   readonly org: string;
   /** Workflow resource (must include metadata and spec). */
   readonly workflow: Workflow;

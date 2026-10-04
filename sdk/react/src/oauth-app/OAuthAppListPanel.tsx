@@ -15,7 +15,7 @@ import { LoadingRegion } from "../internal/LoadingRegion.js";
 
 /** Props for {@link OAuthAppListPanel}. */
 export interface OAuthAppListPanelProps {
-  /** Organization slug to list OAuth apps for. */
+  /** Organization id to list OAuth apps for (a slug is also accepted). */
   readonly org: string;
   /**
    * Fired when the user wants to view/edit an OAuth app.

@@ -94,7 +94,7 @@ export class AgentShareClient {
   }
 }
 
-/** Input for creating/updating a AgentShare. */
+/** Input for creating/updating an AgentShare. */
 export interface AgentShareInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

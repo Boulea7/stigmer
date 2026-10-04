@@ -55,3 +55,17 @@ export async function organizationLabel(
 ): Promise<string> {
   return (await organizationNamed(stigmer, value))?.slug || value;
 }
+
+/**
+ * Labels for many organization values at once, one lookup per distinct
+ * non-empty value however many rows carry it. A value missing from the
+ * answer prints as given.
+ */
+export async function organizationLabels(
+  stigmer: Stigmer,
+  values: Iterable<string>,
+): Promise<ReadonlyMap<string, string>> {
+  const distinct = [...new Set(values)].filter((value) => value !== "");
+  const labels = await Promise.all(distinct.map((value) => organizationLabel(stigmer, value)));
+  return new Map(distinct.map((value, index) => [value, labels[index] ?? value]));
+}

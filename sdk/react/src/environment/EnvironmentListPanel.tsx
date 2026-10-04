@@ -18,7 +18,7 @@ import { LoadingRegion } from "../internal/LoadingRegion.js";
 
 /** Props for {@link EnvironmentListPanel}. */
 export interface EnvironmentListPanelProps {
-  /** Organization slug to list environments for. */
+  /** Organization id to list environments for (a slug is also accepted). */
   readonly org: string;
   /** Optional label filter — only environments matching ALL labels are shown. */
   readonly labels?: Record<string, string>;

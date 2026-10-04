@@ -7,7 +7,12 @@ import { create } from "@bufbuild/protobuf";
 import type { Stigmer } from "@stigmer/sdk";
 import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { describe, expect, it } from "vitest";
-import { organizationLabel, organizationNamed, sameOrganization } from "../organizations.js";
+import {
+  organizationLabel,
+  organizationLabels,
+  organizationNamed,
+  sameOrganization,
+} from "../organizations.js";
 
 const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -49,5 +54,15 @@ describe("organization names", () => {
     expect(await organizationLabel(stigmer, "org_01jbbbbbbbbbbbbbbbbbbbbbbb")).toBe(
       "org_01jbbbbbbbbbbbbbbbbbbbbbbb",
     );
+  });
+
+  it("labels many values with one lookup per distinct non-empty value", async () => {
+    const stigmer = stigmerKnowingAcme();
+    const labels = await organizationLabels(stigmer, [ACME_ID, "", ACME_ID, "globex"]);
+    expect([...labels]).toEqual([
+      [ACME_ID, "acme"],
+      ["globex", "globex"],
+    ]);
+    expect(stigmer.gets).toEqual([ACME_ID, "globex"]);
   });
 });

@@ -16,7 +16,7 @@ import { FailureAnalysisPanel } from "./FailureAnalysisPanel.js";
 
 /** Props for {@link WorkflowExecutionHistory}. */
 export interface WorkflowExecutionHistoryProps {
-  /** Organization slug for scoping dashboard summary data. */
+  /** Organization id for scoping dashboard summary data (a slug is also accepted). */
   readonly org: string;
   /**
    * When set, scopes to a single workflow's executions.

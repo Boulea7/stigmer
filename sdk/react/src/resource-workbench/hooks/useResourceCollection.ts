@@ -31,7 +31,7 @@ export interface UseResourceCollectionOptions<TData = SearchResult> {
    * `ListResult` back. Pass `null` to disable fetching (idle state).
    */
   readonly listFn: ((params: ListParams) => Promise<ListResult>) | null;
-  /** Organization slug to scope the query. Pass `null` to disable fetching. */
+  /** Organization id to scope the query (a slug is also accepted). Pass `null` to disable fetching. */
   readonly org: string | null;
   /** Text search query. No debouncing is applied — the consumer controls timing. */
   readonly query?: string;

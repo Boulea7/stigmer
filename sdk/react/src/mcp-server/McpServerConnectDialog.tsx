@@ -18,12 +18,12 @@ import { VendorApprovalBlockedNotice } from "./VendorApprovalBlockedNotice.js";
 
 /** Props for {@link McpServerConnectDialog}. */
 export interface McpServerConnectDialogProps {
-  /** Organization slug that owns the MCP server. */
+  /** Id of the organization that owns the MCP server (a slug is also accepted). */
   readonly org: string;
   /** MCP server slug. */
   readonly slug: string;
   /**
-   * The authenticated user's active organization slug.
+   * The authenticated user's active organization id (a slug is also accepted).
    * Used for credential storage — tokens are stored in the user's
    * personal environment within this org.
    * Falls back to `org` when omitted.

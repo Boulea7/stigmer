@@ -15,6 +15,10 @@
 // That split is deliberate (stigmer/stigmer#312): when handlers owned
 // rendering, honoring --limit was per-handler discipline, and the two
 // unpaginated branches (organization, api_key) shipped silently ignoring it.
+//
+// Rows carry organizations by id. The human table names each by slug, one
+// lookup per distinct organization in the listing; json and yaml stay the
+// wire as-is.
 
 import { create, type DescMessage, type Message } from "@bufbuild/protobuf";
 import { AgentChannelSchema } from "@stigmer/protos/ai/stigmer/agentic/agentchannel/v1/api_pb";
@@ -40,10 +44,13 @@ import {
   bool,
   type JsonObject,
   obj,
+  type OrgLabel,
   renderCollection,
   str,
+  tableOrganizations,
   type TableShape,
 } from "./render.js";
+import { organizationLabels } from "../client/organizations.js";
 import { requireOrganization } from "../client/single-org.js";
 
 // Kinds that list through the SearchService (list mode: empty query, org
@@ -220,11 +227,13 @@ export async function listResources(
   // rather than per-handler is what keeps the flag honest for every kind —
   // organization and api_key shipped ignoring it when handlers owned this
   // (stigmer/stigmer#312).
+  const entries = page.entries.slice(0, limit);
   return renderCollection(
     page.schema,
-    page.entries.slice(0, limit),
+    entries,
     format,
     page.table,
+    await organizationLabels(client, tableOrganizations(page.schema, entries, format, page.table)),
   );
 }
 
@@ -257,8 +266,9 @@ async function fetchListPage(
 export const SEARCH_TABLE: TableShape = {
   resourceName: "resources",
   headers: ["NAME", "DESCRIPTION", "VISIBILITY", "CREATED"],
-  row: (json) => [
-    str(json, "qualified_slug"),
+  orgs: (json) => [str(json, "org")],
+  row: (json, orgLabel) => [
+    qualifiedName(json, orgLabel),
     truncate(str(json, "description"), 50),
     str(json, "visibility"),
     date(str(json, "created_at")),
@@ -300,14 +310,15 @@ const INSTANCE_TABLE: TableShape = {
 const AGENT_CHANNEL_TABLE: TableShape = {
   resourceName: "agent channels",
   headers: ["ID", "SLUG", "AGENT", "PROVIDER", "STATE", "ENABLED"],
-  row: (json) => {
+  orgs: (json) => [str(obj(obj(json, "spec"), "agent_ref"), "org")],
+  row: (json, orgLabel) => {
     const metadata = obj(json, "metadata");
     const spec = obj(json, "spec");
     const agentRef = obj(spec, "agent_ref");
     return [
       str(metadata, "id"),
       str(metadata, "slug"),
-      `${str(agentRef, "org")}/${str(agentRef, "slug")}`,
+      `${orgLabel(str(agentRef, "org"))}/${str(agentRef, "slug")}`,
       providerOf(spec),
       // Zero-valued enums are omitted from protojson; a channel is
       // initialized to pending_install on create, so "-" is the rare
@@ -345,16 +356,15 @@ const CHANNEL_APP_TABLE: TableShape = {
 const SCHEDULE_TABLE: TableShape = {
   resourceName: "schedules",
   headers: ["ID", "SLUG", "TARGET", "CRON", "TZ", "ENABLED", "STATE"],
-  row: (json) => {
+  orgs: (json) => [str(scheduleAgentRef(json), "org")],
+  row: (json, orgLabel) => {
     const metadata = obj(json, "metadata");
     const spec = obj(json, "spec");
-    // The target oneof has one arm today (`agent`); a future workflow arm
-    // extends this accessor alongside the proto.
-    const agentRef = obj(obj(spec, "agent"), "agent_ref");
+    const agentRef = scheduleAgentRef(json);
     return [
       str(metadata, "id"),
       str(metadata, "slug"),
-      `${str(agentRef, "org")}/${str(agentRef, "slug")}`,
+      `${orgLabel(str(agentRef, "org"))}/${str(agentRef, "slug")}`,
       str(spec, "cron"),
       str(spec, "time_zone"),
       bool(spec, "enabled") ? "true" : "false",
@@ -362,6 +372,23 @@ const SCHEDULE_TABLE: TableShape = {
     ];
   },
 };
+
+// The target oneof has one arm today (`agent`); a future workflow arm
+// extends this accessor alongside the proto.
+function scheduleAgentRef(json: JsonObject): JsonObject {
+  return obj(obj(obj(json, "spec"), "agent"), "agent_ref");
+}
+
+// A search result's `org/slug` with the organization named by its label.
+// The qualified slug leads with the org the row carries (an id); one that
+// does not prints as the server gave it.
+function qualifiedName(json: JsonObject, orgLabel: OrgLabel): string {
+  const qualified = str(json, "qualified_slug");
+  const org = str(json, "org");
+  return org !== "" && qualified.startsWith(`${org}/`)
+    ? `${orgLabel(org)}${qualified.slice(org.length)}`
+    : qualified;
+}
 
 // The provider_config oneof serializes as exactly one provider-named key in
 // protojson (AgentChannelSpec and ChannelAppSpec share the same oneof

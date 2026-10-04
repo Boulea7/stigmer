@@ -99,7 +99,7 @@ class AgentClient:
 
 @dataclass
 class AgentInput:
-    """Input for creating or updating a Agent."""
+    """Input for creating or updating an Agent."""
 
     name: str
     org: str

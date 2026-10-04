@@ -79,7 +79,7 @@ export class IdentityProviderClient {
   }
 }
 
-/** Input for creating/updating a IdentityProvider. */
+/** Input for creating/updating an IdentityProvider. */
 export interface IdentityProviderInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

@@ -14,7 +14,7 @@ export interface WorkflowExplainDialogProps {
   readonly open: boolean;
   /** Called when the dialog should close. */
   readonly onOpenChange: (open: boolean) => void;
-  /** Organization slug. */
+  /** Organization id (a slug is also accepted). */
   readonly org: string;
   /** Current workflow YAML to explain. */
   readonly currentYaml: string;

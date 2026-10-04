@@ -31,7 +31,7 @@ export interface UseWorkflowSaveReturn {
  * and returns success/failure state. Handles UNIMPLEMENTED gracefully
  * (backend not yet deployed) with a descriptive error message.
  *
- * @param org - Organization slug for the target workflow.
+ * @param org - Organization id for the target workflow (a slug is also accepted).
  */
 export function useWorkflowSave(org: string): UseWorkflowSaveReturn {
   const stigmer = useStigmer();

@@ -41,7 +41,7 @@ export interface ResourceWorkbenchProps<TData = SearchResult> {
    * and returns `ListResult`. Pass `null` to disable fetching.
    */
   readonly listFn: ((params: ListParams) => Promise<ListResult>) | null;
-  /** Organization slug. Pass `null` to disable fetching. */
+  /** Organization id (a slug is also accepted). Pass `null` to disable fetching. */
   readonly org: string | null;
 
   // --- View configuration ------------------------------------------------

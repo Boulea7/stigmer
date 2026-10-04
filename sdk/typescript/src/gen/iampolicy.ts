@@ -107,7 +107,7 @@ export class IamPolicyClient {
   }
 }
 
-/** Input for creating/updating a IamPolicy. */
+/** Input for creating/updating an IamPolicy. */
 export interface IamPolicyInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

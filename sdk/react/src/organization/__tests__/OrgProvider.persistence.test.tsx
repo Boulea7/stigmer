@@ -2,7 +2,8 @@
  * OrgProvider remembers the active organization by its id: a choice
  * survives a reload under `stigmer:activeOrg`, survives a rename of the
  * chosen organization (its slug changes, its id does not), and `refresh`
- * selects the organization a target names by id or by slug.
+ * selects the organization a target names by id or by slug. A remembered
+ * value that names no organization, or is empty, falls back to the first.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, renderHook, waitFor, cleanup } from "@testing-library/react";
@@ -127,6 +128,45 @@ describe("OrgProvider persistence by id", () => {
     );
     await waitFor(() => expect(result.current.id).toBe(ACME_ID));
     expect(localStorage.getItem("stigmer:activeOrgSlug")).toBeNull();
+  });
+
+  it("falls back to the first org when the remembered id names none of them", async () => {
+    localStorage.setItem("stigmer:activeOrg", "org_01jzzzzzzzzzzzzzzzzzzzzzzz");
+    const { result } = renderOrg(
+      createMockStigmer([[org(ACME_ID, "acme"), org(GLOBEX_ID, "globex")]]),
+    );
+    await waitFor(() => expect(result.current.id).toBe(ACME_ID));
+    expect(localStorage.getItem("stigmer:activeOrg")).toBe(ACME_ID);
+  });
+
+  it("falls back to the first org for an unknown slug an earlier release remembered, and drops it", async () => {
+    localStorage.setItem("stigmer:activeOrgSlug", "initech");
+    const { result } = renderOrg(
+      createMockStigmer([[org(ACME_ID, "acme"), org(GLOBEX_ID, "globex")]]),
+    );
+    await waitFor(() => expect(result.current.id).toBe(ACME_ID));
+    expect(localStorage.getItem("stigmer:activeOrg")).toBe(ACME_ID);
+    expect(localStorage.getItem("stigmer:activeOrgSlug")).toBeNull();
+  });
+
+  it("reads an empty remembered id as none, falling through to an earlier release's slug", async () => {
+    localStorage.setItem("stigmer:activeOrg", "");
+    localStorage.setItem("stigmer:activeOrgSlug", "globex");
+    const { result } = renderOrg(
+      createMockStigmer([[org(ACME_ID, "acme"), org(GLOBEX_ID, "globex")]]),
+    );
+    await waitFor(() => expect(result.current.id).toBe(GLOBEX_ID));
+    expect(localStorage.getItem("stigmer:activeOrg")).toBe(GLOBEX_ID);
+    expect(localStorage.getItem("stigmer:activeOrgSlug")).toBeNull();
+  });
+
+  it("reads an empty remembered id as none, falling back to the first org", async () => {
+    localStorage.setItem("stigmer:activeOrg", "");
+    const { result } = renderOrg(
+      createMockStigmer([[org(ACME_ID, "acme"), org(GLOBEX_ID, "globex")]]),
+    );
+    await waitFor(() => expect(result.current.id).toBe(ACME_ID));
+    expect(localStorage.getItem("stigmer:activeOrg")).toBe(ACME_ID);
   });
 
   it("treats an older org whose id equals its slug like any other", async () => {

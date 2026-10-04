@@ -17,7 +17,7 @@ import type { McpServerWizardData } from "./steps/types.js";
 
 /** Result passed to `onComplete` after successful MCP server creation. */
 export interface McpServerCreationResult {
-  /** Organization slug of the created MCP server. */
+  /** The created MCP server's organization, by the id it is stored under. */
   readonly org: string;
   /** MCP server slug (for URL construction). */
   readonly slug: string;

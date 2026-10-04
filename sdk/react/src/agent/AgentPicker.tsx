@@ -16,6 +16,7 @@ import { useAgentSearch } from "./useAgentSearch.js";
 import { useScrollShadows } from "../internal/useScrollShadows.js";
 import { ScrollFade } from "../internal/ScrollFade.js";
 import { OrgSlugText } from "../organization/OrgSlugText.js";
+import { useOrgIdForRef } from "../organization/useOrgRefs.js";
 
 /** Props for {@link AgentPicker}. */
 export interface AgentPickerProps {
@@ -82,17 +83,20 @@ export function AgentPicker({
   const searchRef = useRef<HTMLInputElement>(null);
   const { scrollRef: listRef, canScrollUp, canScrollDown } = useScrollShadows();
 
+  // The selection may name its org by slug (one a host or URL supplied)
+  // and a result names it by id, so both sides are compared by id.
+  const orgIdFor = useOrgIdForRef();
   const selectedKey = useMemo(
-    () => (value ? refKey(value) : null),
-    [value],
+    () => (value ? refKey({ ...value, org: orgIdFor(value.org) }) : null),
+    [value, orgIdFor],
   );
 
   const availableResults = useMemo(
     () =>
       selectedKey
-        ? results.filter((r) => `${r.org}/${r.slug}` !== selectedKey)
+        ? results.filter((r) => `${orgIdFor(r.org)}/${r.slug}` !== selectedKey)
         : results,
-    [results, selectedKey],
+    [results, selectedKey, orgIdFor],
   );
 
   useEffect(() => {

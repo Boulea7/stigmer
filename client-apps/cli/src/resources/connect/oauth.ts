@@ -15,6 +15,7 @@ import { create } from "@bufbuild/protobuf";
 import type { McpServer } from "@stigmer/protos/ai/stigmer/agentic/mcpserver/v1/api_pb";
 import { GetOAuthGrantStatusInputSchema } from "@stigmer/protos/ai/stigmer/agentic/mcpserver/v1/io_pb";
 import type { Stigmer } from "@stigmer/sdk";
+import { organizationLabel } from "../../client/organizations.js";
 import { UsageError } from "../../errors/index.js";
 
 const POLL_INTERVAL_MS = 3000;
@@ -64,7 +65,9 @@ export async function runOAuthFlow(deps: OAuthFlowDeps): Promise<void> {
   // the Go-era `/<org>/mcp-servers/<slug>` answered 404 in the TypeScript
   // console and sent the user to a dead page. The org is the server's own
   // answer: on a server that holds one organization the CLI resolved none.
-  const org = deps.server.metadata?.org || deps.org;
+  // The route takes a slug or an id there, so the URL names it by slug where
+  // the caller can see it, and by the id the server stores where not.
+  const org = await organizationLabel(deps.client, deps.server.metadata?.org || deps.org);
   const pageURL = `${consoleURL}/library/mcp-servers/${org}/${slug}`;
 
   log(`OAuth authentication required for '${name}'.`);

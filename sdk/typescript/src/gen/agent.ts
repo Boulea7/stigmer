@@ -90,7 +90,7 @@ export class AgentClient {
   }
 }
 
-/** Input for creating/updating a Agent. */
+/** Input for creating/updating an Agent. */
 export interface AgentInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

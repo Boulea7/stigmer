@@ -79,7 +79,7 @@ class IdentityProviderClient:
 
 @dataclass
 class IdentityProviderInput:
-    """Input for creating or updating a IdentityProvider."""
+    """Input for creating or updating an IdentityProvider."""
 
     name: str
     org: str
