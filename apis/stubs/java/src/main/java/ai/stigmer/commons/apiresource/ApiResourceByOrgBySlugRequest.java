@@ -59,7 +59,7 @@ private static final long serialVersionUID = 0L;
   private volatile java.lang.Object org_ = "";
   /**
    * <pre>
-   * ID of the organization
+   * The organization, by id or slug
    * </pre>
    *
    * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>
@@ -80,7 +80,7 @@ private static final long serialVersionUID = 0L;
   }
   /**
    * <pre>
-   * ID of the organization
+   * The organization, by id or slug
    * </pre>
    *
    * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>
@@ -473,7 +473,7 @@ private static final long serialVersionUID = 0L;
     private java.lang.Object org_ = "";
     /**
      * <pre>
-     * ID of the organization
+     * The organization, by id or slug
      * </pre>
      *
      * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>
@@ -493,7 +493,7 @@ private static final long serialVersionUID = 0L;
     }
     /**
      * <pre>
-     * ID of the organization
+     * The organization, by id or slug
      * </pre>
      *
      * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>
@@ -514,7 +514,7 @@ private static final long serialVersionUID = 0L;
     }
     /**
      * <pre>
-     * ID of the organization
+     * The organization, by id or slug
      * </pre>
      *
      * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>
@@ -531,7 +531,7 @@ private static final long serialVersionUID = 0L;
     }
     /**
      * <pre>
-     * ID of the organization
+     * The organization, by id or slug
      * </pre>
      *
      * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>
@@ -545,7 +545,7 @@ private static final long serialVersionUID = 0L;
     }
     /**
      * <pre>
-     * ID of the organization
+     * The organization, by id or slug
      * </pre>
      *
      * <code>string org = 1 [json_name = "org", (.buf.validate.field) = { ... }</code>

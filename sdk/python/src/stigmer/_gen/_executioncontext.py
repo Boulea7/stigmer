@@ -68,7 +68,7 @@ class ExecutionContextClient:
 
 @dataclass
 class ExecutionContextInput:
-    """Input for creating or updating a ExecutionContext."""
+    """Input for creating or updating an ExecutionContext."""
 
     name: str
     org: str

@@ -39,7 +39,7 @@ export type DiagnosePhase =
 export interface UseDiagnoseExecutionFlowOptions {
   /** ID of the failed workflow execution to diagnose. */
   readonly executionId: string;
-  /** Organization slug for session and execution creation. */
+  /** Organization id for session and execution creation (a slug is also accepted). */
   readonly org: string;
   /** Current workflow YAML for diff computation (optional). */
   readonly currentWorkflowYaml?: string;

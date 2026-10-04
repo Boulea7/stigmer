@@ -137,7 +137,7 @@ func (x *ApiResourceDeleteInput) GetForce() bool {
 // Input for requests that need api-resource org and slug
 type ApiResourceByOrgBySlugRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// ID of the organization
+	// The organization, by id or slug
 	Org string `protobuf:"bytes,1,opt,name=org,proto3" json:"org,omitempty"`
 	// Slug of the resource
 	Slug          string `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
@@ -192,7 +192,7 @@ func (x *ApiResourceByOrgBySlugRequest) GetSlug() string {
 // Input for find (list) operations with pagination
 type FindApiResourcesRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Organization ID to filter by
+	// Organization to filter by, by id or slug
 	Org string `protobuf:"bytes,1,opt,name=org,proto3" json:"org,omitempty"`
 	// API resource kind (optional filter)
 	Kind string `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`
@@ -353,6 +353,67 @@ func (x *UpdateVisibilityInput) GetVisibility() ApiResourceVisibility {
 	return ApiResourceVisibility_api_resource_visibility_unspecified
 }
 
+// Input for renaming any API resource: changing its slug.
+//
+// Used by resource-specific command controllers whose kind lets a slug
+// change. Each controller's rename RPC accepts this shared input and returns
+// the full updated resource. A resource's slug never changes through update
+// or apply; rename is its only writer.
+type RenameInput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ID of the resource being renamed.
+	ResourceId string `protobuf:"bytes,1,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	// The new slug. Same format as metadata.slug, at most 63 characters: the
+	// longest a reference's org takes.
+	Slug          string `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenameInput) Reset() {
+	*x = RenameInput{}
+	mi := &file_ai_stigmer_commons_apiresource_io_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenameInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenameInput) ProtoMessage() {}
+
+func (x *RenameInput) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_stigmer_commons_apiresource_io_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenameInput.ProtoReflect.Descriptor instead.
+func (*RenameInput) Descriptor() ([]byte, []int) {
+	return file_ai_stigmer_commons_apiresource_io_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RenameInput) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *RenameInput) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
 // Generic reference to any API resource by org and slug.
 // Used across resources to reference other resources (e.g., Environment, Agent, Skill).
 // Canonical format: "org/slug" (e.g., "acme/web-search", "acme/my-agent").
@@ -365,14 +426,16 @@ func (x *UpdateVisibilityInput) GetVisibility() ApiResourceVisibility {
 // check is refused at write, never at run.
 type ApiResourceReference struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Organization that owns the referenced resource.
+	// Organization that owns the referenced resource, by slug or id.
 	//
-	// When non-empty: must be a valid org slug (lowercase alphanumeric with hyphens,
-	// starts with a letter, 1-63 characters). Example: "stigmer", "acme-corp".
+	// When non-empty: an organization slug (lowercase alphanumeric with hyphens,
+	// starts with a letter, 2-63 characters; e.g. "stigmer", "acme-corp") or an
+	// organization id (org_<ulid>). The server stores the id, so a stored
+	// reference keeps pointing at its organization across a rename.
 	//
 	// When empty: the reference is relative — the server resolves it to the parent
 	// resource's organization at write time. All stored and returned references
-	// always have org populated (absolute form).
+	// always have org populated (absolute form, the id).
 	//
 	// Use empty org for same-org references (the common case).
 	// An explicit other org is accepted only when that organization is a
@@ -407,7 +470,7 @@ type ApiResourceReference struct {
 
 func (x *ApiResourceReference) Reset() {
 	*x = ApiResourceReference{}
-	mi := &file_ai_stigmer_commons_apiresource_io_proto_msgTypes[5]
+	mi := &file_ai_stigmer_commons_apiresource_io_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -419,7 +482,7 @@ func (x *ApiResourceReference) String() string {
 func (*ApiResourceReference) ProtoMessage() {}
 
 func (x *ApiResourceReference) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_stigmer_commons_apiresource_io_proto_msgTypes[5]
+	mi := &file_ai_stigmer_commons_apiresource_io_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -432,7 +495,7 @@ func (x *ApiResourceReference) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApiResourceReference.ProtoReflect.Descriptor instead.
 func (*ApiResourceReference) Descriptor() ([]byte, []int) {
-	return file_ai_stigmer_commons_apiresource_io_proto_rawDescGZIP(), []int{5}
+	return file_ai_stigmer_commons_apiresource_io_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ApiResourceReference) GetOrg() string {
@@ -491,9 +554,13 @@ const file_ai_stigmer_commons_apiresource_io_proto_rawDesc = "" +
 	"\n" +
 	"visibility\x18\x02 \x01(\x0e25.ai.stigmer.commons.apiresource.ApiResourceVisibilityB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\n" +
-	"visibility\"\xb0\x02\n" +
-	"\x14ApiResourceReference\x127\n" +
-	"\x03org\x18\x01 \x01(\tB%\xbaH\"r \x18?2\x1c^$|^[a-z][a-z0-9-]*[a-z0-9]$R\x03org\x12S\n" +
+	"visibility\"s\n" +
+	"\vRenameInput\x12'\n" +
+	"\vresource_id\x18\x01 \x01(\tB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"resourceId\x12;\n" +
+	"\x04slug\x18\x02 \x01(\tB'\xbaH$\xc8\x01\x01r\x1f\x10\x02\x18?2\x19^[a-z][a-z0-9-]*[a-z0-9]$R\x04slug\"\xc3\x02\n" +
+	"\x14ApiResourceReference\x12J\n" +
+	"\x03org\x18\x01 \x01(\tB8\xbaH5r3\x18?2/^$|^[a-z][a-z0-9-]*[a-z0-9]$|^org_[0-9a-z]{26}$R\x03org\x12S\n" +
 	"\x04kind\x18\x02 \x01(\x0e2?.ai.stigmer.commons.apiresource.apiresourcekind.ApiResourceKindR\x04kind\x12;\n" +
 	"\x04slug\x18\x03 \x01(\tB'\xbaH$\xc8\x01\x01r\x1f\x10\x02\x18?2\x19^[a-z][a-z0-9-]*[a-z0-9]$R\x04slug\x12M\n" +
 	"\aversion\x18\x04 \x01(\tB3\xbaH0r.2,^$|^latest$|^[a-zA-Z0-9._-]+$|^[a-f0-9]{64}$R\aversionB\x94\x02\n" +
@@ -511,22 +578,23 @@ func file_ai_stigmer_commons_apiresource_io_proto_rawDescGZIP() []byte {
 	return file_ai_stigmer_commons_apiresource_io_proto_rawDescData
 }
 
-var file_ai_stigmer_commons_apiresource_io_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_ai_stigmer_commons_apiresource_io_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_ai_stigmer_commons_apiresource_io_proto_goTypes = []any{
 	(*ApiResourceId)(nil),                 // 0: ai.stigmer.commons.apiresource.ApiResourceId
 	(*ApiResourceDeleteInput)(nil),        // 1: ai.stigmer.commons.apiresource.ApiResourceDeleteInput
 	(*ApiResourceByOrgBySlugRequest)(nil), // 2: ai.stigmer.commons.apiresource.ApiResourceByOrgBySlugRequest
 	(*FindApiResourcesRequest)(nil),       // 3: ai.stigmer.commons.apiresource.FindApiResourcesRequest
 	(*UpdateVisibilityInput)(nil),         // 4: ai.stigmer.commons.apiresource.UpdateVisibilityInput
-	(*ApiResourceReference)(nil),          // 5: ai.stigmer.commons.apiresource.ApiResourceReference
-	(*rpc.PageInfo)(nil),                  // 6: ai.stigmer.commons.rpc.PageInfo
-	(ApiResourceVisibility)(0),            // 7: ai.stigmer.commons.apiresource.ApiResourceVisibility
-	(apiresourcekind.ApiResourceKind)(0),  // 8: ai.stigmer.commons.apiresource.apiresourcekind.ApiResourceKind
+	(*RenameInput)(nil),                   // 5: ai.stigmer.commons.apiresource.RenameInput
+	(*ApiResourceReference)(nil),          // 6: ai.stigmer.commons.apiresource.ApiResourceReference
+	(*rpc.PageInfo)(nil),                  // 7: ai.stigmer.commons.rpc.PageInfo
+	(ApiResourceVisibility)(0),            // 8: ai.stigmer.commons.apiresource.ApiResourceVisibility
+	(apiresourcekind.ApiResourceKind)(0),  // 9: ai.stigmer.commons.apiresource.apiresourcekind.ApiResourceKind
 }
 var file_ai_stigmer_commons_apiresource_io_proto_depIdxs = []int32{
-	6, // 0: ai.stigmer.commons.apiresource.FindApiResourcesRequest.page:type_name -> ai.stigmer.commons.rpc.PageInfo
-	7, // 1: ai.stigmer.commons.apiresource.UpdateVisibilityInput.visibility:type_name -> ai.stigmer.commons.apiresource.ApiResourceVisibility
-	8, // 2: ai.stigmer.commons.apiresource.ApiResourceReference.kind:type_name -> ai.stigmer.commons.apiresource.apiresourcekind.ApiResourceKind
+	7, // 0: ai.stigmer.commons.apiresource.FindApiResourcesRequest.page:type_name -> ai.stigmer.commons.rpc.PageInfo
+	8, // 1: ai.stigmer.commons.apiresource.UpdateVisibilityInput.visibility:type_name -> ai.stigmer.commons.apiresource.ApiResourceVisibility
+	9, // 2: ai.stigmer.commons.apiresource.ApiResourceReference.kind:type_name -> ai.stigmer.commons.apiresource.apiresourcekind.ApiResourceKind
 	3, // [3:3] is the sub-list for method output_type
 	3, // [3:3] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name
@@ -546,7 +614,7 @@ func file_ai_stigmer_commons_apiresource_io_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_stigmer_commons_apiresource_io_proto_rawDesc), len(file_ai_stigmer_commons_apiresource_io_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

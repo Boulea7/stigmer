@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   useGitHubConnection,
   GITHUB_CALLBACK_MESSAGE_TYPE,
-  useActiveOrgSlug,
+  useActiveOrgId,
 } from "@stigmer/react";
 import { Button } from "@/domain/_shared/ui/button";
 
@@ -60,7 +60,7 @@ function signalOpenerAndClose(): void {
 export function GitHubCallbackPageView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const { handleCallback, isLoading } = useGitHubConnection(org || null);
 
   const code = searchParams.get("code");

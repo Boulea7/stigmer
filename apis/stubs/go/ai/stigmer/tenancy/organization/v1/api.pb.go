@@ -25,10 +25,14 @@ const (
 
 // Organization is the top-level container for all Stigmer resources.
 //
-// An Organization's metadata.id equals its metadata.slug: unlike every other
-// resource (which is assigned a generated prefixed id), the tenancy root is
-// addressed by its slug, which is globally unique and never reused, even
-// after the organization is deleted.
+// An Organization has a permanent id (org_<ulid>), minted when it is
+// created, and a slug: the unique name people type in URLs, manifests and
+// --org. Every resource the organization owns names it by id in
+// metadata.org, so renaming the slug moves nothing. Requests may name an
+// organization by either; the server answers with the id.
+//
+// An Organization belongs to no organization: its own metadata.org is
+// always empty.
 type Organization struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// API version for this resource type.

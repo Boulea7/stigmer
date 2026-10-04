@@ -1316,8 +1316,13 @@ function emitJavaToProto(buf: string[], cfg: SdkResourceConfig, spec: TaskConfig
   }
 
   buf.push("        ApiResourceMetadata.Builder metaBuilder = ApiResourceMetadata.newBuilder()\n");
-  buf.push("            .setName(this.name)\n");
-  buf.push("            .setOrg(this.org);\n");
+  buf.push("            .setName(this.name);\n");
+  // An org-less kind (Organization, License, Plan) leaves org unset, and an
+  // org-scoped one may leave it to the server's single-organization fill;
+  // protobuf-java refuses a null string, so a null org is never set.
+  buf.push("        if (this.org != null) {\n");
+  buf.push("            metaBuilder.setOrg(this.org);\n");
+  buf.push("        }\n");
   buf.push("        if (this.id != null) {\n");
   buf.push("            metaBuilder.setId(this.id);\n");
   buf.push("        }\n");

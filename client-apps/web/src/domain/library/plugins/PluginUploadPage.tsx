@@ -4,8 +4,10 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   PluginUploader,
+  useActiveOrgId,
   useActiveOrgSlug,
   useBreadcrumbOverride,
+  useOrgSlugForId,
 } from "@stigmer/react";
 
 /**
@@ -17,7 +19,9 @@ import {
  * completion (the plugin's page) and cancellation (the list).
  */
 export function PluginUploadPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const orgSlug = useActiveOrgSlug();
+  const slugForOrg = useOrgSlugForId();
   const router = useRouter();
   const { setLabel } = useBreadcrumbOverride();
 
@@ -32,14 +36,14 @@ export function PluginUploadPage() {
       <div className="mb-6">
         <h1 className="text-foreground text-xl font-semibold">Upload a plugin</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          A plugin folder from your computer, or a .zip of one, installed into {org}. A Cursor, Claude Code, Codex or
+          A plugin folder from your computer, or a .zip of one, installed into {orgSlug}. A Cursor, Claude Code, Codex or
           Agent Plugins folder installs unchanged.
         </p>
       </div>
       <PluginUploader
         org={org}
         onComplete={({ plugin }) =>
-          router.push(`/library/plugins/${plugin.metadata?.org}/${plugin.metadata?.slug}`)
+          router.push(`/library/plugins/${slugForOrg(plugin.metadata?.org ?? "")}/${plugin.metadata?.slug}`)
         }
         onCancel={() => router.push("/library/plugins")}
       />

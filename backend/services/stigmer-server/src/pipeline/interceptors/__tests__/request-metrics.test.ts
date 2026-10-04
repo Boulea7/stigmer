@@ -153,6 +153,7 @@ function servingTransport(
           {
             errorBoundary: createErrorBoundaryInterceptor(logger),
             requestMetrics: createRequestMetricsInterceptor(now),
+            organizationNames: (next) => (request) => next(request),
           },
         ),
       },

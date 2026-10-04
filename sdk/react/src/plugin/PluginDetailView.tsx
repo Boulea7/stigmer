@@ -62,7 +62,7 @@ export interface PluginMemberRef {
 
 /** Props for {@link PluginDetailView}. */
 export interface PluginDetailViewProps {
-  /** Organization slug the plugin is installed in. */
+  /** Id of the organization the plugin is installed in (a slug is also accepted). */
   readonly org: string;
   /** Plugin slug (the plugin's name). */
   readonly slug: string;

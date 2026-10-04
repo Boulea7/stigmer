@@ -4,8 +4,9 @@
  * declares the posture and registers no Authorizer — the open-source OIDC
  * self-host's shape), with the key ring supplied so the run is hermetic:
  *   - the founder creates a client; an anonymous mint answers a token; the
- *     token authenticates as the end user's derived account, which holds the
- *     auto-grant role on the owning organization and sees that one alone;
+ *     token authenticates as the end user's derived account (its subject
+ *     names the owning organization by id), which holds the auto-grant role
+ *     on that organization and sees that one alone;
  *   - the platform-client verifier sits ahead of the unit's verifier and
  *     claims only its lane: the founder's tokens still pass, and a TYPED
  *     platform token (a lane open source does not speak) is refused as
@@ -93,6 +94,8 @@ describe("PlatformClient on a composed server (authentication posture, built-in 
   let dir: string;
   let server: ComposedServer;
   let port: number;
+  /** The organization's minted id; the end user's subject names it. */
+  let orgId: string;
 
   const asFounder = (): Transport =>
     transportFor(port, fakeJwt(FOUNDER, "founder@example.com"));
@@ -128,12 +131,16 @@ describe("PlatformClient on a composed server (authentication posture, built-in 
       IdentityAccountCommandController,
       asFounder(),
     ).provisionMyAccount({});
-    await createClient(OrganizationCommandController, asFounder()).create({
+    const organization = await createClient(
+      OrganizationCommandController,
+      asFounder(),
+    ).create({
       apiVersion: "tenancy.stigmer.ai/v1",
       kind: "Organization",
       metadata: { name: ORG, slug: ORG, org: "" },
       spec: { description: ORG },
     });
+    orgId = organization.metadata?.id ?? "";
     await createClient(
       IdentityAccountCommandController,
       asOutsider(),
@@ -196,7 +203,10 @@ describe("PlatformClient on a composed server (authentication posture, built-in 
       IdentityAccountQueryController,
       presenting(token),
     ).whoAmI({});
-    expect(me.metadata?.id).toBe(accountIdFor(`stgm_pc|${ORG}|user-1`));
+    // The subject names the owning organization by its id, never its slug,
+    // so renaming the organization never moves its end users' accounts.
+    expect(orgId).toMatch(/^org_[0-9a-z]{26}$/);
+    expect(me.metadata?.id).toBe(accountIdFor(`stgm_pc|${orgId}|user-1`));
 
     const mine = await createClient(
       OrganizationQueryController,

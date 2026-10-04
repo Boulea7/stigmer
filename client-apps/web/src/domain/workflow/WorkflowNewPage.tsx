@@ -9,7 +9,7 @@ import {
   WorkflowTemplateGallery,
   STARTER_WORKFLOW_YAML,
   WORKFLOW_TEMPLATES,
-  useActiveOrgSlug,
+  useActiveOrgId,
   useBreadcrumbOverride,
   useElkLayoutEngine,
   useWorkflowArchitect,
@@ -25,7 +25,7 @@ const elkWorkerFactory = () =>
 type PagePhase = "picking" | "templates" | "editor" | "generating";
 
 export function WorkflowNewPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   const router = useRouter();
   const elkEngine = useElkLayoutEngine({ workerFactory: elkWorkerFactory });
   const { navigateToDetail } = useLibraryNavigation();

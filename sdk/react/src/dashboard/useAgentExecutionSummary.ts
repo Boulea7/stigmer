@@ -13,7 +13,7 @@ export { AgentExecutionSummaryTimeWindow };
 
 /** Options for {@link useAgentExecutionSummary}. */
 export interface UseAgentExecutionSummaryOptions {
-  /** Organization slug. When empty/null, the hook does not fetch. */
+  /** Organization id (a slug is also accepted). When empty/null, the hook does not fetch. */
   readonly org: string | null | undefined;
   /** Time window for aggregation. @default LAST_7D */
   readonly timeWindow?: AgentExecutionSummaryTimeWindow;

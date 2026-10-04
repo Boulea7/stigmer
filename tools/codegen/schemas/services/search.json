@@ -94,11 +94,11 @@
           "type": {
             "kind": "string"
           },
-          "description": "Organization to scope the search.\n\n Format: lowercase alphanumeric with hyphens (e.g., \"acme\", \"stigmer\").\n\n Behavior:\n - Empty: Search all organizations the caller has access to\n - Non-empty: Search only within the specified organization",
+          "description": "Organization to scope the search.\n\n The organization's slug (e.g., \"acme\") or its id (org_\u003culid\u003e).\n\n Behavior:\n - Empty: Search all organizations the caller has access to\n - Non-empty: Search only within the specified organization",
           "required": false,
           "validation": {
             "maxLength": 63,
-            "pattern": "^$|^[a-z][a-z0-9-]*$"
+            "pattern": "^$|^[a-z][a-z0-9-]*$|^org_[0-9a-z]{26}$"
           }
         },
         {
@@ -227,7 +227,7 @@
         {
           "name": "organization",
           "number": 30,
-          "description": "The boundary that holds people, Agents, Workflows, Sessions and secrets\n together; nothing outside it sees them.\n\n Organization is the one resource whose metadata.id equals its metadata.slug\n (set by the create pipeline), not a minted org_\u003culid\u003e. It is the immutable,\n globally unique tenancy root that every child resource references by slug\n (metadata.org), so its slug is globally unique and doubles as its id.\n id_prefix below is retained deliberately: it still anchors legacy org_\u003culid\u003e\n records and the CLI's id-vs-slug detection — it is not used to mint new ids."
+          "description": "The boundary that holds people, Agents, Workflows, Sessions and secrets\n together; nothing outside it sees them.\n\n Its id is a minted org_\u003culid\u003e that never changes; every organization-scoped\n resource names it by that id (metadata.org). Its slug is unique across the\n server and may change through rename; requests may name the organization\n by either."
         },
         {
           "name": "platform",

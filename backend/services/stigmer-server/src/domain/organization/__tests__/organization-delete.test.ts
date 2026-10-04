@@ -1,24 +1,24 @@
 /**
  * Pins the organization delete's order through a composed server in the
- * trusted-local posture: the slug is retired first, everything that grants
- * on the organization goes before its row, and a fault stops the delete
- * with the organization in place. An organization's id is its slug, and a
- * slug is never taken again, so nothing a deleted organization left behind
- * can pass to a new holder.
+ * trusted-local posture: everything that grants on the organization goes
+ * before its row, a fault stops the delete with the organization in place,
+ * and the organization's names are released once its row is gone. Every
+ * row names the organization by its minted id, which no later organization
+ * carries, so nothing a deleted organization left behind passes to a later
+ * holder of its slug.
  *
  *   - the `org-delete:pre-delete` slot runs with the organization loaded
  *     and still stored, and its rows still in place;
  *   - a slot step's refusal answers its own code and copy, and leaves the
- *     organization and its rows, its slug already retired;
- *   - a fault retiring the slug fails the delete before anything else, with
- *     the organization and its rows in place;
+ *     organization, its rows and its name;
  *   - the organization's policy rows are revoked before its row, as
  *     principal and as resource: a revocation fault answers Internal with
  *     fixed copy, leaves the organization and its owner row, and a retry
  *     completes the delete;
- *   - a create of a deleted organization's slug is refused with the
- *     ORGANIZATION_SLUG_RESERVED reason, and no row of the old organization
- *     gains an owner.
+ *   - a fault releasing the names after the row is gone is logged and the
+ *     delete succeeds; the name then leads to no organization;
+ *   - a create of a deleted organization's slug makes a new organization,
+ *     which no row of the old one names.
  *
  * The policy store is the library's in-memory double, composed as the
  * IamPolicy store driver so a test can make one row's delete fault; the
@@ -47,7 +47,6 @@ import type { IamPolicy } from "@stigmer/protos/ai/stigmer/iam/iampolicy/v1/api_
 import type { Organization } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { OrganizationCommandController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/command_pb";
 import { OrganizationQueryController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/query_pb";
-import { ErrorInfoSchema } from "@stigmer/protos/google/rpc/error_details_pb";
 
 import { loadConfig } from "../../../boot/config.js";
 import { composeServer } from "../../../boot/compose.js";
@@ -57,6 +56,7 @@ import type { GateSlotName } from "../../../extensions/gate-slots.js";
 import type { ServerExtension } from "../../../extensions/registry.js";
 import type { PipelineStep } from "../../../pipeline/pipeline.js";
 import { EXISTING_RESOURCE_KEY } from "../../../pipeline/steps/load-existing.js";
+import { organizationNameKey } from "../names.js";
 import {
   resetOperatorIdentityForTests,
   setOperatorIdentity,
@@ -108,7 +108,7 @@ describe("organization delete (composed server, trusted-local posture)", () => {
         | undefined;
       const id = organization?.metadata?.id ?? "";
       seenBySlot.set(id, { loaded: id, rowsNaming: rowsNaming(id).length });
-      if (id === REFUSED_SLUG) {
+      if (organization?.metadata?.slug === REFUSED_SLUG) {
         throw new ConnectError(
           "fake edition keeps something for this organization",
           Code.FailedPrecondition,
@@ -142,22 +142,34 @@ describe("organization delete (composed server, trusted-local posture)", () => {
     );
   }
 
-  /** An organization with its creator's owner row, an outsider's member row, and an agent's scope link to it. */
-  async function organizationWithRows(slug: string): Promise<void> {
-    await organizations.create({
+  /**
+   * An organization with its creator's owner row, an outsider's member row,
+   * and an agent's scope link to it; answers its minted id, which the rows
+   * name.
+   */
+  async function organizationWithRows(slug: string): Promise<string> {
+    const created = await organizations.create({
       apiVersion: "tenancy.stigmer.ai/v1",
       kind: "Organization",
       metadata: { name: slug, slug, org: "" },
       spec: { description: "created by the organization delete test" },
     });
-    await platform.bootstrapPolicy(orgRole(OUTSIDER, "member", slug));
+    const id = created.metadata?.id ?? "";
+    await platform.bootstrapPolicy(orgRole(OUTSIDER, "member", id));
     await platform.bootstrapPolicy(
-      triple({ kind: "organization", id: slug }, "organization", {
+      triple({ kind: "organization", id }, "organization", {
         kind: "agent",
         id: AGENT,
       }),
     );
+    return id;
   }
+
+  const nameOf = (slug: string) =>
+    server.store.resourceNames.resolve(
+      organizationNameKey(slug),
+      new Date().toISOString(),
+    );
 
   beforeAll(async () => {
     dir = mkdtempSync(path.join(tmpdir(), "organization-delete-test-"));
@@ -197,24 +209,22 @@ describe("organization delete (composed server, trusted-local posture)", () => {
   });
 
   it("runs the slot with the organization and its rows in place, then removes every row naming it", async () => {
-    await organizationWithRows("delete-clean");
-    expect(rowsNaming("delete-clean")).toHaveLength(3);
+    const id = await organizationWithRows("delete-clean");
+    expect(rowsNaming(id)).toHaveLength(3);
 
     await organizations.delete({ value: "delete-clean" });
 
-    expect(seenBySlot.get("delete-clean")).toEqual({
-      loaded: "delete-clean",
-      rowsNaming: 3,
-    });
-    expect(rowsNaming("delete-clean")).toEqual([]);
+    expect(seenBySlot.get(id)).toEqual({ loaded: id, rowsNaming: 3 });
+    expect(rowsNaming(id)).toEqual([]);
+    expect(await nameOf("delete-clean")).toBeUndefined();
     const gone = await grpcError(() =>
       organizationQuery.get({ value: "delete-clean" }),
     );
     expect(gone.code).toBe(Code.NotFound);
   });
 
-  it("a slot step's refusal answers its own copy and leaves the organization and its rows", async () => {
-    await organizationWithRows(REFUSED_SLUG);
+  it("a slot step's refusal answers its own copy and leaves the organization, its rows and its name", async () => {
+    const id = await organizationWithRows(REFUSED_SLUG);
 
     const refused = await grpcError(() =>
       organizations.delete({ value: REFUSED_SLUG }),
@@ -226,43 +236,34 @@ describe("organization delete (composed server, trusted-local posture)", () => {
     );
     expect(
       (await organizationQuery.get({ value: REFUSED_SLUG })).metadata?.id,
-    ).toBe(REFUSED_SLUG);
-    expect(rowsNaming(REFUSED_SLUG)).toHaveLength(3);
-    // The slug was retired before the slot refused; the organization lives
-    // on, and its slug is refused to a create either way.
-    expect(
-      (await server.store.organizationSlugs.find(REFUSED_SLUG))?.retiredAt,
-    ).not.toBe("");
+    ).toBe(id);
+    expect(rowsNaming(id)).toHaveLength(3);
+    expect((await nameOf(REFUSED_SLUG))?.id).toBe(id);
   });
 
-  it("a fault retiring the slug fails the delete before anything else, with the organization and its rows in place", async () => {
-    await organizationWithRows("delete-retire-faults");
-    const retire = vi
-      .spyOn(server.store.organizationSlugs, "retire")
-      .mockRejectedValueOnce(new Error("ledger unavailable"));
+  it("a fault releasing the names after the row is gone is logged, and the delete succeeds", async () => {
+    const id = await organizationWithRows("delete-release-faults");
+    const release = vi
+      .spyOn(server.store.resourceNames, "release")
+      .mockRejectedValueOnce(new Error("name table unavailable"));
     try {
-      const failed = await grpcError(() =>
-        organizations.delete({ value: "delete-retire-faults" }),
-      );
-      expect(failed.code).toBe(Code.Internal);
-      expect(failed.rawMessage).toBe("failed to retire the organization slug");
+      await organizations.delete({ value: "delete-release-faults" });
     } finally {
-      retire.mockRestore();
+      release.mockRestore();
     }
-    expect(seenBySlot.has("delete-retire-faults")).toBe(false);
-    expect(
-      (await organizationQuery.get({ value: "delete-retire-faults" })).metadata
-        ?.id,
-    ).toBe("delete-retire-faults");
-    expect(rowsNaming("delete-retire-faults")).toHaveLength(3);
-
-    await organizations.delete({ value: "delete-retire-faults" });
-    expect(rowsNaming("delete-retire-faults")).toEqual([]);
+    expect(rowsNaming(id)).toEqual([]);
+    // The name still points at the deleted id, which leads nowhere; a claim
+    // frees it once it is old enough to be no create in flight (names.ts).
+    expect((await nameOf("delete-release-faults"))?.id).toBe(id);
+    const gone = await grpcError(() =>
+      organizationQuery.get({ value: "delete-release-faults" }),
+    );
+    expect(gone.code).toBe(Code.NotFound);
   });
 
   it("a revocation fault fails the delete with the organization and its owner in place, and the retry completes it", async () => {
-    await organizationWithRows("delete-faults");
-    const member = rowsNaming("delete-faults").find(
+    const id = await organizationWithRows("delete-faults");
+    const member = rowsNaming(id).find(
       (row) => row.spec?.relation === "member",
     );
     faultingDelete = member?.metadata?.id;
@@ -277,45 +278,40 @@ describe("organization delete (composed server, trusted-local posture)", () => {
     );
     expect(
       (await organizationQuery.get({ value: "delete-faults" })).metadata?.id,
-    ).toBe("delete-faults");
+    ).toBe(id);
     // The agent's scope link went first; the revocation stopped at the
     // member row, before the owner row the retry needs.
     expect(
-      rowsNaming("delete-faults")
+      rowsNaming(id)
         .map((row) => row.spec?.relation)
         .sort(),
     ).toEqual(["member", "owner"]);
 
     faultingDelete = undefined;
     await organizations.delete({ value: "delete-faults" });
-    expect(rowsNaming("delete-faults")).toEqual([]);
+    expect(rowsNaming(id)).toEqual([]);
   });
 
-  it("a deleted organization's slug is never taken again: the create is refused with the reserved reason", async () => {
-    await organizationWithRows("delete-reborn");
+  it("a create of a deleted organization's slug makes a new organization that no old row names", async () => {
+    const before = await organizationWithRows("delete-reborn");
     await organizations.delete({ value: "delete-reborn" });
 
-    const refused = await grpcError(() =>
-      organizations.create({
-        apiVersion: "tenancy.stigmer.ai/v1",
-        kind: "Organization",
-        metadata: { name: "delete-reborn", slug: "delete-reborn", org: "" },
-        spec: { description: "the slug, taken again" },
-      }),
-    );
+    const reborn = await organizations.create({
+      apiVersion: "tenancy.stigmer.ai/v1",
+      kind: "Organization",
+      metadata: { name: "delete-reborn", slug: "delete-reborn", org: "" },
+      spec: { description: "the slug, taken again" },
+    });
 
-    expect(refused.code).toBe(Code.AlreadyExists);
-    expect(refused.rawMessage).toBe(
-      "Organization slug 'delete-reborn' belonged to an organization that was deleted, and a slug is never reused",
-    );
-    const [reason] = refused.findDetails(ErrorInfoSchema);
-    expect(reason?.reason).toBe("ORGANIZATION_SLUG_RESERVED");
-    expect(reason?.domain).toBe("stigmer.ai");
-    expect(reason?.metadata).toEqual({ slug: "delete-reborn" });
-    expect(rowsNaming("delete-reborn")).toEqual([]);
-    const gone = await grpcError(() =>
-      organizationQuery.get({ value: "delete-reborn" }),
-    );
-    expect(gone.code).toBe(Code.NotFound);
+    const after = reborn.metadata?.id ?? "";
+    expect(after).not.toBe(before);
+    expect(rowsNaming(before)).toEqual([]);
+    expect(
+      rowsNaming(after).map((row) => row.spec?.relation),
+      "only the new creator's owner row",
+    ).toEqual(["owner"]);
+    expect(
+      (await organizationQuery.get({ value: "delete-reborn" })).metadata?.id,
+    ).toBe(after);
   });
 });

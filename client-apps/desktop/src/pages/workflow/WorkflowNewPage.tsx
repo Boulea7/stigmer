@@ -7,12 +7,13 @@ import {
   WorkflowTemplateGallery,
   STARTER_WORKFLOW_YAML,
   WORKFLOW_TEMPLATES,
-  useActiveOrgSlug,
   useBreadcrumbOverride,
   useElkLayoutEngine,
   useWorkflowArchitect,
   toast,
   type WorkflowTemplate,
+  useActiveOrgId,
+  useOrgSlugForId,
 } from "@stigmer/react";
 import { useRequestFullViewport } from "../library/full-viewport-layout";
 
@@ -22,7 +23,8 @@ const elkWorkerFactory = () =>
 type PagePhase = "picking" | "templates" | "editor" | "generating";
 
 export default function WorkflowNewPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const navigate = useNavigate();
   const elkEngine = useElkLayoutEngine({ workerFactory: elkWorkerFactory });
   const { setLabel } = useBreadcrumbOverride();
@@ -59,9 +61,9 @@ export default function WorkflowNewPage() {
 
   const handleGenerateSuccess = useCallback(
     (genOrg: string, slug: string) => {
-      navigate(`/library/workflows/${genOrg}/${slug}`);
+      navigate(`/library/workflows/${slugForOrg(genOrg)}/${slug}`);
     },
-    [navigate],
+    [navigate, slugForOrg],
   );
 
   if (!org) return null;

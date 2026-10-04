@@ -45,7 +45,7 @@ function modelStorageKey(harness: HarnessOption): string {
 
 /** Options for {@link useNewSessionFlow}. */
 export interface UseNewSessionFlowOptions {
-  /** Organization slug. Required for session and execution creation. */
+  /** Organization id (a slug is also accepted). Required for session and execution creation. */
   readonly org: string;
   /**
    * Called after a session and its first execution are created successfully.

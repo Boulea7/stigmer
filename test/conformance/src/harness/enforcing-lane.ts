@@ -320,8 +320,7 @@ export async function newSiblingEnforcingLane(
       if (id === "") {
         throw new Error("organization create on the sibling answered no id");
       }
-      // An organization's id IS its slug (the one kind whose id is not
-      // minted), so the tenancy's `org` names both.
+      // The tenancy names its organization by id, as every resource does.
       return { org: id };
     },
     async cleanupTenancy(context) {

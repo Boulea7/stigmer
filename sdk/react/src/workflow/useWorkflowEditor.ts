@@ -10,7 +10,7 @@ import { useTaskKindRegistry } from "./useTaskKindRegistry.js";
 
 /** Options for {@link useWorkflowEditor}. */
 export interface UseWorkflowEditorOptions {
-  /** Organization slug for the save path. */
+  /** Organization id for the save path (a slug is also accepted). */
   readonly org: string;
 }
 
@@ -51,7 +51,7 @@ export interface UseWorkflowEditorReturn {
  * into a single return value that the `WorkflowEditorView` renders.
  *
  * @param initialYaml - The YAML string to initialize the editor with.
- * @param options - Editor configuration (organization slug).
+ * @param options - Editor configuration (organization id).
  */
 export function useWorkflowEditor(
   initialYaml: string,

@@ -60,8 +60,8 @@ export interface PlanInput {
   name: string;
   slug?: string;
   /**
-   * Always empty: a Plan belongs to the platform, not to an
-   * organization, so `metadata.org` stays unset. Omit it.
+   * Always empty: a Plan belongs to no organization, so
+   * `metadata.org` stays unset. Omit it.
    */
   org?: "";
   labels?: Record<string, string>;

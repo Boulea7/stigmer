@@ -147,9 +147,10 @@ export class CloudTarget implements TargetProfile {
   private grpcBaseUrl: string | undefined;
   private conformanceClients: ConformanceClients | undefined;
   private operatorClients: ConformanceClients | undefined;
-  // Org slug -> resource id, so cleanupTenancy can delete by id without
-  // widening TenancyContext beyond the shape the suites share with local
-  // targets.
+  // The organizations this target provisioned, keyed by the id a
+  // TenancyContext names (the value repeats it): cleanup deletes only what
+  // this target made, without widening TenancyContext beyond the shape the
+  // suites share with local targets.
   private readonly provisionedOrgIds = new Map<string, string>();
 
   // Present only when the environment carries an operator credential — the
@@ -245,13 +246,13 @@ export class CloudTarget implements TargetProfile {
     if (operatorClients === undefined) {
       throw new Error("CloudTarget.setup() must run before provisionPrivilegedScope()");
     }
-    const { slug, id } = await createUniqueOrganization(
+    const { id } = await createUniqueOrganization(
       operatorClients.organizationCommand,
       "the operator's privileged scope",
     );
     return {
       clients: operatorClients,
-      context: { org: slug },
+      context: { org: id },
       cleanup: async () => {
         await operatorClients.organizationCommand.delete({ value: id });
       },
@@ -307,9 +308,10 @@ export class CloudTarget implements TargetProfile {
   }
 
   async provisionTenancy(): Promise<TenancyContext> {
-    const { slug, id } = await createUniqueOrganization(this.clients().organizationCommand, "tenancy");
-    this.provisionedOrgIds.set(slug, id);
-    return { org: slug };
+    // The tenancy names its organization by id, as every resource does.
+    const { id } = await createUniqueOrganization(this.clients().organizationCommand, "tenancy");
+    this.provisionedOrgIds.set(id, id);
+    return { org: id };
   }
 
   async cleanupTenancy(context: TenancyContext): Promise<void> {

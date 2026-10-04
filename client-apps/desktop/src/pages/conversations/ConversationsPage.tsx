@@ -3,8 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ConversationsWorkbench,
   ManageAccessButton,
-  useActiveOrgSlug,
   type ConversationIdentity,
+  useActiveOrgId,
+  useOrgSlugForId,
 } from "@stigmer/react";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 
@@ -18,7 +19,8 @@ import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/
  * the owning agent's Channels tab.
  */
 export default function ConversationsPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const navigate = useNavigate();
   const { channelId, key } = useParams<{ channelId: string; key: string }>();
 
@@ -74,7 +76,7 @@ export default function ConversationsPage() {
         // is one click away there.
         channelHref={(channel) =>
           channel.spec?.agentRef
-            ? `#/library/agents/${channel.spec.agentRef.org || org}/${channel.spec.agentRef.slug}?tab=channels`
+            ? `#/library/agents/${slugForOrg(channel.spec.agentRef.org || org)}/${channel.spec.agentRef.slug}?tab=channels`
             : null
         }
       />

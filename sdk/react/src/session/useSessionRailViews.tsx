@@ -18,7 +18,7 @@ import { UsageTab } from "./facets/UsageTab.js";
 export interface UseSessionRailViewsOptions {
   /** All executions in the session — drives Changes/Artifacts/Usage. */
   readonly allExecutions: readonly AgentExecution[];
-  /** Organization slug for artifact Apply CTA. */
+  /** Organization id for artifact Apply CTA (a slug is also accepted). */
   readonly org: string;
   /** Session configuration for the Config facet. */
   readonly sessionConfig: SetupTabProps | undefined;

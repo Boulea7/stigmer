@@ -10,7 +10,7 @@ import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 
 /** Props for {@link WorkflowRefinePanel}. */
 export interface WorkflowRefinePanelProps {
-  /** Organization slug for refinement context. */
+  /** Organization id for refinement context (a slug is also accepted). */
   readonly org: string;
   /** Current workflow YAML from the editor. */
   readonly currentYaml: string;

@@ -1,14 +1,16 @@
 // `search` dispatch: a relevance-ranked, cross-resource text query over the
 // unified SearchService. Only agents and workflows are search-indexed (matching
 // the Go CLI). Results render identically to `list` (the shared SEARCH_TABLE),
-// with a pagination footer the command appends for human output.
+// with a pagination footer the command appends for human output, and names
+// each result's organization by slug in the same way.
 
 import type { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 import { SearchResultSchema } from "@stigmer/protos/ai/stigmer/search/v1/io_pb";
 import type { Stigmer } from "@stigmer/sdk";
 import type { OutputFormat } from "../output/index.js";
+import { organizationLabels } from "../client/organizations.js";
 import { SEARCH_TABLE } from "./list.js";
-import { renderCollection } from "./render.js";
+import { renderCollection, tableOrganizations } from "./render.js";
 
 export interface SearchParams {
   /** Organization scope. Empty searches across every org the caller can access. */
@@ -42,7 +44,16 @@ export async function searchResources(
   });
 
   return {
-    rendered: renderCollection(SearchResultSchema, response.entries, format, SEARCH_TABLE),
+    rendered: renderCollection(
+      SearchResultSchema,
+      response.entries,
+      format,
+      SEARCH_TABLE,
+      await organizationLabels(
+        client,
+        tableOrganizations(SearchResultSchema, response.entries, format, SEARCH_TABLE),
+      ),
+    ),
     page: params.page,
     totalPages: response.totalPages,
     totalCount: response.totalCount,

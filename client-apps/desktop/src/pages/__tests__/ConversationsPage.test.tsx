@@ -35,7 +35,9 @@ vi.mock("@stigmer/react", () => ({
     page.access.push(props);
     return null;
   },
-  useActiveOrgSlug: () => "acme",
+  useActiveOrgId: () => "org_acme",
+  // The person's organizations: org_acme reads "acme" in a URL.
+  useOrgSlugForId: () => (id: string) => (id === "org_acme" ? "acme" : id),
 }));
 
 import ConversationsPage from "../conversations/ConversationsPage";
@@ -66,7 +68,7 @@ describe("desktop ConversationsPage", () => {
     renderAt(`/conversations/${encodeURIComponent("ach_1")}/${encodeURIComponent("wa:+15550100")}`);
 
     const props = page.workbench.at(-1);
-    expect(props?.org).toBe("acme");
+    expect(props?.org).toBe("org_acme");
     expect(props?.selected).toEqual({ agentChannelId: "ach_1", conversationKey: "wa:+15550100" });
     expect(page.access.at(-1)).toMatchObject({
       label: "Channel access",
@@ -74,7 +76,7 @@ describe("desktop ConversationsPage", () => {
         kind: ApiResourceKind.agent_channel,
         kindString: "agent_channel",
         id: "ach_1",
-        org: "acme",
+        org: "org_acme",
         name: "Support line",
       },
     });
@@ -103,6 +105,10 @@ describe("desktop ConversationsPage", () => {
 
     expect(href?.({ spec: { agentRef: { org: "", slug: "helper" } } })).toBe("#/library/agents/acme/helper?tab=channels");
     expect(href?.({ spec: { agentRef: { org: "other", slug: "helper" } } })).toBe("#/library/agents/other/helper?tab=channels");
+    // A stored reference names its org by id; the link carries the slug.
+    expect(href?.({ spec: { agentRef: { org: "org_acme", slug: "helper" } } })).toBe(
+      "#/library/agents/acme/helper?tab=channels",
+    );
     expect(href?.({ spec: {} })).toBeNull();
   });
 });

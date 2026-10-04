@@ -1,3 +1,8 @@
+/**
+ * useArtifactInspection reads an execution artifact's content, detects a
+ * Stigmer resource or skill package in it, and offers to apply or push it
+ * into an organization: the call names the org by id, the label by slug.
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -7,6 +12,7 @@ import { ExecutionArtifactSchema } from "@stigmer/protos/ai/stigmer/agentic/agen
 import { ExecutionArtifactKind } from "@stigmer/protos/ai/stigmer/agentic/agentexecution/v1/enum_pb";
 import { StigmerContext } from "../../context";
 import { useArtifactInspection } from "../useArtifactInspection";
+import { ACME_ID, orgWrapper } from "../../organization/__tests__/org-fixture";
 
 function fileArtifact(name: string) {
   return create(ExecutionArtifactSchema, {
@@ -157,5 +163,44 @@ describe("useArtifactInspection — detection + apply", () => {
     await waitFor(() => expect(result.current.applyResult?.kind).toBe("Agent"));
     expect(onApplied).toHaveBeenCalledTimes(1);
     expect(onApplied.mock.calls[0][0].name).toBe("my-agent");
+  });
+});
+
+describe("useArtifactInspection — the organization by slug and by id", () => {
+  it("labels the Apply CTA with the org's slug and applies into its id", async () => {
+    const getArtifactContent = vi.fn().mockResolvedValue(contentResult(AGENT_YAML));
+    const apply = vi.fn().mockResolvedValue({
+      yamlKind: "Agent",
+      displayName: "Agent",
+      name: "my-agent",
+      org: ACME_ID,
+      slug: "my-agent",
+      id: "agt_01",
+    });
+
+    const { result } = renderHook(
+      () => useArtifactInspection(fileArtifact("agent.yaml"), "aex_1", ACME_ID),
+      { wrapper: orgWrapper({ agentExecution: { getArtifactContent }, manifest: { apply } }) },
+    );
+
+    await waitFor(() => expect(result.current.ctaLabel).toBe("Apply to acme"));
+    await act(async () => {
+      await result.current.apply();
+    });
+    expect(apply.mock.calls[0][0].org).toBe(ACME_ID);
+  });
+
+  it("labels the Push Skill CTA of a skill package with the org's slug", async () => {
+    const getArtifactContent = vi
+      .fn()
+      .mockResolvedValue(contentResult("---\nname: triage\ndescription: Triage notes\n---\n# Triage\n"));
+
+    const { result } = renderHook(
+      () => useArtifactInspection(dirArtifact("skill-pack"), "aex_1", ACME_ID),
+      { wrapper: orgWrapper({ agentExecution: { getArtifactContent } }) },
+    );
+
+    await waitFor(() => expect(result.current.ctaLabel).toBe("Push Skill to acme"));
+    expect(result.current.detectionLabel).toBe("Skill \u00B7 2 files");
   });
 });

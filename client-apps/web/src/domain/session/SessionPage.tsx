@@ -7,7 +7,6 @@ import {
   useGitHubTreeLister,
   useGitHubFileReader,
   useWorkspaceSources,
-  useActiveOrgSlug,
   useActiveOrgId,
   useFollowSessionOrganization,
   useSession,
@@ -30,9 +29,8 @@ export function SessionPageInner({ id }: { id: string }) {
   // (stigmer/stigmer#1580).
   const { session } = useSession(id);
   useFollowSessionOrganization(session);
-  const org = useActiveOrgSlug();
   const orgId = useActiveOrgId();
-  const gitHubConnection = useGitHubConnection(org);
+  const gitHubConnection = useGitHubConnection(orgId);
   const { enableGitHub, enableLocal } = useWorkspaceSources();
   const workspaceFileLister = useGitHubTreeLister(gitHubConnection.token);
   const workspaceFileReader = useGitHubFileReader(gitHubConnection.token);
@@ -44,7 +42,7 @@ export function SessionPageInner({ id }: { id: string }) {
     <div className="flex h-full w-full flex-col">
       <SessionViewer
         sessionId={id}
-        org={org}
+        org={orgId}
         accountDefaults={accountDefaults}
         gitHubConnection={enableGitHub ? gitHubConnection : undefined}
         enableGitHub={enableGitHub}

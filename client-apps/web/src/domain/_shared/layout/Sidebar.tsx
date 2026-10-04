@@ -4,7 +4,7 @@ import { type MouseEvent, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  useActiveOrgSlug,
+  useActiveOrgId,
   useConversationsWantsHumanCount,
   useRecentActivity,
   WorkspaceSidebar,
@@ -35,7 +35,7 @@ export function Sidebar() {
   const router = useRouter();
   const recentActivity = useRecentActivity();
   const { refetch, prependOptimistic } = recentActivity;
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
   // The Conversations badge: conversations wanting a human right now.
   // Data as props — the SDK sidebar never fetches for itself.
   const { count: wantsHumanCount } = useConversationsWantsHumanCount(org || null);

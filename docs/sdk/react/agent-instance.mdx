@@ -371,7 +371,7 @@ so the delete copy reflects that.
     onDeleted: { type: "() => void", description: "Called after successful deletion." },
     onStartSessionClick: { type: "(instance: AgentInstance) => void", description: "Called when the user clicks \"Start session\" for this instance." },
     onUpdated: { type: "() => void", description: "Called when instance data changes (for parent refetch)." },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
   }}
 />
 
@@ -421,9 +421,9 @@ This is an SDK component — embeddable by platform builders.
     onDeleteClick: { type: "(instance: AgentInstance) => void", description: "Called when the user clicks \"Delete\" on an instance." },
     onInstanceClick: { type: "(instance: AgentInstance) => void", description: "Called when the user clicks an instance row (opens detail)." },
     onStartSessionClick: { type: "(instance: AgentInstance) => void", description: "Called when the user clicks \"Start session\" on an instance." },
-    org: { type: "string", description: "The AGENT's organization slug (needed for environment resolution and the create flow). Not the list scope — that is `viewerOrg`, which differs from `org` when viewing another org's agent.", required: true },
+    org: { type: "string", description: "The AGENT's organization id (a slug is also accepted; needed for environment resolution and the create flow). Not the list scope — that is `viewerOrg`, which differs from `org` when viewing another org's agent.", required: true },
     refreshKey: { type: "number", description: "Increment this value to trigger a refetch of the instance list. Useful after creating or deleting an instance externally." },
-    viewerOrg: { type: "string", description: "The viewer's active organization slug. Scopes the list to this org's instances of the agent, so a member of several orgs sees exactly the current org context's instances. Omit to default to the agent's own org." },
+    viewerOrg: { type: "string", description: "The viewer's active organization id (a slug is also accepted). Scopes the list to this org's instances of the agent, so a member of several orgs sees exactly the current org context's instances. Omit to default to the agent's own org." },
   }}
 />
 
@@ -445,7 +445,7 @@ Uses native `<dialog>` element for proper focus trapping and escape handling.
     onCreated: { type: "(instance: AgentInstance) => void", description: "Called after the instance is successfully created." },
     onOpenChange: { type: "(open: boolean) => void", description: "Called when the dialog should open or close.", required: true },
     open: { type: "boolean", description: "Whether the dialog is open.", required: true },
-    org: { type: "string", description: "Organization slug.", required: true },
+    org: { type: "string", description: "Organization id (a slug is also accepted).", required: true },
   }}
 />
 

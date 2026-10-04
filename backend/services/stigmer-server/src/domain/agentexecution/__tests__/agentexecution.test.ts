@@ -75,7 +75,11 @@ import { submitApproval } from "../submit-approval.js";
 import { submitFileDecision } from "../submit-file-decision.js";
 import { stubConnectedEngine } from "./engine-stub.js";
 import { fileReviewSeed } from "./file-review-seed.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
+import type { OrganizationIds } from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -86,6 +90,15 @@ const silentLogger = createLogger({
 const API_VERSION = "agentic.stigmer.ai/v1";
 const KIND = "AgentExecution";
 const ORG = "acme";
+
+// Requests name organizations by slug, which the serving chain turns into
+// the minted id; rows seeded straight into the store carry the id, as a
+// create through the API would have written them.
+let organizationIds: OrganizationIds;
+let ORG_ID: string;
+function idOf(slug: string): string {
+  return organizationId(organizationIds, slug);
+}
 
 type CommandClient = Client<typeof AgentExecutionCommandController>;
 type QueryClient = Client<typeof AgentExecutionQueryController>;
@@ -125,8 +138,9 @@ beforeAll(async () => {
   const transport: Transport = createGrpcTransport({
     baseUrl: `http://127.0.0.1:${port}`,
   });
-  await seedOrganizations(transport, [
+  organizationIds = await seedOrganizations(transport, [
     ORG,
+    "paging-org",
     "org-a",
     "org-b",
     "org-report",
@@ -134,6 +148,7 @@ beforeAll(async () => {
     "other-org",
     "org-never-used",
   ]);
+  ORG_ID = idOf(ORG);
   command = createClient(AgentExecutionCommandController, transport);
   query = createClient(AgentExecutionQueryController, transport);
 });
@@ -170,7 +185,7 @@ function seedInput(overrides?: {
       id,
       name: slug,
       slug,
-      org: overrides?.org ?? ORG,
+      org: overrides?.org ?? ORG_ID,
     },
     spec: {
       sessionId: overrides?.sessionId ?? `ses_test_${counter}`,
@@ -231,7 +246,7 @@ describe("create over the wire (engine gate)", () => {
       create(AgentSchema, {
         apiVersion: "agentic.stigmer.ai/v1",
         kind: "Agent",
-        metadata: { id: "agt_create_gate", name: "gate-agent", org: ORG },
+        metadata: { id: "agt_create_gate", name: "gate-agent", org: ORG_ID },
       }),
     );
 
@@ -383,10 +398,12 @@ describe("get / list / listBySession over the wire", () => {
     const newestFirst: string[] = [];
     for (let i = 0; i < 5; i++) {
       newestFirst.unshift(
-        await seed(seedInput({ org, createdAtMs: base + i * 1000 })),
+        await seed(seedInput({ org: idOf(org), createdAtMs: base + i * 1000 })),
       );
     }
-    await seed(seedInput({ org: "other-org", createdAtMs: base + 10_000 }));
+    await seed(
+      seedInput({ org: idOf("other-org"), createdAtMs: base + 10_000 }),
+    );
 
     const walked: string[] = [];
     let pageToken = "";
@@ -517,7 +534,7 @@ describe("usage reports over the wire", () => {
     await seed(
       seedInput({
         agentId: "agt_scoped",
-        org: "org-a",
+        org: idOf("org-a"),
         sessionId: "ses_a1",
         startedAt: "2026-03-10T10:00:00Z",
       }),
@@ -525,7 +542,7 @@ describe("usage reports over the wire", () => {
     await seed(
       seedInput({
         agentId: "agt_scoped",
-        org: "org-a",
+        org: idOf("org-a"),
         sessionId: "ses_a2",
         startedAt: "2026-03-11T10:00:00Z",
       }),
@@ -533,7 +550,7 @@ describe("usage reports over the wire", () => {
     await seed(
       seedInput({
         agentId: "agt_scoped",
-        org: "org-b",
+        org: idOf("org-b"),
         sessionId: "ses_b1",
         startedAt: "2026-03-10T10:00:00Z",
       }),
@@ -564,13 +581,13 @@ describe("usage reports over the wire", () => {
       "agt_named",
       AgentSchema,
       create(AgentSchema, {
-        metadata: { id: "agt_named", name: "PR Reviewer", org: "org-a" },
+        metadata: { id: "agt_named", name: "PR Reviewer", org: idOf("org-a") },
       }),
     );
     await seed(
       seedInput({
         agentId: "agt_named",
-        org: "org-a",
+        org: idOf("org-a"),
         startedAt: "2026-03-10T10:00:00Z",
       }),
     );
@@ -607,7 +624,7 @@ describe("usage reports over the wire", () => {
     await seed(
       seedInput({
         agentId: "agt_org_report",
-        org: "org-report",
+        org: idOf("org-report"),
         sessionId: "ses_r1",
         startedAt: "2026-04-10T10:00:00Z",
       }),
@@ -615,7 +632,7 @@ describe("usage reports over the wire", () => {
     await seed(
       seedInput({
         agentId: "agt_org_report",
-        org: "org-report",
+        org: idOf("org-report"),
         sessionId: "ses_r2",
         startedAt: "2026-04-11T10:00:00Z",
       }),
@@ -816,7 +833,7 @@ function gatedSeed(overrides?: {
   return {
     apiVersion: API_VERSION,
     kind: KIND,
-    metadata: { id, name: slug, slug, org: ORG },
+    metadata: { id, name: slug, slug, org: ORG_ID },
     spec: {
       sessionId: `ses_${id}`,
       agentId: `agt_${id}`,
@@ -1065,7 +1082,7 @@ describe("submitApproval over the wire (submit_approval_contract_test.go arms)",
     await seed({
       apiVersion: API_VERSION,
       kind: KIND,
-      metadata: { id, name: slug, slug, org: ORG },
+      metadata: { id, name: slug, slug, org: ORG_ID },
       spec: { message: "Say hello." },
       status: {
         phase: ExecutionPhase.EXECUTION_WAITING_FOR_APPROVAL,
@@ -1441,7 +1458,7 @@ describe("the decider is the authorized caller (direct calls, #1385)", () => {
       await seed({
         apiVersion: API_VERSION,
         kind: KIND,
-        metadata: { id, name: slug, slug, org: ORG },
+        metadata: { id, name: slug, slug, org: ORG_ID },
         spec: { message: "Say hello." },
         status,
       });
@@ -1488,7 +1505,7 @@ describe("submitFileDecision over the wire", () => {
       init: {
         apiVersion: API_VERSION,
         kind: KIND,
-        metadata: { id, name: slug, slug, org: ORG },
+        metadata: { id, name: slug, slug, org: ORG_ID },
         spec: { message: "Say hello." },
         status,
       },
@@ -1628,7 +1645,7 @@ describe("getExecutionSummary — the populated arm", () => {
     // never skips them (Go: a zero created_at disables the skip).
     await seed(
       seedInput({
-        org: "org-summary",
+        org: idOf("org-summary"),
         phase: ExecutionPhase.EXECUTION_COMPLETED,
         startedAt: "2026-06-01T10:00:00Z",
         completedAt: "2026-06-01T11:00:00Z",
@@ -1636,14 +1653,14 @@ describe("getExecutionSummary — the populated arm", () => {
     );
     await seed(
       seedInput({
-        org: "org-summary",
+        org: idOf("org-summary"),
         agentId: "agt_failing",
         phase: ExecutionPhase.EXECUTION_FAILED,
       }),
     );
     await seed(
       seedInput({
-        org: "org-summary",
+        org: idOf("org-summary"),
         phase: ExecutionPhase.EXECUTION_PENDING,
       }),
     );

@@ -54,7 +54,7 @@ class LicenseInput:
     term: int
     expires_at: str
     grace_until: str
-    # Always empty: a License belongs to the platform, not to an organization.
+    # Always empty: a License belongs to no organization.
     org: str = ""
     id: str | None = None
     slug: str | None = None

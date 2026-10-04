@@ -22,11 +22,19 @@ import {
 /** Options for {@link parseManifest}. */
 export interface ParseManifestOptions {
   /**
-   * Target organization slug. Injected into `metadata.org` when the document
-   * omits it. When the document specifies a *different* org, the document's
-   * value wins and a warning is attached (matching `stigmer apply`).
+   * Target organization, by slug or id. Injected into `metadata.org` when
+   * the document omits it. When the document specifies a *different* org,
+   * the document's value wins and a warning is attached (matching
+   * `stigmer apply`).
    */
   readonly org?: string;
+  /**
+   * Every other value the target organization goes by (its slug when `org`
+   * is its id, or its id when `org` is its slug). Parsing asks no server, so
+   * these are what let a document naming the target in another form apply
+   * quietly, and one naming a different organization in either form warn.
+   */
+  readonly orgNames?: readonly string[];
 }
 
 /** One resource document parsed from a manifest. */
@@ -102,7 +110,7 @@ export function parseManifest(
       );
     }
 
-    documents.push(parseDocument(value as Record<string, unknown>, where, options.org));
+    documents.push(parseDocument(value as Record<string, unknown>, where, options.org, options.orgNames));
   }
 
   if (documents.length === 0) {
@@ -121,6 +129,7 @@ function parseDocument(
   value: Record<string, unknown>,
   where: string,
   org: string | undefined,
+  orgNames: readonly string[] = [],
 ): ManifestDocument {
   const kind = value.kind;
   if (typeof kind !== "string" || kind === "") {
@@ -152,7 +161,7 @@ function parseDocument(
     );
   }
 
-  const warning = injectOrg(message, org ?? "");
+  const warning = injectOrg(message, org ?? "", orgNames);
 
   const metadata = metadataOf(message);
   const name = metadata?.name ?? "";
@@ -179,8 +188,12 @@ export function metadataOf(message: Message): ApiResourceMetadata | undefined {
 
 // Inject the target org into metadata.org when the document omitted it. When
 // the document specifies a *different* org, the document's value is honored
-// and a warning is returned (matching `stigmer apply`).
-function injectOrg(message: Message, org: string): string | undefined {
+// and a warning is returned (matching `stigmer apply`). An organization is
+// named by its id or its slug, and parsing asks no server. Given
+// `orgNames`, the target is known by every name, so any other value is a
+// different organization. Given `org` alone, a document's org is known to
+// differ only when it has the same form (two ids, or two slugs).
+function injectOrg(message: Message, org: string, orgNames: readonly string[]): string | undefined {
   if (org === "") return undefined;
   const holder = message as unknown as { metadata?: ApiResourceMetadata };
   if (holder.metadata === undefined) {
@@ -191,10 +204,16 @@ function injectOrg(message: Message, org: string): string | undefined {
     holder.metadata.org = org;
     return undefined;
   }
-  if (holder.metadata.org !== org) {
+  const documentOrg = holder.metadata.org;
+  const target = [org, ...orgNames];
+  if (
+    !target.includes(documentOrg) &&
+    (orgNames.length > 0 || isOrganizationId(org) === isOrganizationId(documentOrg))
+  ) {
+    const targetLabel = target.find((name) => !isOrganizationId(name)) ?? org;
     return (
-      `The document's org "${holder.metadata.org}" differs from the ` +
-      `target org "${org}"; applying to "${holder.metadata.org}".`
+      `The document's org "${documentOrg}" differs from the ` +
+      `target org "${targetLabel}"; applying to "${documentOrg}".`
     );
   }
   return undefined;
@@ -202,4 +221,9 @@ function injectOrg(message: Message, org: string): string | undefined {
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Whether a value is a minted organization id (`org_` and a lowercase ULID) rather than a slug. */
+function isOrganizationId(value: string): boolean {
+  return /^org_[0-9a-z]{26}$/.test(value);
 }

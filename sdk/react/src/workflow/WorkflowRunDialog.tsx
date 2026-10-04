@@ -15,7 +15,7 @@ export interface WorkflowRunDialogProps {
   readonly open: boolean;
   /** Called when the dialog should close (cancel, backdrop click, Escape). */
   readonly onOpenChange: (open: boolean) => void;
-  /** Organization slug that owns the workflow. */
+  /** Id of the organization that owns the workflow (a slug is also accepted). */
   readonly org: string;
   /** The workflow blueprint to run. */
   readonly workflow: Workflow;

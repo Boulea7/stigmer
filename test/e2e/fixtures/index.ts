@@ -38,13 +38,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   ],
 
   // An organization of the test's own, made the console's active org before
-  // the first page loads (the org switcher's own localStorage key), so a
-  // spec sees only what it seeded.
+  // the first page loads (the org switcher's own localStorage key, which
+  // holds the organization's id), so a spec sees only what it seeded.
   freshOrg: async ({ stigmerClient, page }, use) => {
     const result = await createTestOrg(stigmerClient);
-    await page.addInitScript((slug) => {
-      localStorage.setItem("stigmer:activeOrgSlug", slug);
-    }, result.slug);
+    await page.addInitScript((id) => {
+      localStorage.setItem("stigmer:activeOrg", id);
+    }, result.id);
     await use(result);
     await result.cleanup();
   },

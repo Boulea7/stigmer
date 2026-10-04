@@ -17,7 +17,7 @@ import type { AgentWizardData } from "./steps/types.js";
 
 /** Result passed to `onComplete` after successful agent creation. */
 export interface AgentCreationResult {
-  /** Organization slug of the created agent. */
+  /** The created agent's organization, by the id it is stored under. */
   readonly org: string;
   /** Agent slug (for URL construction). */
   readonly slug: string;
@@ -87,11 +87,15 @@ const STEPS: WizardStepDef<AgentWizardData>[] = [
  * This component is an SDK-first, embeddable wizard with zero Console
  * dependencies. Platform builders can mount it anywhere.
  *
+ * `onComplete` receives the organization by id; the URL carries the slug.
+ *
  * @example
  * ```tsx
+ * const slugForOrg = useOrgSlugForId();
+ *
  * <AgentCreationWizard
  *   org="acme"
- *   onComplete={({ org, slug }) => navigate(`/agents/${org}/${slug}`)}
+ *   onComplete={({ org, slug }) => navigate(`/agents/${slugForOrg(org)}/${slug}`)}
  *   onCancel={() => navigate("/agents")}
  * />
  * ```

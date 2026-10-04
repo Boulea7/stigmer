@@ -14,9 +14,9 @@ export interface UseSessionListOptions {
   /** Optional tag filter. */
   tags?: string[];
   /**
-   * Organization slug to list the sessions of. When omitted, the list spans
+   * Organization id to list the sessions of (a slug is also accepted). When omitted, the list spans
    * every organization the caller can view. Console pages should pass the
-   * active org (`useActiveOrgSlug()`).
+   * active org (`useActiveOrgId()`).
    */
   org?: string | null;
 }
@@ -62,7 +62,7 @@ function sessionIdentity(session: Session): string {
  * @example
  * ```tsx
  * function SessionSidebar() {
- *   const org = useActiveOrgSlug();
+ *   const org = useActiveOrgId();
  *   const { sessions, isLoading, hasMore, loadMore, isLoadingMore } =
  *     useSessionList({ org, pageSize: 25 });
  *

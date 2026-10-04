@@ -179,6 +179,8 @@ import {
   createSingleOrganizationInterceptor,
   newSingleOrganizationHolder,
 } from "../pipeline/interceptors/single-organization.js";
+import { createOrganizationNameInterceptor } from "../pipeline/interceptors/organization-names.js";
+import { newOrganizationNameResolver } from "../domain/organization/names.js";
 import { accountAsCaller } from "../domain/identityaccount/actor.js";
 import { ensureSingleOrganization } from "./single-organization.js";
 import { operatorIdentitySnapshot } from "../pipeline/steps/defaults.js";
@@ -1954,6 +1956,9 @@ export async function composeServer(
           extensions.drivers.visitorErrorPolicy,
         ),
         requestMetrics: createRequestMetricsInterceptor(),
+        organizationNames: createOrganizationNameInterceptor(
+          newOrganizationNameResolver(store),
+        ),
         ...(singleOrganization === undefined
           ? {}
           : {
@@ -2031,7 +2036,8 @@ export async function composeServer(
       // The one organization of a composition that declares one, made
       // before any background work reads the store and before the port
       // (boot/single-organization.ts). A failure is a boot throw, except a
-      // retired slug, which leaves the fill off with a warning.
+      // create refused as a duplicate that leaves the store with none, which
+      // leaves the fill off with a warning.
       if (singleOrganization !== undefined) {
         await ensureSingleOrganization({
           store,

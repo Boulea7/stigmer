@@ -24,8 +24,9 @@
  * and delete chains load their target first and answer NOT_FOUND
  * themselves, and a general existence read would refuse the rowless
  * `platform` (model/bindings.ts), whose checks the laptop must keep
- * allowing. An Organization's id is its slug (domain/organization/
- * steps.ts), so the read is one primary key; the posture is open source's
+ * allowing. The serving chain has already turned a slug into the
+ * organization's id (pipeline/interceptors/organization-names.ts), so the
+ * read is one primary key; the posture is open source's
  * edition only (compose.ts refuses a wider edition without sign-in), so
  * every Organization is a row in this store.
  *

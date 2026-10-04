@@ -96,7 +96,7 @@ export class EnvironmentClient {
   }
 }
 
-/** Input for creating/updating a Environment. */
+/** Input for creating/updating an Environment. */
 export interface EnvironmentInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

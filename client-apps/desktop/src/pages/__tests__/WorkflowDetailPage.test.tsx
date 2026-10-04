@@ -54,7 +54,7 @@ vi.mock("@stigmer/react", () => ({
   useDeleteWorkflowInstance: () => ({ deleteInstance: noop }),
   useElkLayoutEngine: () => undefined,
   useBreadcrumbOverride: () => ({ setLabel: noop }),
-  useActiveOrgSlug: () => "acme",
+  useActiveOrgId: () => "org_acme",
   toast: { success: () => undefined, error: () => undefined },
 }));
 

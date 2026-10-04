@@ -1,0 +1,227 @@
+/**
+ * Pins how the desktop library list pages (agents, skills, plugins,
+ * workflows, MCP servers) name organizations. A listed resource names its
+ * organization by id: the list is scoped to the active organization's id,
+ * the Organization column renders that id through `OrgSlugText` (which shows
+ * the slug), and every way out of a row (opening it, View details, Copy ID,
+ * an MCP server's Connect dialog) carries the slug of the resource's own
+ * organization, never the id and never the active organization's slug. The
+ * workbench, the action menu and the dialogs are pinned in @stigmer/react.
+ */
+import type { ComponentType, ReactNode } from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+
+interface Item {
+  id: string;
+  org: string;
+  slug: string;
+  name: string;
+  description: string;
+}
+
+interface Column {
+  id: string;
+  cell: (item: Item) => ReactNode;
+}
+
+interface WorkbenchProps {
+  org: string;
+  columns: Column[];
+  onItemClick: (item: Item) => void;
+  renderItemAction?: (item: Item) => ReactNode;
+}
+
+interface ConnectDialogProps {
+  org: string;
+  slug: string;
+  activeOrg: string;
+  open: boolean;
+  onOpenDetails: () => void;
+}
+
+const page = vi.hoisted(() => ({
+  workbench: [] as WorkbenchProps[],
+  connect: [] as ConnectDialogProps[],
+  // A resource shared into the viewer's library from another organization:
+  // its org id resolves to that organization's slug, not the active one's.
+  item: {
+    id: "res_1",
+    org: "org_shared",
+    slug: "triage",
+    name: "Triage",
+    description: "",
+  },
+}));
+
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+
+vi.mock("@stigmer/react", () => {
+  const ActionMenu = Object.assign(
+    ({ children }: { children: ReactNode }) => <>{children}</>,
+    {
+      Trigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+      Content: ({ children }: { children: ReactNode }) => <>{children}</>,
+      Item: ({ children, onSelect }: { children: ReactNode; onSelect: () => void }) => (
+        <button type="button" onClick={onSelect}>
+          {children}
+        </button>
+      ),
+      Separator: () => null,
+    },
+  );
+  const noop = () => undefined;
+  const resourceClient = { list: noop, delete: noop };
+  return {
+    ActionMenu,
+    ResourceWorkbench: (props: WorkbenchProps) => {
+      page.workbench.push(props);
+      return (
+        <div>
+          {props.columns.map((column) => (
+            <div key={column.id} data-testid={`cell-${column.id}`}>
+              {column.cell(page.item)}
+            </div>
+          ))}
+          <button type="button" onClick={() => props.onItemClick(page.item)}>
+            open row
+          </button>
+          {props.renderItemAction?.(page.item)}
+        </div>
+      );
+    },
+    OrgSlugText: ({ orgId }: { orgId: string }) => <span data-org-id={orgId} />,
+    McpServerConnectDialog: (props: ConnectDialogProps) => {
+      page.connect.push(props);
+      return null;
+    },
+    ApplyManifestDialog: () => null,
+    ConfirmDialog: () => null,
+    useConfirmAction: () => ({ confirmState: null, confirm: noop, handleConfirm: noop, handleCancel: noop }),
+    useStigmer: () => ({
+      agent: resourceClient,
+      skill: resourceClient,
+      plugin: resourceClient,
+      workflow: resourceClient,
+      mcpServer: resourceClient,
+    }),
+    toast,
+    useActiveOrgId: () => "org_acme",
+    // The person's organizations: the active one and the one sharing the row.
+    useOrgSlugForId: () => (id: string) =>
+      ({ org_acme: "acme", org_shared: "shared-team" })[id] ?? id,
+  };
+});
+
+import AgentListPage from "../library/AgentListPage";
+import SkillListPage from "../library/SkillListPage";
+import PluginListPage from "../library/PluginListPage";
+import McpServerListPage from "../library/McpServerListPage";
+import WorkflowListPage from "../workflow/WorkflowListPage";
+
+function LocationProbe() {
+  return <span data-testid="location">{useLocation().pathname}</span>;
+}
+
+function renderPage(Page: ComponentType) {
+  return render(
+    <MemoryRouter initialEntries={["/library"]}>
+      <Routes>
+        <Route path="*" element={<Page />} />
+      </Routes>
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+}
+
+function location(): string | null {
+  return screen.getByTestId("location").textContent;
+}
+
+beforeEach(() => {
+  page.workbench.length = 0;
+  page.connect.length = 0;
+  toast.success.mockClear();
+});
+
+const MENU_PAGES: ReadonlyArray<{ name: string; Page: ComponentType; segment: string; copied: string }> = [
+  { name: "AgentListPage", Page: AgentListPage, segment: "agents", copied: "Copied agent ID" },
+  { name: "SkillListPage", Page: SkillListPage, segment: "skills", copied: "Copied skill ID" },
+  { name: "PluginListPage", Page: PluginListPage, segment: "plugins", copied: "Copied plugin ID" },
+  { name: "WorkflowListPage", Page: WorkflowListPage, segment: "workflows", copied: "Copied workflow reference" },
+];
+
+describe.each(MENU_PAGES)("desktop $name — organizations", ({ Page, segment, copied }) => {
+  it("lists the active organization by id and shows each row's org through OrgSlugText", () => {
+    renderPage(Page);
+
+    expect(page.workbench.at(-1)?.org).toBe("org_acme");
+    expect(screen.getByTestId("cell-org").querySelector("[data-org-id]")?.getAttribute("data-org-id")).toBe(
+      "org_shared",
+    );
+  });
+
+  it("opens a row at a URL carrying its own organization's slug", () => {
+    renderPage(Page);
+
+    fireEvent.click(screen.getByRole("button", { name: "open row" }));
+
+    expect(location()).toBe(`/library/${segment}/shared-team/triage`);
+  });
+
+  it("opens View details at the same slug URL", () => {
+    renderPage(Page);
+
+    fireEvent.click(screen.getByRole("button", { name: /View details/ }));
+
+    expect(location()).toBe(`/library/${segment}/shared-team/triage`);
+  });
+
+  it("copies the reference with the organization's slug", () => {
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    renderPage(Page);
+
+    fireEvent.click(screen.getByRole("button", { name: /Copy/ }));
+
+    expect(writeText).toHaveBeenCalledWith("shared-team/triage");
+    expect(toast.success).toHaveBeenCalledWith(copied);
+    writeText.mockRestore();
+  });
+});
+
+describe("desktop McpServerListPage — organizations", () => {
+  it("lists the active organization by id and shows each row's org through OrgSlugText", () => {
+    renderPage(McpServerListPage);
+
+    expect(page.workbench.at(-1)?.org).toBe("org_acme");
+    expect(screen.getByTestId("cell-org").querySelector("[data-org-id]")?.getAttribute("data-org-id")).toBe(
+      "org_shared",
+    );
+  });
+
+  it("opens a row at a URL carrying its own organization's slug", () => {
+    renderPage(McpServerListPage);
+
+    fireEvent.click(screen.getByRole("button", { name: "open row" }));
+
+    expect(location()).toBe("/library/mcp-servers/shared-team/triage");
+  });
+
+  it("connects by the server's org id and opens its details at the slug URL", () => {
+    renderPage(McpServerListPage);
+
+    fireEvent.click(screen.getByRole("button", { name: "Connect Triage" }));
+    expect(page.connect.at(-1)).toMatchObject({
+      org: "org_shared",
+      slug: "triage",
+      activeOrg: "org_acme",
+      open: true,
+    });
+
+    act(() => page.connect.at(-1)?.onOpenDetails());
+
+    expect(location()).toBe("/library/mcp-servers/shared-team/triage");
+    expect(page.connect.at(-1)?.open).toBe(false);
+  });
+});

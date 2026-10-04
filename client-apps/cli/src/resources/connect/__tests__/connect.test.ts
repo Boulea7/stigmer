@@ -328,7 +328,7 @@ describe("dry-run path", () => {
     ]);
 
     const lines: string[] = [];
-    renderConnectResult(result, (l) => lines.push(l), false);
+    renderConnectResult(result, (l) => lines.push(l), false, "acme");
     const text = lines.join("\n");
     expect(text).toContain("MCP Server: acme/github");
     expect(text).toContain("Transport:  stdio");

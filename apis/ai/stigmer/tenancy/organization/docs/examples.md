@@ -90,7 +90,9 @@ spec:
 
 Fields that are **mutable** after creation: `metadata.name`, `metadata.labels`, `metadata.annotations`, `spec.description`, `spec.logo_url`.
 
-Fields that are **immutable** after creation: `metadata.slug`, `spec.management_mode`, `spec.identity_provider_ref`, `spec.external_org_id`.
+Fields that are **immutable** after creation: `spec.management_mode`, `spec.identity_provider_ref`, `spec.external_org_id`.
+
+`metadata.slug` changes only through `rename` (owners only); an update or apply ignores a different slug. The organization's `metadata.id` (`org_…`) never changes, so a rename moves no agent, member or secret, and the old slug keeps leading to the organization for 30 days.
 
 ```yaml
 # Update — only mutate allowed fields
@@ -98,7 +100,7 @@ apiVersion: tenancy.stigmer.ai/v1
 kind: Organization
 metadata:
   name: Acme Corp Engineering  # name is mutable
-  slug: acme-corp              # slug is immutable; must match existing value
+  slug: acme-corp              # a different slug here is ignored; rename changes it
   labels:
     industry: fintech
     tier: enterprise

@@ -24,16 +24,31 @@ import {
 
 export type JsonObject = Record<string, JsonValue>;
 
-/** A row extractor + headers describing a collection's table view. */
+/** How a table cell names an organization value: its label, or the value as given. */
+export type OrgLabel = (value: string) => string;
+
+/**
+ * A row extractor + headers describing a collection's table view. A table
+ * whose rows name organizations lists them in `orgs`, so the caller can
+ * label each distinct value once (by slug, in place of the id the rows
+ * carry) before the rows render through `orgLabel`.
+ */
 export interface TableShape {
   readonly resourceName: string;
   readonly headers: readonly string[];
-  readonly row: (json: JsonObject) => readonly string[];
+  readonly row: (json: JsonObject, orgLabel: OrgLabel) => readonly string[];
+  readonly orgs?: (json: JsonObject) => readonly string[];
 }
 
-/** How the human field view renders: `hideOrg` leaves the Org line out (a server that holds one organization never names it). */
+/**
+ * How the human field view renders: `hideOrg` leaves the Org line out (a
+ * server that holds one organization never names it); `orgLabel` is how
+ * the Org line names it, the organization's slug in place of the id the
+ * resource carries.
+ */
 export interface RenderFieldsOptions {
   readonly hideOrg?: boolean;
+  readonly orgLabel?: string;
 }
 
 /** Render a single resource for a read verb (json/yaml = protojson, always complete; table = fields). */
@@ -48,18 +63,36 @@ export function renderResource(
   return renderResourceFields(protoToJsonValue(schema, message), options);
 }
 
-/** Render a collection for a read verb (json/yaml = protojson array; table = grid). */
+/**
+ * Render a collection for a read verb (json/yaml = protojson array, the
+ * wire as-is; table = grid, naming each organization by `orgLabels` where
+ * it holds one).
+ */
 export function renderCollection(
   schema: DescMessage,
   messages: readonly Message[],
   format: OutputFormat,
   table: TableShape,
+  orgLabels: ReadonlyMap<string, string> = new Map(),
 ): string {
   if (format === "json") return renderProtoListJson(schema, messages);
   if (format === "yaml") return renderProtoListYaml(schema, messages);
   if (messages.length === 0) return renderEmpty(table.resourceName);
-  const rows = messages.map((message) => table.row(asObject(protoToJsonValue(schema, message))));
+  const label = labelFrom(orgLabels);
+  const rows = messages.map((message) => table.row(asObject(protoToJsonValue(schema, message)), label));
   return `\n${renderTable(table.headers, rows)}`;
+}
+
+/** The organization values a human table's rows name; none for machine output or a table that names none. */
+export function tableOrganizations(
+  schema: DescMessage,
+  messages: readonly Message[],
+  format: OutputFormat,
+  table: TableShape,
+): readonly string[] {
+  const orgs = table.orgs;
+  if (format === "json" || format === "yaml" || orgs === undefined) return [];
+  return messages.flatMap((message) => orgs(asObject(protoToJsonValue(schema, message))));
 }
 
 /**
@@ -79,9 +112,15 @@ export function renderListMessage(
   if (format === "yaml") return renderProtoYaml(schema, message);
   const entries = protoToJsonValue(schema, message);
   const list = asObject(entries).entries;
-  const rows = (Array.isArray(list) ? list : []).map((entry) => table.row(asObject(entry)));
+  const label = labelFrom(new Map());
+  const rows = (Array.isArray(list) ? list : []).map((entry) => table.row(asObject(entry), label));
   if (rows.length === 0) return renderEmpty(table.resourceName);
   return `\n${renderTable(table.headers, rows)}`;
+}
+
+// How a table names an organization: its label where one is known, else the value as given.
+function labelFrom(orgLabels: ReadonlyMap<string, string>): OrgLabel {
+  return (value) => orgLabels.get(value) ?? value;
 }
 
 // Human field view of a resource's metadata envelope (+ common spec fields).
@@ -94,7 +133,7 @@ function renderResourceFields(json: JsonValue, options: RenderFieldsOptions): st
   pushField(fields, "ID", metadata.id);
   pushField(fields, "Name", metadata.name);
   pushField(fields, "Slug", metadata.slug);
-  if (options.hideOrg !== true) pushField(fields, "Org", metadata.org);
+  if (options.hideOrg !== true) pushField(fields, "Org", options.orgLabel ?? metadata.org);
   pushField(fields, "Visibility", metadata.visibility);
   pushField(fields, "Description", spec.description);
 

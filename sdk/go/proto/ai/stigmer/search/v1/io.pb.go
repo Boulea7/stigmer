@@ -62,7 +62,7 @@ type SearchRequest struct {
 	Query string `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
 	// Organization to scope the search.
 	//
-	// Format: lowercase alphanumeric with hyphens (e.g., "acme", "stigmer").
+	// The organization's slug (e.g., "acme") or its id (org_<ulid>).
 	//
 	// Behavior:
 	// - Empty: Search all organizations the caller has access to
@@ -259,14 +259,16 @@ type SearchResult struct {
 	//
 	// Lowercase alphanumeric with hyphens (e.g., "code-review-agent", "web-search").
 	Slug string `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	// Fully qualified slug: "org/slug".
+	// Fully qualified reference: "<org>/<slug>", where org is the owning
+	// organization's id, as metadata.org carries it.
 	//
-	// Pre-computed for CLI and UI display.
-	// Example: "stigmer/web-search", "acme/code-reviewer"
+	// Example: "org_01j5q3k7m8r2s4tnz2hf6w8x9a/code-reviewer"; an organization
+	// made before ids were minted reads "acme/code-reviewer".
 	//
-	// This is the canonical reference format used in YAML configurations.
+	// A reference in this form resolves as written. Clients that show it to a
+	// person put the organization's slug in place of its id.
 	QualifiedSlug string `protobuf:"bytes,5,opt,name=qualified_slug,json=qualifiedSlug,proto3" json:"qualified_slug,omitempty"`
-	// Organization that owns this resource (e.g., "stigmer", "acme-corp").
+	// Organization that owns this resource, by id (e.g., "org_01j5q3k7m8r2s4tnz2hf6w8x9a").
 	Org string `protobuf:"bytes,6,opt,name=org,proto3" json:"org,omitempty"`
 	// Brief description of the resource for display in search results.
 	//
@@ -433,12 +435,12 @@ var File_ai_stigmer_search_v1_io_proto protoreflect.FileDescriptor
 
 const file_ai_stigmer_search_v1_io_proto_rawDesc = "" +
 	"\n" +
-	"\x1dai/stigmer/search/v1/io.proto\x12\x14ai.stigmer.search.v1\x1aFai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind.proto\x1a)ai/stigmer/commons/apiresource/enum.proto\x1a'ai/stigmer/commons/rpc/pagination.proto\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaa\x02\n" +
+	"\x1dai/stigmer/search/v1/io.proto\x12\x14ai.stigmer.search.v1\x1aFai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind.proto\x1a)ai/stigmer/commons/apiresource/enum.proto\x1a'ai/stigmer/commons/rpc/pagination.proto\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbd\x02\n" +
 	"\rSearchRequest\x12d\n" +
 	"\x05kinds\x18\x01 \x03(\x0e2?.ai.stigmer.commons.apiresource.apiresourcekind.ApiResourceKindB\r\xbaH\n" +
 	"\x92\x01\a\"\x05\x82\x01\x02\x10\x01R\x05kinds\x12\x1e\n" +
-	"\x05query\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\x05query\x12/\n" +
-	"\x03org\x18\x03 \x01(\tB\x1d\xbaH\x1ar\x18\x18?2\x14^$|^[a-z][a-z0-9-]*$R\x03org\x124\n" +
+	"\x05query\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\x05query\x12B\n" +
+	"\x03org\x18\x03 \x01(\tB0\xbaH-r+\x18?2'^$|^[a-z][a-z0-9-]*$|^org_[0-9a-z]{26}$R\x03org\x124\n" +
 	"\x04page\x18\x05 \x01(\v2 .ai.stigmer.commons.rpc.PageInfoR\x04pageJ\x04\b\x04\x10\x05J\x04\b\x06\x10\aR\x0eexclude_publicR\x10cross_org_public\"\xaf\x02\n" +
 	"\x0eSearchResponse\x12<\n" +
 	"\aentries\x18\x01 \x03(\v2\".ai.stigmer.search.v1.SearchResultR\aentries\x12\\\n" +

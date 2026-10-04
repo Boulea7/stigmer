@@ -8,7 +8,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { MethodSchema, ServiceDefinition, ServiceSchemaFile } from "./gen-common.js";
-import { goQuote, hasExplicitPresence, isEmptyType, isIDType, isSpecialType, searchListSupersedesMethod } from "./gen-common.js";
+import { goQuote, hasExplicitPresence, indefiniteArticle, isEmptyType, isIDType, isSpecialType, searchListSupersedesMethod } from "./gen-common.js";
 import { isPythonKeyword, pyClientFieldName, pyFieldName, pyMethodName, pyProtoFileToModule, pyProtoImportLine, pyProtoModuleAlias, pyStubMethodName } from "./lang-names.js";
 import type { ResourceGenInfo, SdkResourceConfig } from "./sdk-resource-config.js";
 import { deriveResourceConfig, loadSpecSchemaWithTypes, META_FIELD_NAMES } from "./sdk-resource-config.js";
@@ -744,7 +744,8 @@ function generatePythonInputAndProto(
 
   buf.push("@dataclass\n");
   buf.push(`class ${inputName}:\n`);
-  buf.push(`    """Input for creating or updating a ${cfg.protoResType}."""\n\n`);
+  const article = indefiniteArticle(cfg.protoResType);
+  buf.push(`    """Input for creating or updating ${article} ${cfg.protoResType}."""\n\n`);
   buf.push("    name: str\n");
   if (!cfg.isOrgless) {
     buf.push("    org: str\n");
@@ -753,7 +754,7 @@ function generatePythonInputAndProto(
   if (cfg.isOrgless) {
     // An org-less kind's org defaults to empty; a value is sent as given, so
     // the server's refusal names the mistake.
-    buf.push(`    # Always empty: a ${cfg.protoResType} belongs to the platform, not to an organization.\n`);
+    buf.push(`    # Always empty: ${article} ${cfg.protoResType} belongs to no organization.\n`);
     buf.push('    org: str = ""\n');
   }
   // id: exact update addressing for platform-scoped (org-less) kinds.

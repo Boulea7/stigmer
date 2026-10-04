@@ -12,7 +12,7 @@ import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 export interface WorkflowRepairCardProps {
   /** ID of the failed workflow execution to diagnose. */
   readonly executionId: string;
-  /** Organization slug for authorization and resource context. */
+  /** Organization id for authorization and resource context (a slug is also accepted). */
   readonly org: string;
   /** Current workflow YAML for diff computation (optional). */
   readonly currentWorkflowYaml?: string;

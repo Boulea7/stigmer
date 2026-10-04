@@ -357,8 +357,10 @@ export class LocalExecutionTarget implements TargetProfile {
     // No auth and no bootstrap org: a fresh Organization is a fully isolated
     // scope. It is created, not just named: a write into an Organization the
     // server does not hold is NOT_FOUND (stigmer#1163).
-    const { slug } = await createUniqueOrganization(this.clients().organizationCommand, "tenancy");
-    return { org: slug };
+    // The tenancy names its organization by id, as every resource does;
+    // the organization-identity suite drives the slug forms.
+    const { id } = await createUniqueOrganization(this.clients().organizationCommand, "tenancy");
+    return { org: id };
   }
 
   async cleanupTenancy(): Promise<void> {
@@ -370,8 +372,8 @@ export class LocalExecutionTarget implements TargetProfile {
   // privileged contract (stigmer#547).
   async provisionPrivilegedScope(): Promise<PrivilegedScope> {
     const clients = this.clients();
-    const { slug } = await createUniqueOrganization(clients.organizationCommand, "the privileged scope");
-    return { clients, context: { org: slug }, cleanup: async () => {} };
+    const { id } = await createUniqueOrganization(clients.organizationCommand, "the privileged scope");
+    return { clients, context: { org: id }, cleanup: async () => {} };
   }
 
   async teardown(): Promise<void> {

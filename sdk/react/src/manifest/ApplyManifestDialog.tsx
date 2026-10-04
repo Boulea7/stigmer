@@ -10,6 +10,7 @@ import {
   useApplyManifest,
   type ManifestPreviewEntry,
 } from "./useApplyManifest.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 // CodeMirror loads only when the dialog actually opens.
 const LazyYamlEditor = lazy(() =>
@@ -22,7 +23,7 @@ export interface ApplyManifestDialogProps {
   readonly open: boolean;
   /** Called when the dialog should open or close. */
   readonly onOpenChange: (open: boolean) => void;
-  /** Target organization slug for documents that omit `metadata.org`. */
+  /** Target organization (its id) for documents that omit `metadata.org`. */
   readonly org: string;
   /**
    * Called when the dialog closes after at least one document applied,
@@ -257,6 +258,7 @@ function EditorLoading() {
 // ---------------------------------------------------------------------------
 
 function PreviewRow({ entry }: { readonly entry: ManifestPreviewEntry }) {
+  const slugForOrg = useOrgSlugForId();
   return (
     <li className="stg:rounded-md stg:border stg:border-border stg:bg-card stg:px-3 stg:py-2">
       <div className="stg:flex stg:items-center stg:gap-2">
@@ -268,7 +270,7 @@ function PreviewRow({ entry }: { readonly entry: ManifestPreviewEntry }) {
         </span>
         <ActionBadge entry={entry} />
         <span className="stg:ml-auto stg:text-xs stg:text-muted-foreground">
-          {entry.document.org}
+          {slugForOrg(entry.document.org)}
         </span>
       </div>
       {entry.document.warning && (

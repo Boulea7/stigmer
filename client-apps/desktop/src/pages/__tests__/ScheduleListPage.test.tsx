@@ -53,7 +53,9 @@ vi.mock("@stigmer/react", () => ({
   createScheduleColumns: () => [],
   createScheduleListFn: () => LIST_FN,
   useStigmer: () => ({}),
-  useActiveOrgSlug: () => "acme",
+  useActiveOrgId: () => "org_acme",
+  // The person's organizations: org_acme reads "acme" in a URL.
+  useOrgSlugForId: () => (id: string) => (id === "org_acme" ? "acme" : id),
 }));
 
 import ScheduleListPage from "../library/ScheduleListPage";
@@ -84,7 +86,7 @@ describe("desktop ScheduleListPage", () => {
 
     expect(page.workbench.at(-1)).toMatchObject({
       listFn: LIST_FN,
-      org: "acme",
+      org: "org_acme",
       searchable: false,
       defaultViewMode: "table",
       viewModes: ["table"],
@@ -97,7 +99,8 @@ describe("desktop ScheduleListPage", () => {
   it("opens a schedule from its row", () => {
     renderList();
 
-    act(() => page.workbench.at(-1)?.onItemClick({ metadata: { org: "acme", slug: "nightly" } }));
+    // A listed schedule names its org by id; the URL carries the slug.
+    act(() => page.workbench.at(-1)?.onItemClick({ metadata: { org: "org_acme", slug: "nightly" } }));
     expect(screen.getByTestId("location").textContent).toBe("/library/schedules/acme/nightly");
   });
 
@@ -105,7 +108,7 @@ describe("desktop ScheduleListPage", () => {
     renderList();
 
     fireEvent.click(screen.getByRole("button", { name: "Apply YAML" }));
-    expect(page.dialog.at(-1)).toMatchObject({ open: true, org: "acme" });
+    expect(page.dialog.at(-1)).toMatchObject({ open: true, org: "org_acme" });
     act(() => page.dialog.at(-1)?.onApplied());
     expect(page.workbench.at(-1)?.refetchToken).toBe(1);
 

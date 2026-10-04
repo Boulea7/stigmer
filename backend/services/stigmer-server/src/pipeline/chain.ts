@@ -17,6 +17,10 @@
  *                         `org` is the server's one organization, filled
  *                         before validation and the handler read it)
  *   3. protovalidate    — boundary validation before any handler
+ *      org names        — SERVING chain only, every edition
+ *                         (interceptors/organization-names.ts: every
+ *                         organization a request names by slug becomes its
+ *                         id, before authorization and the handler read it)
  *   4. apiresource      — kind context from the service option
  *
  * ConnectRPC applies array order as nesting order (first = outermost),
@@ -30,7 +34,7 @@
  * without an identity source is a compile error, never a silently
  * unauthenticated transport.
  *
- * The two serving-only interceptors travel as ONE optional parameter so
+ * The serving-only interceptors travel as ONE optional parameter so
  * a chain cannot half-inherit them: in-process hops are exempt from
  * sanitization by construction — the outer handler needs the full inner
  * diagnostic (the Java InProcessCallContextHolder exemption,
@@ -50,6 +54,8 @@ export interface ServingChainInterceptors {
   readonly requestMetrics: Interceptor;
   /** Present only when the composition declares one organization. */
   readonly singleOrganization?: Interceptor;
+  /** Every organization a request names, resolved to its id. */
+  readonly organizationNames: Interceptor;
 }
 
 export function buildInterceptorChain(
@@ -66,6 +72,7 @@ export function buildInterceptorChain(
       ? []
       : [serving.singleOrganization]),
     createProtovalidateInterceptor(),
+    ...(serving === undefined ? [] : [serving.organizationNames]),
     createApiResourceInterceptor(),
   ];
 }

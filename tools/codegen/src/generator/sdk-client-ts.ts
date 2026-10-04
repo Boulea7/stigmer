@@ -12,6 +12,7 @@ import type { MethodSchema, ServiceDefinition, ServiceSchemaFile } from "./gen-c
 import {
   deriveTSImportBase,
   goQuote,
+  indefiniteArticle,
   isCommonsType,
   isEmptyType,
   isIDType,
@@ -569,7 +570,8 @@ function generateTSInputTypes(
 
   const specFields = spec.fields.filter((f) => !META_FIELD_NAMES.has(f.name));
 
-  buf.push(`/** Input for creating/updating a ${cfg.protoResType}. */\n`);
+  const article = indefiniteArticle(cfg.protoResType);
+  buf.push(`/** Input for creating/updating ${article} ${cfg.protoResType}. */\n`);
   buf.push(`export interface ${inputName} {\n`);
   buf.push("  /**\n");
   buf.push("   * The resource's `metadata.id`, for exact update addressing when set\n");
@@ -582,8 +584,8 @@ function generateTSInputTypes(
   buf.push("  slug?: string;\n");
   if (cfg.isOrgless) {
     buf.push("  /**\n");
-    buf.push(`   * Always empty: a ${cfg.protoResType} belongs to the platform, not to an\n`);
-    buf.push("   * organization, so `metadata.org` stays unset. Omit it.\n");
+    buf.push(`   * Always empty: ${article} ${cfg.protoResType} belongs to no organization, so\n`);
+    buf.push("   * `metadata.org` stays unset. Omit it.\n");
     buf.push("   */\n");
     buf.push("  org?: \"\";\n");
   } else {

@@ -24,7 +24,7 @@ import { useEnvironmentList } from "../../environment/useEnvironmentList.js";
 export interface WorkflowInstanceDetailPanelProps {
   /** The instance to display. */
   readonly instance: WorkflowInstance;
-  /** Organization slug. */
+  /** Organization id (a slug is also accepted). */
   readonly org: string;
   /** Called when the panel should close. */
   readonly onClose: () => void;

@@ -23,6 +23,8 @@ import { McpServerConfigPanel } from "./McpServerConfigPanel.js";
 import type { McpServerSetupEntry } from "./mcpServerSetupReducer.js";
 import { useMcpServerConnect } from "./useMcpServerConnect.js";
 import { useMcpServerOAuthConnect } from "./useMcpServerOAuthConnect.js";
+import { OrgSlugText } from "../organization/OrgSlugText.js";
+import { useOrgIdForRef } from "../organization/useOrgRefs.js";
 // ---------------------------------------------------------------------------
 // Setup integration props
 // ---------------------------------------------------------------------------
@@ -148,7 +150,7 @@ export interface McpServerPickerProps {
    */
   readonly poolValues?: (key: string) => EnvVarInput | undefined;
   /**
-   * The authenticated user's active organization slug.
+   * The authenticated user's active organization id (a slug is also accepted).
    * Used for OAuth token storage — tokens are stored in the user's personal
    * environment within this org, not the MCP server's org.
    * When omitted, falls back to the `org` prop.
@@ -291,9 +293,23 @@ export function McpServerPicker({
 
   const selectedCount = selectedKeys.size;
 
+  // A selection may name its org by slug (one a host or URL supplied) and
+  // a result names it by id, so both sides are compared by id.
+  const orgIdFor = useOrgIdForRef();
+  const selectedServers = useMemo(
+    () =>
+      new Set(
+        [...selectedKeys].map((key) => {
+          const ref = refFromServerKey(key);
+          return `${orgIdFor(ref.org)}/${ref.slug}`;
+        }),
+      ),
+    [selectedKeys, orgIdFor],
+  );
+
   const availableResults = useMemo(
-    () => results.filter((r) => !selectedKeys.has(`${r.org}/${r.slug}`)),
-    [results, selectedKeys],
+    () => results.filter((r) => !selectedServers.has(`${orgIdFor(r.org)}/${r.slug}`)),
+    [results, selectedServers, orgIdFor],
   );
 
   // -----------------------------------------------------------------------
@@ -698,7 +714,7 @@ export function McpServerPicker({
                     <HighlightMatch text={result.name} query={query} />
                   </span>
                   <span className="stg:ml-auto stg:shrink-0 stg:text-[0.6rem] stg:text-muted-foreground">
-                    {result.org}
+                    <OrgSlugText orgId={result.org} />
                   </span>
                 </span>
                 {result.description && (

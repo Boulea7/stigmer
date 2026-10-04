@@ -108,6 +108,37 @@ public final class OrganizationCommandControllerGrpc {
     return getUpdateMethod;
   }
 
+  private static volatile io.grpc.MethodDescriptor<ai.stigmer.commons.apiresource.RenameInput,
+      ai.stigmer.tenancy.organization.v1.Organization> getRenameMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "rename",
+      requestType = ai.stigmer.commons.apiresource.RenameInput.class,
+      responseType = ai.stigmer.tenancy.organization.v1.Organization.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<ai.stigmer.commons.apiresource.RenameInput,
+      ai.stigmer.tenancy.organization.v1.Organization> getRenameMethod() {
+    io.grpc.MethodDescriptor<ai.stigmer.commons.apiresource.RenameInput, ai.stigmer.tenancy.organization.v1.Organization> getRenameMethod;
+    if ((getRenameMethod = OrganizationCommandControllerGrpc.getRenameMethod) == null) {
+      synchronized (OrganizationCommandControllerGrpc.class) {
+        if ((getRenameMethod = OrganizationCommandControllerGrpc.getRenameMethod) == null) {
+          OrganizationCommandControllerGrpc.getRenameMethod = getRenameMethod =
+              io.grpc.MethodDescriptor.<ai.stigmer.commons.apiresource.RenameInput, ai.stigmer.tenancy.organization.v1.Organization>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(SERVICE_NAME, "rename"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  ai.stigmer.commons.apiresource.RenameInput.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  ai.stigmer.tenancy.organization.v1.Organization.getDefaultInstance()))
+              .setSchemaDescriptor(new OrganizationCommandControllerMethodDescriptorSupplier("rename"))
+              .build();
+        }
+      }
+    }
+    return getRenameMethod;
+  }
+
   private static volatile io.grpc.MethodDescriptor<ai.stigmer.tenancy.organization.v1.OrganizationId,
       ai.stigmer.tenancy.organization.v1.Organization> getDeleteMethod;
 
@@ -220,14 +251,17 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Create an organization.
-     * An organization's slug is its id, and it is the organization's for good:
-     * a slug any organization has ever held, one since deleted included, is
-     * never taken again. A create of a held slug is refused with
-     * ALREADY_EXISTS; a create of a slug whose organization was deleted is
+     * The server mints the organization's id (org_&lt;ulid&gt;); metadata.org must be
+     * empty, because an organization belongs to no organization (one that names
+     * the organization itself, by its own id or slug, is cleared). A slug held by
+     * another organization is refused with ALREADY_EXISTS; a slug another
+     * organization was renamed away from, and which still resolves to it, is
      * refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
      * (domain "stigmer.ai"):
-     *   - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-     *     and a slug is never reused. Metadata: slug.
+     *   - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+     *     until a recent rename, and it still resolves there; or an
+     *     organization from an earlier release was filed under it, which keeps
+     *     it reserved for good, deleted or not. Metadata: slug.
      * On Stigmer Cloud, creating a platform-managed organization is a plan
      * feature of its integrator. An integrator whose plan lacks it is refused
      * with FAILED_PRECONDITION carrying a google.rpc.ErrorInfo detail (domain
@@ -252,6 +286,8 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Update an existing organization.
+     * The slug is not changed by an update (it is ignored, as for every
+     * kind); rename changes it.
      * </pre>
      */
     default void update(ai.stigmer.tenancy.organization.v1.Organization request,
@@ -261,8 +297,25 @@ public final class OrganizationCommandControllerGrpc {
 
     /**
      * <pre>
-     * Delete an organization. Its slug stays reserved: no organization can be
-     * created with it again.
+     * Rename an organization: change its slug, the name people type.
+     * Nothing the organization owns moves, because every resource names it by
+     * id. The old slug keeps resolving to the organization for 30 days, during
+     * which no other organization can take it and this one can take it back;
+     * then it is released. A slug another organization holds is refused with
+     * ALREADY_EXISTS, and one another organization was recently renamed away
+     * from with ORGANIZATION_SLUG_RESERVED (see create).
+     * </pre>
+     */
+    default void rename(ai.stigmer.commons.apiresource.RenameInput request,
+        io.grpc.stub.StreamObserver<ai.stigmer.tenancy.organization.v1.Organization> responseObserver) {
+      io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getRenameMethod(), responseObserver);
+    }
+
+    /**
+     * <pre>
+     * Delete an organization. Its slug is released once the organization is
+     * gone: a later organization may take it, and sees nothing the deleted one
+     * owned, because every resource names its organization by id.
      * A server that holds one organization (GetServerInfoOutput.single_org's
      * composition) refuses to delete it with FAILED_PRECONDITION carrying a
      * google.rpc.ErrorInfo detail (domain "stigmer.ai"), before anything is
@@ -326,14 +379,17 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Create an organization.
-     * An organization's slug is its id, and it is the organization's for good:
-     * a slug any organization has ever held, one since deleted included, is
-     * never taken again. A create of a held slug is refused with
-     * ALREADY_EXISTS; a create of a slug whose organization was deleted is
+     * The server mints the organization's id (org_&lt;ulid&gt;); metadata.org must be
+     * empty, because an organization belongs to no organization (one that names
+     * the organization itself, by its own id or slug, is cleared). A slug held by
+     * another organization is refused with ALREADY_EXISTS; a slug another
+     * organization was renamed away from, and which still resolves to it, is
      * refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
      * (domain "stigmer.ai"):
-     *   - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-     *     and a slug is never reused. Metadata: slug.
+     *   - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+     *     until a recent rename, and it still resolves there; or an
+     *     organization from an earlier release was filed under it, which keeps
+     *     it reserved for good, deleted or not. Metadata: slug.
      * On Stigmer Cloud, creating a platform-managed organization is a plan
      * feature of its integrator. An integrator whose plan lacks it is refused
      * with FAILED_PRECONDITION carrying a google.rpc.ErrorInfo detail (domain
@@ -359,6 +415,8 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Update an existing organization.
+     * The slug is not changed by an update (it is ignored, as for every
+     * kind); rename changes it.
      * </pre>
      */
     public void update(ai.stigmer.tenancy.organization.v1.Organization request,
@@ -369,8 +427,26 @@ public final class OrganizationCommandControllerGrpc {
 
     /**
      * <pre>
-     * Delete an organization. Its slug stays reserved: no organization can be
-     * created with it again.
+     * Rename an organization: change its slug, the name people type.
+     * Nothing the organization owns moves, because every resource names it by
+     * id. The old slug keeps resolving to the organization for 30 days, during
+     * which no other organization can take it and this one can take it back;
+     * then it is released. A slug another organization holds is refused with
+     * ALREADY_EXISTS, and one another organization was recently renamed away
+     * from with ORGANIZATION_SLUG_RESERVED (see create).
+     * </pre>
+     */
+    public void rename(ai.stigmer.commons.apiresource.RenameInput request,
+        io.grpc.stub.StreamObserver<ai.stigmer.tenancy.organization.v1.Organization> responseObserver) {
+      io.grpc.stub.ClientCalls.asyncUnaryCall(
+          getChannel().newCall(getRenameMethod(), getCallOptions()), request, responseObserver);
+    }
+
+    /**
+     * <pre>
+     * Delete an organization. Its slug is released once the organization is
+     * gone: a later organization may take it, and sees nothing the deleted one
+     * owned, because every resource names its organization by id.
      * A server that holds one organization (GetServerInfoOutput.single_org's
      * composition) refuses to delete it with FAILED_PRECONDITION carrying a
      * google.rpc.ErrorInfo detail (domain "stigmer.ai"), before anything is
@@ -420,14 +496,17 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Create an organization.
-     * An organization's slug is its id, and it is the organization's for good:
-     * a slug any organization has ever held, one since deleted included, is
-     * never taken again. A create of a held slug is refused with
-     * ALREADY_EXISTS; a create of a slug whose organization was deleted is
+     * The server mints the organization's id (org_&lt;ulid&gt;); metadata.org must be
+     * empty, because an organization belongs to no organization (one that names
+     * the organization itself, by its own id or slug, is cleared). A slug held by
+     * another organization is refused with ALREADY_EXISTS; a slug another
+     * organization was renamed away from, and which still resolves to it, is
      * refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
      * (domain "stigmer.ai"):
-     *   - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-     *     and a slug is never reused. Metadata: slug.
+     *   - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+     *     until a recent rename, and it still resolves there; or an
+     *     organization from an earlier release was filed under it, which keeps
+     *     it reserved for good, deleted or not. Metadata: slug.
      * On Stigmer Cloud, creating a platform-managed organization is a plan
      * feature of its integrator. An integrator whose plan lacks it is refused
      * with FAILED_PRECONDITION carrying a google.rpc.ErrorInfo detail (domain
@@ -452,6 +531,8 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Update an existing organization.
+     * The slug is not changed by an update (it is ignored, as for every
+     * kind); rename changes it.
      * </pre>
      */
     public ai.stigmer.tenancy.organization.v1.Organization update(ai.stigmer.tenancy.organization.v1.Organization request) throws io.grpc.StatusException {
@@ -461,8 +542,25 @@ public final class OrganizationCommandControllerGrpc {
 
     /**
      * <pre>
-     * Delete an organization. Its slug stays reserved: no organization can be
-     * created with it again.
+     * Rename an organization: change its slug, the name people type.
+     * Nothing the organization owns moves, because every resource names it by
+     * id. The old slug keeps resolving to the organization for 30 days, during
+     * which no other organization can take it and this one can take it back;
+     * then it is released. A slug another organization holds is refused with
+     * ALREADY_EXISTS, and one another organization was recently renamed away
+     * from with ORGANIZATION_SLUG_RESERVED (see create).
+     * </pre>
+     */
+    public ai.stigmer.tenancy.organization.v1.Organization rename(ai.stigmer.commons.apiresource.RenameInput request) throws io.grpc.StatusException {
+      return io.grpc.stub.ClientCalls.blockingV2UnaryCall(
+          getChannel(), getRenameMethod(), getCallOptions(), request);
+    }
+
+    /**
+     * <pre>
+     * Delete an organization. Its slug is released once the organization is
+     * gone: a later organization may take it, and sees nothing the deleted one
+     * owned, because every resource names its organization by id.
      * A server that holds one organization (GetServerInfoOutput.single_org's
      * composition) refuses to delete it with FAILED_PRECONDITION carrying a
      * google.rpc.ErrorInfo detail (domain "stigmer.ai"), before anything is
@@ -511,14 +609,17 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Create an organization.
-     * An organization's slug is its id, and it is the organization's for good:
-     * a slug any organization has ever held, one since deleted included, is
-     * never taken again. A create of a held slug is refused with
-     * ALREADY_EXISTS; a create of a slug whose organization was deleted is
+     * The server mints the organization's id (org_&lt;ulid&gt;); metadata.org must be
+     * empty, because an organization belongs to no organization (one that names
+     * the organization itself, by its own id or slug, is cleared). A slug held by
+     * another organization is refused with ALREADY_EXISTS; a slug another
+     * organization was renamed away from, and which still resolves to it, is
      * refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
      * (domain "stigmer.ai"):
-     *   - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-     *     and a slug is never reused. Metadata: slug.
+     *   - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+     *     until a recent rename, and it still resolves there; or an
+     *     organization from an earlier release was filed under it, which keeps
+     *     it reserved for good, deleted or not. Metadata: slug.
      * On Stigmer Cloud, creating a platform-managed organization is a plan
      * feature of its integrator. An integrator whose plan lacks it is refused
      * with FAILED_PRECONDITION carrying a google.rpc.ErrorInfo detail (domain
@@ -543,6 +644,8 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Update an existing organization.
+     * The slug is not changed by an update (it is ignored, as for every
+     * kind); rename changes it.
      * </pre>
      */
     public ai.stigmer.tenancy.organization.v1.Organization update(ai.stigmer.tenancy.organization.v1.Organization request) {
@@ -552,8 +655,25 @@ public final class OrganizationCommandControllerGrpc {
 
     /**
      * <pre>
-     * Delete an organization. Its slug stays reserved: no organization can be
-     * created with it again.
+     * Rename an organization: change its slug, the name people type.
+     * Nothing the organization owns moves, because every resource names it by
+     * id. The old slug keeps resolving to the organization for 30 days, during
+     * which no other organization can take it and this one can take it back;
+     * then it is released. A slug another organization holds is refused with
+     * ALREADY_EXISTS, and one another organization was recently renamed away
+     * from with ORGANIZATION_SLUG_RESERVED (see create).
+     * </pre>
+     */
+    public ai.stigmer.tenancy.organization.v1.Organization rename(ai.stigmer.commons.apiresource.RenameInput request) {
+      return io.grpc.stub.ClientCalls.blockingUnaryCall(
+          getChannel(), getRenameMethod(), getCallOptions(), request);
+    }
+
+    /**
+     * <pre>
+     * Delete an organization. Its slug is released once the organization is
+     * gone: a later organization may take it, and sees nothing the deleted one
+     * owned, because every resource names its organization by id.
      * A server that holds one organization (GetServerInfoOutput.single_org's
      * composition) refuses to delete it with FAILED_PRECONDITION carrying a
      * google.rpc.ErrorInfo detail (domain "stigmer.ai"), before anything is
@@ -603,14 +723,17 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Create an organization.
-     * An organization's slug is its id, and it is the organization's for good:
-     * a slug any organization has ever held, one since deleted included, is
-     * never taken again. A create of a held slug is refused with
-     * ALREADY_EXISTS; a create of a slug whose organization was deleted is
+     * The server mints the organization's id (org_&lt;ulid&gt;); metadata.org must be
+     * empty, because an organization belongs to no organization (one that names
+     * the organization itself, by its own id or slug, is cleared). A slug held by
+     * another organization is refused with ALREADY_EXISTS; a slug another
+     * organization was renamed away from, and which still resolves to it, is
      * refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
      * (domain "stigmer.ai"):
-     *   - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-     *     and a slug is never reused. Metadata: slug.
+     *   - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+     *     until a recent rename, and it still resolves there; or an
+     *     organization from an earlier release was filed under it, which keeps
+     *     it reserved for good, deleted or not. Metadata: slug.
      * On Stigmer Cloud, creating a platform-managed organization is a plan
      * feature of its integrator. An integrator whose plan lacks it is refused
      * with FAILED_PRECONDITION carrying a google.rpc.ErrorInfo detail (domain
@@ -636,6 +759,8 @@ public final class OrganizationCommandControllerGrpc {
     /**
      * <pre>
      * Update an existing organization.
+     * The slug is not changed by an update (it is ignored, as for every
+     * kind); rename changes it.
      * </pre>
      */
     public com.google.common.util.concurrent.ListenableFuture<ai.stigmer.tenancy.organization.v1.Organization> update(
@@ -646,8 +771,26 @@ public final class OrganizationCommandControllerGrpc {
 
     /**
      * <pre>
-     * Delete an organization. Its slug stays reserved: no organization can be
-     * created with it again.
+     * Rename an organization: change its slug, the name people type.
+     * Nothing the organization owns moves, because every resource names it by
+     * id. The old slug keeps resolving to the organization for 30 days, during
+     * which no other organization can take it and this one can take it back;
+     * then it is released. A slug another organization holds is refused with
+     * ALREADY_EXISTS, and one another organization was recently renamed away
+     * from with ORGANIZATION_SLUG_RESERVED (see create).
+     * </pre>
+     */
+    public com.google.common.util.concurrent.ListenableFuture<ai.stigmer.tenancy.organization.v1.Organization> rename(
+        ai.stigmer.commons.apiresource.RenameInput request) {
+      return io.grpc.stub.ClientCalls.futureUnaryCall(
+          getChannel().newCall(getRenameMethod(), getCallOptions()), request);
+    }
+
+    /**
+     * <pre>
+     * Delete an organization. Its slug is released once the organization is
+     * gone: a later organization may take it, and sees nothing the deleted one
+     * owned, because every resource names its organization by id.
      * A server that holds one organization (GetServerInfoOutput.single_org's
      * composition) refuses to delete it with FAILED_PRECONDITION carrying a
      * google.rpc.ErrorInfo detail (domain "stigmer.ai"), before anything is
@@ -666,7 +809,8 @@ public final class OrganizationCommandControllerGrpc {
   private static final int METHODID_APPLY = 0;
   private static final int METHODID_CREATE = 1;
   private static final int METHODID_UPDATE = 2;
-  private static final int METHODID_DELETE = 3;
+  private static final int METHODID_RENAME = 3;
+  private static final int METHODID_DELETE = 4;
 
   private static final class MethodHandlers<Req, Resp> implements
       io.grpc.stub.ServerCalls.UnaryMethod<Req, Resp>,
@@ -695,6 +839,10 @@ public final class OrganizationCommandControllerGrpc {
           break;
         case METHODID_UPDATE:
           serviceImpl.update((ai.stigmer.tenancy.organization.v1.Organization) request,
+              (io.grpc.stub.StreamObserver<ai.stigmer.tenancy.organization.v1.Organization>) responseObserver);
+          break;
+        case METHODID_RENAME:
+          serviceImpl.rename((ai.stigmer.commons.apiresource.RenameInput) request,
               (io.grpc.stub.StreamObserver<ai.stigmer.tenancy.organization.v1.Organization>) responseObserver);
           break;
         case METHODID_DELETE:
@@ -740,6 +888,13 @@ public final class OrganizationCommandControllerGrpc {
               ai.stigmer.tenancy.organization.v1.Organization,
               ai.stigmer.tenancy.organization.v1.Organization>(
                 service, METHODID_UPDATE)))
+        .addMethod(
+          getRenameMethod(),
+          io.grpc.stub.ServerCalls.asyncUnaryCall(
+            new MethodHandlers<
+              ai.stigmer.commons.apiresource.RenameInput,
+              ai.stigmer.tenancy.organization.v1.Organization>(
+                service, METHODID_RENAME)))
         .addMethod(
           getDeleteMethod(),
           io.grpc.stub.ServerCalls.asyncUnaryCall(
@@ -798,6 +953,7 @@ public final class OrganizationCommandControllerGrpc {
               .addMethod(getApplyMethod())
               .addMethod(getCreateMethod())
               .addMethod(getUpdateMethod())
+              .addMethod(getRenameMethod())
               .addMethod(getDeleteMethod())
               .build();
         }

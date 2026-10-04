@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { McpServerSchema } from "@stigmer/protos/ai/stigmer/agentic/mcpserver/v1/api_pb";
+import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import type { Stigmer } from "@stigmer/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { UsageError } from "../../../errors/index.js";
@@ -114,6 +115,45 @@ describe("runOAuthFlow", () => {
     expect(openBrowser).toHaveBeenCalledWith(
       "https://app.stigmer.ai/library/mcp-servers/acme/github",
     );
+  });
+
+  it("names the server's organization by slug in the page URL where the server stores its id", async () => {
+    const id = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+    const { client } = fakeClient(1);
+    const knowingAcme = {
+      ...client,
+      organization: {
+        get: async (value: string) => {
+          if (value !== id) throw new Error("organization not found");
+          return create(OrganizationSchema, { metadata: { id, slug: "acme" } });
+        },
+      },
+    } as unknown as Stigmer;
+    const openBrowser = vi.fn(async () => {});
+    const deps = {
+      client: knowingAcme,
+      org: "",
+      consoleURL: "https://app.stigmer.ai",
+      probeLocalConsole: false,
+      openBrowser,
+      now: () => 0,
+      sleep: noopSleep,
+      log: () => {},
+    };
+    await runOAuthFlow({
+      ...deps,
+      server: create(McpServerSchema, { metadata: { id: "mcp_1", slug: "github", org: id } }),
+    });
+    // One the caller cannot see keeps the id, which the console's route also takes.
+    const hidden = "org_01jbbbbbbbbbbbbbbbbbbbbbbb";
+    await runOAuthFlow({
+      ...deps,
+      server: create(McpServerSchema, { metadata: { id: "mcp_1", slug: "github", org: hidden } }),
+    });
+    expect(openBrowser.mock.calls).toEqual([
+      ["https://app.stigmer.ai/library/mcp-servers/acme/github"],
+      [`https://app.stigmer.ai/library/mcp-servers/${hidden}/github`],
+    ]);
   });
 
   it("aborts before opening the browser when the local console is unreachable", async () => {

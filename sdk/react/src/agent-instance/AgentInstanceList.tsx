@@ -24,13 +24,13 @@ export interface AgentInstanceListProps {
   /** The default instance ID (from agent.status.defaultInstanceId) — filtered out of the list. */
   readonly defaultInstanceId?: string;
   /**
-   * The AGENT's organization slug (needed for environment resolution
+   * The AGENT's organization id (a slug is also accepted; needed for environment resolution
    * and the create flow). Not the list scope — that is `viewerOrg`,
    * which differs from `org` when viewing another org's agent.
    */
   readonly org: string;
   /**
-   * The viewer's active organization slug. Scopes the list to this
+   * The viewer's active organization id (a slug is also accepted). Scopes the list to this
    * org's instances of the agent, so a member of several orgs sees
    * exactly the current org context's instances. Omit to default to
    * the agent's own org.

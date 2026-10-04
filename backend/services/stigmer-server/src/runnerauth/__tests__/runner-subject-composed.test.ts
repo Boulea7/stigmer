@@ -199,6 +199,8 @@ describe("the built-in posture (OIDC, no unit Authorizer): the runner acts as th
   let server: ComposedServer;
   let port: number;
   let carolId: string;
+  /** The organization's minted id: a row written straight to the store names it by id. */
+  let orgId: string;
 
   beforeAll(async () => {
     issuer = await startIssuer();
@@ -226,7 +228,7 @@ describe("the built-in posture (OIDC, no unit Authorizer): the runner acts as th
     // Carol founds the organization her runs belong to, so she holds its
     // owner role: the model admits a run's creator to it only while they
     // are in the run's organization.
-    await createClient(
+    const organization = await createClient(
       OrganizationCommandController,
       transportFor(port, await issuer.mint("auth0|carol", "carol@example.com")),
     ).create({
@@ -235,6 +237,8 @@ describe("the built-in posture (OIDC, no unit Authorizer): the runner acts as th
       metadata: { name: ORG, slug: ORG, org: "" },
       spec: { description: "the runner-subject lane's organization" },
     });
+    orgId = organization.metadata?.id ?? "";
+    expect(orgId).toMatch(/^org_[0-9a-z]{26}$/);
   });
 
   afterAll(async () => {
@@ -252,7 +256,7 @@ describe("the built-in posture (OIDC, no unit Authorizer): the runner acts as th
       id,
       WorkflowExecutionSchema,
       create(WorkflowExecutionSchema, {
-        metadata: { id, name: id, org: ORG },
+        metadata: { id, name: id, org: orgId },
         status: { phase, audit: { specAudit: { createdBy: { id: carolId } } } },
       }),
     );

@@ -6,11 +6,15 @@
  * the web console in the system browser, because the Tauri webview blocks
  * the OAuth popup. The detail view and the panel are pinned in
  * @stigmer/react.
+ *
+ * Also pins how the page names organizations: the viewer's org reaches the
+ * view as its id, and a referenced resource, which names its org by id,
+ * opens at a URL carrying the org's slug.
  */
 import type { ReactElement } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { act, render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { mockTauri } from "../../__test-utils__/tauri";
 import { CONSOLE_URL } from "../../config";
 
@@ -27,16 +31,26 @@ interface PanelProps {
   sessionHref: (id: string) => string;
 }
 
+interface DetailProps {
+  additionalTabs: Tab[];
+  viewerOrg: string;
+  onSkillClick: (ref: { org: string; slug: string }) => void;
+  onMcpServerClick: (ref: { org: string; slug: string }) => void;
+  onPluginClick: (ref: { org: string; slug: string }) => void;
+}
+
 const page = vi.hoisted(() => ({
   agent: undefined as unknown,
-  detail: [] as Array<{ additionalTabs: Tab[] }>,
+  detail: [] as DetailProps[],
 }));
+
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
 
 const noop = () => undefined;
 
 vi.mock("@stigmer/react", () => ({
   AgentChannelsPanel: () => null,
-  AgentDetailView: (props: { additionalTabs: Tab[] }) => {
+  AgentDetailView: (props: DetailProps) => {
     page.detail.push(props);
     return null;
   },
@@ -50,19 +64,28 @@ vi.mock("@stigmer/react", () => ({
   useDeleteResource: () => ({ deleteResource: noop, isDeleting: false }),
   useExportResource: () => ({ copyYaml: noop, copyJson: noop, downloadYaml: noop }),
   useBreadcrumbOverride: () => ({ setLabel: noop }),
-  useActiveOrgSlug: () => "viewer-org",
+  useActiveOrgId: () => "org_01jaaaaaaaaaaaaaaaaaaaaaaa",
+  // The person's organizations: their one org reads "acme" in a URL.
+  useOrgSlugForId: () => (id: string) =>
+    id === "org_01jaaaaaaaaaaaaaaaaaaaaaaa" ? "acme" : id,
 }));
 
 import AgentDetailPage from "../library/AgentDetailPage";
 
-const AGENT = { metadata: { id: "agt_1", org: "acme", slug: "helper" } };
+const AGENT = { metadata: { id: "agt_1", org: ACME_ID, slug: "helper" } };
+
+function Location() {
+  return <div data-testid="location">{useLocation().pathname}</div>;
+}
 
 function renderAgent() {
   return render(
     <MemoryRouter initialEntries={["/library/agents/acme/helper"]}>
       <Routes>
         <Route path="/library/agents/:org/:slug" element={<AgentDetailPage />} />
+        <Route path="*" element={null} />
       </Routes>
+      <Location />
     </MemoryRouter>,
   );
 }
@@ -102,5 +125,41 @@ describe("desktop AgentDetailPage — the Channels tab", () => {
     expect(tauri.callsTo("open_auth_in_browser")[0]).toEqual({
       authUrl: `${CONSOLE_URL}/library/agents/acme/helper?tab=channels`,
     });
+  });
+});
+
+describe("desktop AgentDetailPage — organizations", () => {
+  it("scopes the view to the viewer's org by id while the URL carries the slug", () => {
+    page.agent = AGENT;
+    renderAgent();
+
+    expect(page.detail.at(-1)?.viewerOrg).toBe(ACME_ID);
+  });
+
+  it("opens a referenced skill at a URL carrying its org's slug", () => {
+    page.agent = AGENT;
+    renderAgent();
+
+    act(() => page.detail.at(-1)?.onSkillClick({ org: ACME_ID, slug: "triage" }));
+
+    expect(screen.getByTestId("location").textContent).toBe("/library/skills/acme/triage");
+  });
+
+  it("opens a referenced MCP server at a URL carrying its org's slug", () => {
+    page.agent = AGENT;
+    renderAgent();
+
+    act(() => page.detail.at(-1)?.onMcpServerClick({ org: ACME_ID, slug: "github" }));
+
+    expect(screen.getByTestId("location").textContent).toBe("/library/mcp-servers/acme/github");
+  });
+
+  it("opens the installing plugin at a URL carrying its org's slug", () => {
+    page.agent = AGENT;
+    renderAgent();
+
+    act(() => page.detail.at(-1)?.onPluginClick({ org: ACME_ID, slug: "toolkit" }));
+
+    expect(screen.getByTestId("location").textContent).toBe("/library/plugins/acme/toolkit");
   });
 });

@@ -18,7 +18,7 @@ import { FailedRunsWidget } from "./FailedRunsWidget.js";
 import type { WorkflowExecution } from "@stigmer/protos/ai/stigmer/agentic/workflowexecution/v1/api_pb";
 
 export interface WorkflowDashboardProps {
-  /** Organization slug for scoping the dashboard data. */
+  /** Organization id for scoping the dashboard data (a slug is also accepted). */
   readonly org: string | null | undefined;
   /** Time window for the summary statistics. */
   readonly timeWindow?: UseWorkflowDashboardSummaryOptions["timeWindow"];

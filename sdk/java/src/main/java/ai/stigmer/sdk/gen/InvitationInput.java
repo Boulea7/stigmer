@@ -52,8 +52,10 @@ public final class InvitationInput {
             spec.setLabel(this.label);
         }
         ApiResourceMetadata.Builder metaBuilder = ApiResourceMetadata.newBuilder()
-            .setName(this.name)
-            .setOrg(this.org);
+            .setName(this.name);
+        if (this.org != null) {
+            metaBuilder.setOrg(this.org);
+        }
         if (this.id != null) {
             metaBuilder.setId(this.id);
         }

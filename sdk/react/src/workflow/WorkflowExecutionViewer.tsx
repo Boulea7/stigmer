@@ -107,7 +107,7 @@ export type WorkflowExecutionPanelMode = "auto" | "none";
 export interface WorkflowExecutionViewerProps {
   /** ID of the workflow execution to display. */
   readonly executionId: string;
-  /** Organization slug — needed for AI diagnosis authorization. */
+  /** Organization id — needed for AI diagnosis authorization (a slug is also accepted). */
   readonly org?: string;
   /**
    * Whether the viewer offers the execution panel at all. `"none"` removes

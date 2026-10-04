@@ -191,6 +191,9 @@ describe("built-in authorizer (composed server, OIDC with no unit Authorizer: th
   let privateAgent: Agent;
   let orgAgent: Agent;
   let otherOrgAgent: Agent;
+  /** The ids the server minted for ORG and OTHER_ORG; requests name them by slug. */
+  let orgId: string;
+  let otherOrgId: string;
 
   const asFounder = () =>
     transportFor(port, fakeJwt(FOUNDER, "founder@example.com"));
@@ -227,9 +230,12 @@ describe("built-in authorizer (composed server, OIDC with no unit Authorizer: th
       asFounder(),
     );
     await founderAccounts.provisionMyAccount({});
-    await createClient(OrganizationCommandController, asFounder()).create(
-      organizationInput(ORG),
-    );
+    orgId =
+      (
+        await createClient(OrganizationCommandController, asFounder()).create(
+          organizationInput(ORG),
+        )
+      ).metadata?.id ?? "";
     await createClient(
       IdentityAccountCommandController,
       asMember(),
@@ -246,9 +252,12 @@ describe("built-in authorizer (composed server, OIDC with no unit Authorizer: th
     // The second organization, founded AFTER the member provisioned: the
     // founder is its owner (the role lifecycle); the member holds no row on
     // it — an outsider, on a real two-organization server.
-    await createClient(OrganizationCommandController, asFounder()).create(
-      organizationInput(OTHER_ORG),
-    );
+    otherOrgId =
+      (
+        await createClient(OrganizationCommandController, asFounder()).create(
+          organizationInput(OTHER_ORG),
+        )
+      ).metadata?.id ?? "";
     otherOrgAgent = await founderAgents.create(
       agentInput(
         "Other Org Agent",
@@ -272,14 +281,16 @@ describe("built-in authorizer (composed server, OIDC with no unit Authorizer: th
     expect(
       (await founderQuery.get({ value: orgAgent.metadata!.id })).metadata?.id,
     ).toBe(orgAgent.metadata!.id);
-    // `can_view` on the organization is `viewer`, which a member holds.
-    expect(
-      (
-        await createClient(OrganizationQueryController, asMember()).get({
-          value: ORG,
-        })
-      ).metadata?.id,
-    ).toBe(ORG);
+    // `can_view` on the organization is `viewer`, which a member holds. The
+    // request names it by slug; the serving chain resolves the slug to the
+    // minted id, which is what the read answers.
+    const organization = await createClient(
+      OrganizationQueryController,
+      asMember(),
+    ).get({ value: ORG });
+    expect(organization.metadata?.id).toMatch(/^org_[0-9a-z]{26}$/);
+    expect(organization.metadata?.id).toBe(orgId);
+    expect(organization.metadata?.slug).toBe(ORG);
   });
 
   it("a member reads an org-visible agent", async () => {
@@ -371,13 +382,13 @@ describe("built-in authorizer (composed server, OIDC with no unit Authorizer: th
       OrganizationQueryController,
       asMember(),
     ).findMyOrganizations({});
-    expect(mine.entries.map((o) => o.metadata?.id)).toEqual([ORG]);
+    expect(mine.entries.map((o) => o.metadata?.id)).toEqual([orgId]);
     const founders = await createClient(
       OrganizationQueryController,
       asFounder(),
     ).findMyOrganizations({});
     expect(founders.entries.map((o) => o.metadata?.id).sort()).toEqual(
-      [ORG, OTHER_ORG].sort(),
+      [orgId, otherOrgId].sort(),
     );
     expect(
       await codeOf(
@@ -593,6 +604,8 @@ describe("built-in authorizer (composed server, trusted-local: the permissive de
   let dir: string;
   let server: ComposedServer;
   let port: number;
+  /** The id the server minted for ORG, created by the first test below. */
+  let orgId: string;
 
   beforeAll(async () => {
     dir = mkdtempSync(path.join(tmpdir(), "built-in-authorizer-local-"));
@@ -613,9 +626,12 @@ describe("built-in authorizer (composed server, trusted-local: the permissive de
 
   it("a private agent created tokenless is read tokenless — one caller, nothing to separate", async () => {
     const anonymous = transportFor(port);
-    await createClient(OrganizationCommandController, anonymous).create(
-      organizationInput(ORG),
-    );
+    orgId =
+      (
+        await createClient(OrganizationCommandController, anonymous).create(
+          organizationInput(ORG),
+        )
+      ).metadata?.id ?? "";
     const created = await createClient(
       AgentCommandController,
       anonymous,
@@ -643,7 +659,7 @@ describe("built-in authorizer (composed server, trusted-local: the permissive de
     const all = await createClient(OrganizationQueryController, anonymous).find(
       { org: ORG },
     );
-    expect(all.entries.map((o) => o.metadata?.id)).toContain(ORG);
+    expect(all.entries.map((o) => o.metadata?.id)).toContain(orgId);
   });
 
   it("the laptop's lists are the full scan — no scope composed, the rows stamped `system` included", async () => {
@@ -722,7 +738,7 @@ describe("built-in authorizer (composed server, trusted-local: the permissive de
     const landed = await agents.apply(
       agentInput("Phantom Laptop Agent", ApiResourceVisibility.visibility_org),
     );
-    expect(landed.metadata?.org).toBe(ORG);
+    expect(landed.metadata?.org).toBe(orgId);
   });
 });
 

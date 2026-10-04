@@ -53,8 +53,10 @@ public final class WorkflowInstanceInput {
             spec.setExecutionVisibility(this.executionVisibility);
         }
         ApiResourceMetadata.Builder metaBuilder = ApiResourceMetadata.newBuilder()
-            .setName(this.name)
-            .setOrg(this.org);
+            .setName(this.name);
+        if (this.org != null) {
+            metaBuilder.setOrg(this.org);
+        }
         if (this.id != null) {
             metaBuilder.setId(this.id);
         }

@@ -14,7 +14,7 @@ export { ApiResourceKind };
 export interface SearchParams {
   /** Resource kinds to include in the search. */
   readonly kinds: ApiResourceKind[];
-  /** Organization slug to scope the query. */
+  /** The organization to scope the query, by id or slug. */
   readonly org: string;
   /** Free-text search query. */
   readonly query?: string;

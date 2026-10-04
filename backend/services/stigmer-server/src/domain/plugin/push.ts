@@ -112,7 +112,8 @@ import {
   slugHolder,
 } from "./members.js";
 import type { Member, PlannedMember } from "./members.js";
-import { parseOverlays } from "./overlay/documents.js";
+import { newOrganizationNameResolver, organizationSlugOf } from "../organization/names.js";
+import { parseOverlays, resolveOverlayOrganizations } from "./overlay/documents.js";
 import type { ParsedOverlays } from "./overlay/documents.js";
 import { OverlayParseError } from "./overlay/parse.js";
 import { sanitizeOverlays } from "./overlay/sanitize.js";
@@ -264,14 +265,23 @@ export function newGeneratePluginIdIfNeededStep(): PipelineStep<PushDesc> {
   };
 }
 
-/** ParseOverlayDocuments — the `ai.stigmer/` documents become protos, strictly. */
-export function newParseOverlayDocumentsStep(): PipelineStep<PushDesc> {
+/**
+ * ParseOverlayDocuments — the `ai.stigmer/` documents become protos,
+ * strictly, with every organization they name by slug resolved to its id
+ * (they are written through the in-process lane, which resolves nothing).
+ */
+export function newParseOverlayDocumentsStep(
+  store: Store,
+): PipelineStep<PushDesc> {
+  const resolver = newOrganizationNameResolver(store);
   return {
     name: "ParseOverlayDocuments",
-    execute(ctx: RequestContext<PushDesc>): void {
+    async execute(ctx: RequestContext<PushDesc>): Promise<void> {
       const pkg = ctx.get(PLUGIN_PACKAGE_KEY) as PluginPackage;
       try {
-        ctx.set(PLUGIN_OVERLAYS_KEY, parseOverlays(pkg.overlay, ctx.input.org));
+        const overlays = parseOverlays(pkg.overlay);
+        await resolveOverlayOrganizations(overlays, ctx.input.org, resolver, (org) => organizationSlugOf(store, org));
+        ctx.set(PLUGIN_OVERLAYS_KEY, overlays);
       } catch (error) {
         if (error instanceof OverlayParseError) {
           throw invalidArgumentError(error.message);
@@ -409,7 +419,7 @@ export function newPlanMaterializationStep(
           case "held-unmanaged":
             throw alreadyExistsError(
               noun,
-              `'${member.slug}' exists in org '${identity.org}' and is not managed by a plugin; rename or delete it first`,
+              `'${member.slug}' exists in org '${await organizationSlugOf(store, identity.org)}' and is not managed by a plugin; rename or delete it first`,
             );
           case "held-by-plugin":
             throw alreadyExistsError(
@@ -468,7 +478,7 @@ export function newPlanMaterializationStep(
       }
       if (missing.length > 0) {
         throw new ConnectError(
-          `installing plugin '${identity.slug}' needs ${missing.join(", ")} in organization '${identity.org}'`,
+          `installing plugin '${identity.slug}' needs ${missing.join(", ")} in organization '${await organizationSlugOf(store, identity.org)}'`,
           Code.PermissionDenied,
         );
       }

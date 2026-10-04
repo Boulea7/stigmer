@@ -60,7 +60,7 @@ export class ArtifactClient {
   }
 }
 
-/** Input for creating/updating a Artifact. */
+/** Input for creating/updating an Artifact. */
 export interface ArtifactInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

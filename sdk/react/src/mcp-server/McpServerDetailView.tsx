@@ -51,13 +51,14 @@ import type { KeyValueRow, SelectOption } from "../inline-edit/types.js";
 import { ManagedByPluginNotice } from "../plugin/ManagedByPluginNotice.js";
 import { useManagingPlugin } from "../plugin/useManagingPlugin.js";
 import { LoadingRegion } from "../internal/LoadingRegion.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Tab identifier for the MCP server capability panel. */
 export type CapabilityTab = "tools" | "policies" | "resources";
 
 /** Props for {@link McpServerDetailView}. */
 export interface McpServerDetailViewProps {
-  /** Organization slug that owns the MCP server. */
+  /** Id of the organization that owns the MCP server (a slug is also accepted). */
   readonly org: string;
   /** MCP server slug (URL-friendly identifier unique within the org). */
   readonly slug: string;
@@ -119,7 +120,7 @@ export interface McpServerDetailViewProps {
     key: string,
   ) => import("@stigmer/sdk").EnvVarInput | undefined;
   /**
-   * The authenticated user's active organization slug.
+   * The authenticated user's active organization id (a slug is also accepted).
    * Used for OAuth token storage — tokens are stored in the user's personal
    * environment within this org, not the MCP server's org.
    * When omitted, falls back to the `org` prop (MCP server's org).
@@ -205,6 +206,7 @@ export function McpServerDetailView({
   onResourceUpdated,
   className,
 }: McpServerDetailViewProps) {
+  const slugForOrg = useOrgSlugForId();
   // Hoisted-state mode: when the caller supplies `mcpServerState`, disable
   // the internal fetch via the hook's documented null-skip (a stable no-op,
   // so `fetched` reports isLoading=false with no RPC) and render from the
@@ -484,7 +486,7 @@ export function McpServerDetailView({
     org: meta?.org,
     slug: meta?.slug,
     qualifiedSlug: meta?.slug
-      ? (meta.org ? `${meta.org}/${meta.slug}` : meta.slug)
+      ? (meta.org ? `${slugForOrg(meta.org)}/${meta.slug}` : meta.slug)
       : undefined,
     icon: editable && saveMcpField ? (
       <InlineEditImage

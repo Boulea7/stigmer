@@ -16,7 +16,7 @@ import { yamlToGraph } from "./workflow-graph-conversions.js";
 export interface WorkflowEditorViewProps {
   /** The initial YAML content to load into the editor. */
   readonly initialYaml: string;
-  /** Organization slug for the save path. */
+  /** Organization id for the save path (a slug is also accepted). */
   readonly org: string;
   /** Called after a successful save. */
   readonly onSaveSuccess?: () => void;
@@ -42,7 +42,7 @@ export interface WorkflowEditorViewProps {
  * validation summary, save button, dirty indicator, and full-page toggle.
  *
  * Composes {@link useWorkflowEditor} internally — the caller only needs
- * to provide the initial YAML and org slug.
+ * to provide the initial YAML and organization id.
  *
  * Zero Console dependencies. All visual properties flow through
  * `--stgm-*` design tokens.

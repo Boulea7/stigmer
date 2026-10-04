@@ -335,7 +335,7 @@ export interface MessageThreadProps {
    */
   readonly onOpenPlan?: (executionId: string) => void;
   /**
-   * Organization slug. Required for the plan completion card's
+   * Organization id (a slug is also accepted). Required for the plan completion card's
    * "Review plan" action, which opens the shared artifact preview
    * modal (the modal needs `org` for its detection/apply pipeline).
    */

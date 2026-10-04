@@ -5,6 +5,7 @@ import {
   useResolveAgentExecutionSession,
   useActiveOrgId,
   ManageAccessButton,
+  useOrgSlugForId,
 } from "@stigmer/react";
 import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/apiresourcekind/api_resource_kind_pb";
 
@@ -13,6 +14,7 @@ export default function WorkflowExecutionDetailPage() {
   const [searchParams] = useSearchParams();
   const org = searchParams.get("org") ?? undefined;
   const orgId = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const navigate = useNavigate();
   const [pendingAgentExecutionId, setPendingAgentExecutionId] = useState<string | null>(null);
 
@@ -34,9 +36,9 @@ export default function WorkflowExecutionDetailPage() {
   const handleNavigateToWorkflowEditor = useCallback(
     (_yaml: string, workflowSlug: string) => {
       const targetOrg = org ?? "";
-      navigate(`/library/workflows/${targetOrg}/${workflowSlug}`);
+      navigate(`/library/workflows/${slugForOrg(targetOrg)}/${workflowSlug}`);
     },
-    [navigate, org],
+    [navigate, org, slugForOrg],
   );
 
   if (!id) return null;

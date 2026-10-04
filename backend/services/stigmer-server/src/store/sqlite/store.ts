@@ -47,9 +47,12 @@ import type {
   ClaimResult,
   OAuthGrant,
   OAuthGrantStore,
-  OrganizationSlugClaim,
-  OrganizationSlugEntry,
-  OrganizationSlugStore,
+  ResourceNameClaim,
+  ResourceNameEntry,
+  ResourceNameKey,
+  ResourceNameRename,
+  ResourceNameRenamed,
+  ResourceNameStore,
   PendingOAuthState,
   PendingOAuthStateStore,
   RawResourceDocument,
@@ -81,6 +84,7 @@ import type {
 } from "../list-index.js";
 import { NOOP_STORE_LOGGER } from "../logger.js";
 import type { StoreLogger } from "../logger.js";
+import { assertRenameMoves } from "../resource-names.js";
 import {
   apiResourceKindName,
   filterRowsByField,
@@ -160,7 +164,7 @@ const RECONCILE_BATCH = 500;
 export class SqliteStore implements Store {
   readonly bootstrapState: BootstrapStateStore;
   readonly signalDedupe: SignalDedupeStore;
-  readonly organizationSlugs: OrganizationSlugStore;
+  readonly resourceNames: ResourceNameStore;
   readonly oauthGrants: OAuthGrantStore;
   readonly pendingOAuthStates: PendingOAuthStateStore;
 
@@ -181,7 +185,7 @@ export class SqliteStore implements Store {
     this.listIndexes = listIndexes;
     this.bootstrapState = new SqliteBootstrapStateStore(() => this.open());
     this.signalDedupe = new SqliteSignalDedupeStore(() => this.open(), logger);
-    this.organizationSlugs = new SqliteOrganizationSlugStore(() => this.open());
+    this.resourceNames = new SqliteResourceNameStore(() => this.open());
     this.oauthGrants = new SqliteOAuthGrantStore(() => this.open());
     this.pendingOAuthStates = new SqlitePendingOAuthStateStore(() =>
       this.open(),
@@ -1608,82 +1612,235 @@ function isUniqueConstraintError(error: unknown): boolean {
 }
 
 // =============================================================================
-// Organization slugs
+// Resource names
 // =============================================================================
 
-/** A ledger row as the driver reads it (`retired_at` NULL while held). */
-interface OrganizationSlugRow {
-  slug: string;
+/** A name row as the driver reads it. */
+interface ResourceNameRow {
+  kind: string;
+  org: string;
+  name: string;
+  id: string;
+  state: string;
   claimed_at: string;
-  retired_at: string | null;
+  expires_at: string;
 }
 
-function organizationSlugEntryOf(
-  row: OrganizationSlugRow,
-): OrganizationSlugEntry {
+const RESOURCE_NAME_COLUMNS =
+  "kind, org, name, id, state, claimed_at, expires_at";
+
+function resourceNameEntryOf(row: ResourceNameRow): ResourceNameEntry {
   return {
-    slug: row.slug,
+    kind: row.kind,
+    org: row.org,
+    name: row.name,
+    id: row.id,
+    state: row.state === "previous" ? "previous" : "current",
     claimedAt: row.claimed_at,
-    retiredAt: row.retired_at ?? "",
+    expiresAt: row.expires_at,
   };
 }
 
-class SqliteOrganizationSlugStore implements OrganizationSlugStore {
+/**
+ * The name store, the Postgres driver's in this engine's terms. Every
+ * multi-statement write runs in BEGIN IMMEDIATE, which takes the write lock
+ * up front, so it also excludes another process on the same file; nothing
+ * awaits inside, so nothing interleaves on the one connection.
+ */
+class SqliteResourceNameStore implements ResourceNameStore {
   constructor(private readonly open: () => DatabaseSync) {}
 
-  async claim(slug: string): Promise<OrganizationSlugClaim> {
-    const db = this.open();
-    const claimedAt = new Date().toISOString();
-    // INSERT OR IGNORE on the primary key: the one connection serialises
-    // writers, and `changes` says whether this claim is the one that won.
-    const inserted = db
-      .prepare(
-        `INSERT OR IGNORE INTO organization_slugs (slug, claimed_at) VALUES (?, ?)`,
-      )
-      .run(slug, claimedAt);
-    if (Number(inserted.changes) === 1) {
-      return { claimed: true, entry: { slug, claimedAt, retiredAt: "" } };
-    }
-    const holder = await this.find(slug);
-    if (holder === undefined) {
-      // A holder only disappears through its own create's release, so a
-      // lost claim with no holder is a claim that raced that release:
-      // surfaced as a fault rather than fabricating an entry.
-      throw new Error(
-        `organization slug '${slug}': its holder disappeared during the claim`,
-      );
-    }
-    return { claimed: false, entry: holder };
-  }
-
-  async retire(slug: string): Promise<void> {
-    const retiredAt = new Date().toISOString();
-    this.open()
-      .prepare(
-        `INSERT INTO organization_slugs (slug, claimed_at, retired_at) VALUES (?, ?, ?)
-         ON CONFLICT (slug) DO UPDATE SET retired_at = excluded.retired_at
-         WHERE organization_slugs.retired_at IS NULL`,
-      )
-      .run(slug, retiredAt, retiredAt);
-  }
-
-  async release(entry: OrganizationSlugEntry): Promise<void> {
-    this.open()
-      .prepare(
-        `DELETE FROM organization_slugs
-         WHERE slug = ? AND claimed_at = ? AND retired_at IS NULL`,
-      )
-      .run(entry.slug, entry.claimedAt);
-  }
-
-  async find(slug: string): Promise<OrganizationSlugEntry | undefined> {
+  async resolve(
+    key: ResourceNameKey,
+    now: string,
+  ): Promise<ResourceNameEntry | undefined> {
     const row = this.open()
       .prepare(
-        `SELECT slug, claimed_at, retired_at FROM organization_slugs WHERE slug = ?`,
+        `SELECT ${RESOURCE_NAME_COLUMNS} FROM resource_names
+         WHERE kind = ? AND org = ? AND name = ?
+           AND (expires_at = '' OR expires_at > ?)`,
       )
-      .get(slug) as OrganizationSlugRow | undefined;
-    return row === undefined ? undefined : organizationSlugEntryOf(row);
+      .get(key.kind, key.org, key.name, now) as ResourceNameRow | undefined;
+    return row === undefined ? undefined : resourceNameEntryOf(row);
   }
+
+  async current(
+    kind: string,
+    org: string,
+    id: string,
+  ): Promise<ResourceNameEntry | undefined> {
+    const row = this.open()
+      .prepare(
+        `SELECT ${RESOURCE_NAME_COLUMNS} FROM resource_names
+         WHERE kind = ? AND org = ? AND id = ? AND state = 'current'`,
+      )
+      .get(kind, org, id) as ResourceNameRow | undefined;
+    return row === undefined ? undefined : resourceNameEntryOf(row);
+  }
+
+  async claim(
+    key: ResourceNameKey,
+    id: string,
+    now: string,
+  ): Promise<ResourceNameClaim> {
+    return this.transaction((db) => {
+      removeExpiredName(db, key, now);
+      const inserted = db
+        .prepare(
+          `INSERT OR IGNORE INTO resource_names (kind, org, name, id, state, claimed_at)
+           VALUES (?, ?, ?, ?, 'current', ?)`,
+        )
+        .run(key.kind, key.org, key.name, id, now);
+      if (Number(inserted.changes) === 1) {
+        return {
+          claimed: true,
+          entry: { ...key, id, state: "current", claimedAt: now, expiresAt: "" },
+        };
+      }
+      return { claimed: false, entry: nameHolderOf(db, key) };
+    });
+  }
+
+  async rename(rename: ResourceNameRename): Promise<ResourceNameRenamed> {
+    assertRenameMoves(rename);
+    const to = { kind: rename.kind, org: rename.org, name: rename.to };
+    return this.transaction((db) => {
+      removeExpiredName(db, to, rename.now);
+      const takenBack = db
+        .prepare(
+          `SELECT ${RESOURCE_NAME_COLUMNS} FROM resource_names
+           WHERE kind = ? AND org = ? AND name = ? AND id = ?`,
+        )
+        .get(to.kind, to.org, to.name, rename.id) as ResourceNameRow | undefined;
+      const row = db
+        .prepare(
+          `INSERT INTO resource_names (kind, org, name, id, state, claimed_at)
+           VALUES (?, ?, ?, ?, 'current', ?)
+           ON CONFLICT (kind, org, name) DO UPDATE
+             SET state = 'current', claimed_at = excluded.claimed_at, expires_at = ''
+             WHERE resource_names.id = excluded.id
+           RETURNING ${RESOURCE_NAME_COLUMNS}`,
+        )
+        .get(to.kind, to.org, to.name, rename.id, rename.now) as
+        | ResourceNameRow
+        | undefined;
+      if (row === undefined) {
+        return { claimed: false, entry: nameHolderOf(db, to) };
+      }
+      // Every other current name, not only `from`: a concurrent rename that
+      // moved `from` first leaves its own new name current, and this one
+      // demotes it too. A name equal to the id is never given an expiry.
+      db.prepare(
+        `UPDATE resource_names
+         SET state = 'previous', claimed_at = ?,
+             expires_at = CASE WHEN name = id THEN '' ELSE ? END
+         WHERE kind = ? AND org = ? AND id = ?
+           AND state = 'current' AND name <> ?`,
+      ).run(
+        rename.now,
+        rename.fromExpiresAt,
+        rename.kind,
+        rename.org,
+        rename.id,
+        rename.to,
+      );
+      return takenBack === undefined
+        ? { claimed: true, entry: resourceNameEntryOf(row) }
+        : { claimed: true, entry: resourceNameEntryOf(row), takenBack: resourceNameEntryOf(takenBack) };
+    });
+  }
+
+  async revertRename(
+    rename: ResourceNameRename,
+    takenBack?: ResourceNameEntry,
+  ): Promise<void> {
+    this.transaction((db) => {
+      if (takenBack === undefined) {
+        db.prepare(
+          `DELETE FROM resource_names
+           WHERE kind = ? AND org = ? AND name = ? AND id = ?`,
+        ).run(rename.kind, rename.org, rename.to, rename.id);
+      } else {
+        db.prepare(
+          `UPDATE resource_names SET state = ?, claimed_at = ?, expires_at = ?
+           WHERE kind = ? AND org = ? AND name = ? AND id = ?`,
+        ).run(
+          takenBack.state,
+          takenBack.claimedAt,
+          takenBack.expiresAt,
+          rename.kind,
+          rename.org,
+          rename.to,
+          rename.id,
+        );
+      }
+      // `from` is current again unless a rename that overlapped this one
+      // made its own name current meanwhile (postgres/store.ts says why).
+      db.prepare(
+        `UPDATE resource_names SET state = 'current', expires_at = ''
+         WHERE kind = ? AND org = ? AND name = ? AND id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM resource_names
+             WHERE kind = ? AND org = ? AND id = ? AND state = 'current'
+           )`,
+      ).run(rename.kind, rename.org, rename.from, rename.id, rename.kind, rename.org, rename.id);
+    });
+  }
+
+  async release(kind: string, org: string, id: string): Promise<void> {
+    this.transaction((db) => {
+      db.prepare(
+        `DELETE FROM resource_names
+         WHERE kind = ? AND org = ? AND id = ? AND name <> id`,
+      ).run(kind, org, id);
+      db.prepare(
+        `UPDATE resource_names SET state = 'previous', expires_at = ''
+         WHERE kind = ? AND org = ? AND id = ? AND name = id`,
+      ).run(kind, org, id);
+    });
+  }
+
+  private transaction<T>(fn: (db: DatabaseSync) => T): T {
+    const db = this.open();
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = fn(db);
+      db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+}
+
+/** Removes the name's row when it is a previous name that expired by `now`. */
+function removeExpiredName(
+  db: DatabaseSync,
+  key: ResourceNameKey,
+  now: string,
+): void {
+  db.prepare(
+    `DELETE FROM resource_names
+     WHERE kind = ? AND org = ? AND name = ?
+       AND state = 'previous' AND expires_at <> '' AND expires_at <= ?`,
+  ).run(key.kind, key.org, key.name, now);
+}
+
+/** The row that won a lost write, read inside the losing transaction. */
+function nameHolderOf(db: DatabaseSync, key: ResourceNameKey): ResourceNameEntry {
+  const row = db
+    .prepare(
+      `SELECT ${RESOURCE_NAME_COLUMNS} FROM resource_names
+       WHERE kind = ? AND org = ? AND name = ?`,
+    )
+    .get(key.kind, key.org, key.name) as ResourceNameRow | undefined;
+  if (row === undefined) {
+    throw new Error(
+      `resource name '${key.kind}/${key.org}/${key.name}': its holder disappeared during the write`,
+    );
+  }
+  return resourceNameEntryOf(row);
 }
 
 // =============================================================================

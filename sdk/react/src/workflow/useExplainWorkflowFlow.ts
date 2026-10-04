@@ -26,7 +26,7 @@ export type ExplainPhase = "idle" | "starting" | "streaming" | "complete" | "err
 
 /** Options for {@link useExplainWorkflowFlow}. */
 export interface UseExplainWorkflowFlowOptions {
-  /** Organization slug. */
+  /** Organization id (a slug is also accepted). */
   readonly org: string;
   /** Current workflow YAML to explain. */
   readonly currentYaml: string;

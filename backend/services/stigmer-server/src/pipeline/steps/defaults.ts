@@ -22,8 +22,6 @@
  * keeps metadata.id only while it still equals that record. A claim is a
  * value, not a flag, so a later step that rewrote the id, or a request
  * that happened to carry the same string before any claim, keeps nothing.
- * A kind that derives its id AFTER this step (Organization's CopySlugToId)
- * needs no claim.
  *
  * SpecAudit/StatusAudit are SLOTS, not steps (stigmer/stigmer#540): every
  * setAuditFieldsForUpdate call site declares which slot it owns —

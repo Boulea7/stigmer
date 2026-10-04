@@ -41,6 +41,8 @@ export function IdentityProvidersSection({
   const headingId = useId();
   const { activeOrg } = useOrg();
   const idpAvailable = useResourceAvailable(ApiResourceKind.identity_provider);
+  // Requests name the org by id; the slug only reads in the SSO login URL
+  // a person shares.
   const orgSlug = activeOrg?.metadata?.slug ?? "";
   const orgId = activeOrg?.metadata?.id ?? "";
   const createCheck = useCheckPermission(
@@ -81,7 +83,7 @@ export function IdentityProvidersSection({
           Identity Providers
         </h2>
 
-        {idpAvailable && orgSlug && canCreate && flow.phase === "idle" && (
+        {idpAvailable && orgId && canCreate && flow.phase === "idle" && (
           <button
             type="button"
             onClick={() => setFlow({ phase: "creating" })}
@@ -102,14 +104,14 @@ export function IdentityProvidersSection({
           Identity providers are not available in local mode. Federated
           authentication requires Stigmer Cloud.
         </CloudFeatureNotice>
-      ) : !orgSlug ? (
+      ) : !orgId ? (
         <p className="stg:text-muted-foreground stg:py-4 stg:text-center stg:text-xs">
           Select an organization to manage identity providers.
         </p>
       ) : flow.phase === "creating" ? (
         <div className="stg:border-border stg:bg-card stg:rounded-lg stg:border stg:p-4">
           <IdentityProviderWizard
-            org={orgSlug}
+            org={orgId}
             onCreated={handleCreated}
             onCancel={() => setFlow({ phase: "idle" })}
           />
@@ -129,7 +131,7 @@ export function IdentityProvidersSection({
         </div>
       ) : (
         <IdentityProviderListPanel
-          org={orgSlug}
+          org={orgId}
           onEdit={(idp) =>
             setFlow({ phase: "editing", identityProvider: idp })
           }

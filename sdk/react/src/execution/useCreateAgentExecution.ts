@@ -82,7 +82,7 @@ export interface BootstrapSessionSpec {
 
 /** Fields shared by both variants of {@link CreateAgentExecutionInput}. */
 export interface SharedAgentExecutionFields {
-  /** Organization slug that owns the session. */
+  /** Id of the organization that owns the session (a slug is also accepted). */
   readonly org: string;
   /** User message that initiates the execution. */
   readonly message: string;

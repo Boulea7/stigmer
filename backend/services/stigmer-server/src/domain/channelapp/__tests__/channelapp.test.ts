@@ -50,7 +50,10 @@ import {
   noExistingSecretMessage,
   plaintextRequiredMessage,
 } from "../constants.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -67,6 +70,9 @@ const secrets = SecretService.create(TEST_KEY);
 const API_VERSION = "agentic.stigmer.ai/v1";
 const KIND = "ChannelApp";
 const ORG = "acme";
+// The id the server mints for ORG: rows written straight to the store and
+// stored references name the organization by it, never by its slug.
+let ORG_ID: string;
 
 type CommandClient = Client<typeof ChannelAppCommandController>;
 type QueryClient = Client<typeof ChannelAppQueryController>;
@@ -101,12 +107,13 @@ beforeAll(async () => {
   const transport: Transport = createGrpcTransport({
     baseUrl: `http://127.0.0.1:${port}`,
   });
-  await seedOrganizations(transport, [
+  const organizations = await seedOrganizations(transport, [
     ORG,
     "some-other-org",
     "acme-slack-queries",
     "acme-wa-queries",
   ]);
+  ORG_ID = organizationId(organizations, ORG);
   command = createClient(ChannelAppCommandController, transport);
   query = createClient(ChannelAppQueryController, transport);
 });
@@ -418,7 +425,7 @@ describe("update marker preserves per field", () => {
       metadata: {
         id: "chapp_seeded_empty",
         name: "Seeded Empty Secret",
-        org: ORG,
+        org: ORG_ID,
         slug: "seeded-empty-secret",
       },
       spec: {
@@ -428,7 +435,7 @@ describe("update marker preserves per field", () => {
             clientId: "1.2",
             clientSecret: await secrets.encrypt(
               "x",
-              EncryptionScope.forOrganization(ORG),
+              EncryptionScope.forOrganization(ORG_ID),
             ),
             signingSecret: "",
           },
@@ -608,12 +615,12 @@ describe("delete is blocked while referenced", () => {
       metadata: {
         id: "ach_01ref",
         name: "support-bot-slack",
-        org: ORG,
+        org: ORG_ID,
         slug: "support-bot-slack",
       },
       spec: {
         appRef: {
-          org: ORG,
+          org: ORG_ID,
           kind: ApiResourceKind.channel_app,
           slug: created.metadata!.slug,
         },
@@ -632,7 +639,7 @@ describe("delete is blocked while referenced", () => {
     expect(err.code).toBe(Code.FailedPrecondition);
     expect(err.rawMessage).toBe(
       deleteBlockedByChannelMessage(
-        ORG,
+        ORG_ID,
         created.metadata!.slug,
         "support-bot-slack",
       ),
@@ -661,7 +668,7 @@ describe("delete is blocked while referenced", () => {
       metadata: {
         id: "ach_02rel",
         name: "relative-ref-channel",
-        org: ORG,
+        org: ORG_ID,
         slug: "relative-ref-channel",
       },
       spec: {

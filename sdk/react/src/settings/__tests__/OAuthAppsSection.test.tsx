@@ -36,7 +36,6 @@ const stubs = vi.hoisted(() => ({
 }));
 
 vi.mock("../../organization/OrgProvider.js", () => ({
-  useActiveOrgSlug: () => "acme",
   useActiveOrgId: () => "org_acme",
 }));
 vi.mock("../../oauth-app/useOAuthAppList.js", () => ({
@@ -99,7 +98,7 @@ describe("OAuthAppsSection", () => {
   it("lists the active organization's apps the caller may view", () => {
     stubs.apps = [SLACK];
     renderSection();
-    expect(stubs.listedOrg).toBe("acme");
+    expect(stubs.listedOrg).toBe("org_acme");
     expect(screen.getByText("slack-client-1")).toBeTruthy();
   });
 

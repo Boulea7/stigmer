@@ -62,7 +62,7 @@ export function serializeWorkflowYaml(workflow: Workflow): string {
  * including tasks, env declarations, budget, and flow control.
  *
  * @param content - Raw YAML content string.
- * @param org - Target organization slug. Overrides `metadata.org` in the YAML.
+ * @param org - Target organization id (a slug is also accepted). Overrides `metadata.org` in the YAML.
  * @returns A `WorkflowInput` ready for the SDK apply/update call.
  * @throws {Error} When the YAML is malformed or missing required fields.
  */

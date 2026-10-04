@@ -8,6 +8,7 @@ package organizationv1
 
 import (
 	context "context"
+	apiresource "github.com/stigmer/stigmer/apis/stubs/go/ai/stigmer/commons/apiresource"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -22,6 +23,7 @@ const (
 	OrganizationCommandController_Apply_FullMethodName  = "/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/apply"
 	OrganizationCommandController_Create_FullMethodName = "/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/create"
 	OrganizationCommandController_Update_FullMethodName = "/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/update"
+	OrganizationCommandController_Rename_FullMethodName = "/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/rename"
 	OrganizationCommandController_Delete_FullMethodName = "/ai.stigmer.tenancy.organization.v1.OrganizationCommandController/delete"
 )
 
@@ -38,15 +40,18 @@ type OrganizationCommandControllerClient interface {
 	Apply(ctx context.Context, in *Organization, opts ...grpc.CallOption) (*Organization, error)
 	// Create an organization.
 	//
-	// An organization's slug is its id, and it is the organization's for good:
-	// a slug any organization has ever held, one since deleted included, is
-	// never taken again. A create of a held slug is refused with
-	// ALREADY_EXISTS; a create of a slug whose organization was deleted is
+	// The server mints the organization's id (org_<ulid>); metadata.org must be
+	// empty, because an organization belongs to no organization (one that names
+	// the organization itself, by its own id or slug, is cleared). A slug held by
+	// another organization is refused with ALREADY_EXISTS; a slug another
+	// organization was renamed away from, and which still resolves to it, is
 	// refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
 	// (domain "stigmer.ai"):
 	//
-	//   - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-	//     and a slug is never reused. Metadata: slug.
+	//   - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+	//     until a recent rename, and it still resolves there; or an
+	//     organization from an earlier release was filed under it, which keeps
+	//     it reserved for good, deleted or not. Metadata: slug.
 	//
 	// On Stigmer Cloud, creating a platform-managed organization is a plan
 	// feature of its integrator. An integrator whose plan lacks it is refused
@@ -67,9 +72,22 @@ type OrganizationCommandControllerClient interface {
 	//     as it is composed to. Metadata: limit.
 	Create(ctx context.Context, in *Organization, opts ...grpc.CallOption) (*Organization, error)
 	// Update an existing organization.
+	//
+	// The slug is not changed by an update (it is ignored, as for every
+	// kind); rename changes it.
 	Update(ctx context.Context, in *Organization, opts ...grpc.CallOption) (*Organization, error)
-	// Delete an organization. Its slug stays reserved: no organization can be
-	// created with it again.
+	// Rename an organization: change its slug, the name people type.
+	//
+	// Nothing the organization owns moves, because every resource names it by
+	// id. The old slug keeps resolving to the organization for 30 days, during
+	// which no other organization can take it and this one can take it back;
+	// then it is released. A slug another organization holds is refused with
+	// ALREADY_EXISTS, and one another organization was recently renamed away
+	// from with ORGANIZATION_SLUG_RESERVED (see create).
+	Rename(ctx context.Context, in *apiresource.RenameInput, opts ...grpc.CallOption) (*Organization, error)
+	// Delete an organization. Its slug is released once the organization is
+	// gone: a later organization may take it, and sees nothing the deleted one
+	// owned, because every resource names its organization by id.
 	//
 	// A server that holds one organization (GetServerInfoOutput.single_org's
 	// composition) refuses to delete it with FAILED_PRECONDITION carrying a
@@ -119,6 +137,16 @@ func (c *organizationCommandControllerClient) Update(ctx context.Context, in *Or
 	return out, nil
 }
 
+func (c *organizationCommandControllerClient) Rename(ctx context.Context, in *apiresource.RenameInput, opts ...grpc.CallOption) (*Organization, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Organization)
+	err := c.cc.Invoke(ctx, OrganizationCommandController_Rename_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationCommandControllerClient) Delete(ctx context.Context, in *OrganizationId, opts ...grpc.CallOption) (*Organization, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Organization)
@@ -142,15 +170,18 @@ type OrganizationCommandControllerServer interface {
 	Apply(context.Context, *Organization) (*Organization, error)
 	// Create an organization.
 	//
-	// An organization's slug is its id, and it is the organization's for good:
-	// a slug any organization has ever held, one since deleted included, is
-	// never taken again. A create of a held slug is refused with
-	// ALREADY_EXISTS; a create of a slug whose organization was deleted is
+	// The server mints the organization's id (org_<ulid>); metadata.org must be
+	// empty, because an organization belongs to no organization (one that names
+	// the organization itself, by its own id or slug, is cleared). A slug held by
+	// another organization is refused with ALREADY_EXISTS; a slug another
+	// organization was renamed away from, and which still resolves to it, is
 	// refused with ALREADY_EXISTS carrying a google.rpc.ErrorInfo detail
 	// (domain "stigmer.ai"):
 	//
-	//   - ORGANIZATION_SLUG_RESERVED — a deleted organization held the slug,
-	//     and a slug is never reused. Metadata: slug.
+	//   - ORGANIZATION_SLUG_RESERVED — another organization held the slug
+	//     until a recent rename, and it still resolves there; or an
+	//     organization from an earlier release was filed under it, which keeps
+	//     it reserved for good, deleted or not. Metadata: slug.
 	//
 	// On Stigmer Cloud, creating a platform-managed organization is a plan
 	// feature of its integrator. An integrator whose plan lacks it is refused
@@ -171,9 +202,22 @@ type OrganizationCommandControllerServer interface {
 	//     as it is composed to. Metadata: limit.
 	Create(context.Context, *Organization) (*Organization, error)
 	// Update an existing organization.
+	//
+	// The slug is not changed by an update (it is ignored, as for every
+	// kind); rename changes it.
 	Update(context.Context, *Organization) (*Organization, error)
-	// Delete an organization. Its slug stays reserved: no organization can be
-	// created with it again.
+	// Rename an organization: change its slug, the name people type.
+	//
+	// Nothing the organization owns moves, because every resource names it by
+	// id. The old slug keeps resolving to the organization for 30 days, during
+	// which no other organization can take it and this one can take it back;
+	// then it is released. A slug another organization holds is refused with
+	// ALREADY_EXISTS, and one another organization was recently renamed away
+	// from with ORGANIZATION_SLUG_RESERVED (see create).
+	Rename(context.Context, *apiresource.RenameInput) (*Organization, error)
+	// Delete an organization. Its slug is released once the organization is
+	// gone: a later organization may take it, and sees nothing the deleted one
+	// owned, because every resource names its organization by id.
 	//
 	// A server that holds one organization (GetServerInfoOutput.single_org's
 	// composition) refuses to delete it with FAILED_PRECONDITION carrying a
@@ -200,6 +244,9 @@ func (UnimplementedOrganizationCommandControllerServer) Create(context.Context, 
 }
 func (UnimplementedOrganizationCommandControllerServer) Update(context.Context, *Organization) (*Organization, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedOrganizationCommandControllerServer) Rename(context.Context, *apiresource.RenameInput) (*Organization, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Rename not implemented")
 }
 func (UnimplementedOrganizationCommandControllerServer) Delete(context.Context, *OrganizationId) (*Organization, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
@@ -278,6 +325,24 @@ func _OrganizationCommandController_Update_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrganizationCommandController_Rename_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(apiresource.RenameInput)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationCommandControllerServer).Rename(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationCommandController_Rename_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationCommandControllerServer).Rename(ctx, req.(*apiresource.RenameInput))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _OrganizationCommandController_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(OrganizationId)
 	if err := dec(in); err != nil {
@@ -314,6 +379,10 @@ var OrganizationCommandController_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "update",
 			Handler:    _OrganizationCommandController_Update_Handler,
+		},
+		{
+			MethodName: "rename",
+			Handler:    _OrganizationCommandController_Rename_Handler,
 		},
 		{
 			MethodName: "delete",

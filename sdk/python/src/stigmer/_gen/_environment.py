@@ -98,7 +98,7 @@ class EnvironmentClient:
 
 @dataclass
 class EnvironmentInput:
-    """Input for creating or updating a Environment."""
+    """Input for creating or updating an Environment."""
 
     name: str
     org: str

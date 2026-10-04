@@ -14,7 +14,7 @@ import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 
 /** Props for {@link CreateApiKeyForm}. */
 export interface CreateApiKeyFormProps {
-  /** Organization slug used as the `org` field when creating the key. */
+  /** Organization id used as the `org` field when creating the key (a slug is also accepted). */
   readonly org: string;
   /**
    * Fired with the newly created API key after successful creation.

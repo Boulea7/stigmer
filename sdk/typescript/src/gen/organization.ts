@@ -7,7 +7,7 @@ import { create } from "@bufbuild/protobuf";
 import { EmptySchema } from "@bufbuild/protobuf/wkt";
 import { createClient, type Client, type Transport } from "@connectrpc/connect";
 import { ApiResourceVisibility } from "@stigmer/protos/ai/stigmer/commons/apiresource/enum_pb";
-import { ApiResourceReferenceSchema, type FindApiResourcesRequest } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
+import { ApiResourceReferenceSchema, type RenameInput, type FindApiResourcesRequest } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
 import { ApiResourceMetadataSchema } from "@stigmer/protos/ai/stigmer/commons/apiresource/metadata_pb";
 import { OrganizationSchema, type Organization } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { OrganizationCommandController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/command_pb";
@@ -44,6 +44,12 @@ export class OrganizationClient {
     } catch (e) { throw wrapError(e); }
   }
 
+  async rename(input: RenameInput): Promise<Organization> {
+    try {
+      return await this.command.rename(input);
+    } catch (e) { throw wrapError(e); }
+  }
+
   async delete(id: string): Promise<Organization> {
     try {
       return await this.command.delete(create(OrganizationIdSchema, { value: id }));
@@ -75,7 +81,7 @@ export class OrganizationClient {
   }
 }
 
-/** Input for creating/updating a Organization. */
+/** Input for creating/updating an Organization. */
 export interface OrganizationInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set
@@ -86,7 +92,11 @@ export interface OrganizationInput {
   id?: string;
   name: string;
   slug?: string;
-  org: string;
+  /**
+   * Always empty: an Organization belongs to no organization, so
+   * `metadata.org` stays unset. Omit it.
+   */
+  org?: "";
   labels?: Record<string, string>;
   visibility?: ApiResourceVisibility;
   description?: string;
@@ -120,7 +130,7 @@ export function buildOrganizationProto(input: OrganizationInput): Organization {
     metadata: Object.assign(create(ApiResourceMetadataSchema), {
       ...(input.id && { id: input.id }),
       name: input.name,
-      org: input.org,
+      org: input.org ?? "",
       ...(input.slug && { slug: input.slug }),
       ...(input.labels && { labels: input.labels }),
       ...(input.visibility && { visibility: input.visibility }),
@@ -166,7 +176,6 @@ export function toOrganizationUpdateInput(resource: Organization): OrganizationI
     id: meta?.id || undefined,
     name: meta?.name ?? "",
     slug: meta?.slug || undefined,
-    org: meta?.org || meta?.slug || "",
     labels: meta?.labels && Object.keys(meta.labels).length > 0 ? { ...meta.labels } : undefined,
     visibility: meta?.visibility || undefined,
     description: spec.description || undefined,

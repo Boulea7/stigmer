@@ -24,7 +24,7 @@
 
 import type { DescMessage, DescService, Message } from "@bufbuild/protobuf";
 import type { Client } from "@connectrpc/connect";
-import type { UpdateVisibilityInput } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
+import type { RenameInput, UpdateVisibilityInput } from "@stigmer/protos/ai/stigmer/commons/apiresource/io_pb";
 import { type Session, SessionSchema } from "@stigmer/protos/ai/stigmer/agentic/session/v1/api_pb";
 import { SessionCommandController } from "@stigmer/protos/ai/stigmer/agentic/session/v1/command_pb";
 import {
@@ -63,6 +63,13 @@ export interface ApplyHandler {
    * Manifest kinds inherit the binding from the SDK registry.
    */
   updateVisibility?(controller: ControllerFn, input: UpdateVisibilityInput): Promise<Message>;
+  /**
+   * Drive the controller's `rename` RPC, the only door for a slug change
+   * (an update ignores the slug). Present exactly when the kind has the
+   * RPC; the apply core follows up through it when a manifest that carries
+   * the resource's id declares a different slug than the stored one.
+   */
+  rename?(controller: ControllerFn, input: RenameInput): Promise<Message>;
 }
 
 // The SDK registry's applyOrder values end at schedule = 12; the extras slot
@@ -74,6 +81,7 @@ const CLI_EXTRA_HANDLERS: readonly ApplyHandler[] = [
     schema: OrganizationSchema,
     applyOrder: 0,
     apply: (c, m) => c(OrganizationCommandController).apply(m as Organization),
+    rename: (c, i) => c(OrganizationCommandController).rename(i),
   },
   {
     kind: ApiResourceKind.workflow_instance,

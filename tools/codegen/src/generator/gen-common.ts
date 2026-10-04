@@ -113,6 +113,24 @@ export function toPascalCase(s: string): string {
   return parts.join("");
 }
 
+/**
+ * The indefinite article before a resource's name in emitted prose: "an"
+ * before a vowel ("an Organization", "an Agent Instance"), else "a".
+ */
+export function indefiniteArticle(name: string): string {
+  if (name.length === 0) return "a";
+  switch (name[0].toLowerCase()) {
+    case "a":
+    case "e":
+    case "i":
+    case "o":
+    case "u":
+      return "an";
+    default:
+      return "a";
+  }
+}
+
 /** Port of singularize (PascalCase plural → singular). */
 export function singularize(name: string): string {
   if (name.endsWith("ies")) return name.slice(0, -3) + "y";

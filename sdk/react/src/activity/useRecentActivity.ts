@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import type { RecentActivityEntry as ProtoEntry } from "@stigmer/protos/ai/stigmer/activity/v1/io_pb";
 import { useStigmer } from "../hooks.js";
-import { useActiveOrgSlug } from "../organization/OrgProvider.js";
+import { useActiveOrgId } from "../organization/OrgProvider.js";
 import { useFetch } from "../internal/useFetch.js";
 import type { RecentActivityEntry, RecentActivityType } from "./types.js";
 
@@ -69,7 +69,7 @@ export function useRecentActivity(
 ): UseRecentActivityReturn {
   const pageSize = options?.pageSize ?? DEFAULT_PAGE_SIZE;
   const stigmer = useStigmer();
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
 
   const { data, isLoading, error, refetch } = useFetch(
     () =>

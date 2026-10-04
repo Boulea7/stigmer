@@ -37,7 +37,6 @@ const stubs = vi.hoisted(() => ({
 }));
 
 vi.mock("../../organization/OrgProvider.js", () => ({
-  useActiveOrgSlug: () => "acme",
   useActiveOrgId: () => "org_acme",
 }));
 vi.mock("../../channel-app/useChannelAppList.js", () => ({
@@ -105,7 +104,7 @@ describe("ChannelAppsSection", () => {
   it("lists the active organization's apps the caller may view", () => {
     stubs.apps = [SLACK];
     renderSection();
-    expect(stubs.listedOrg).toBe("acme");
+    expect(stubs.listedOrg).toBe("org_acme");
     expect(screen.getByText("Acme Slack")).toBeTruthy();
   });
 

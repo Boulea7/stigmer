@@ -63,7 +63,7 @@ class ArtifactClient:
 
 @dataclass
 class ArtifactInput:
-    """Input for creating or updating a Artifact."""
+    """Input for creating or updating an Artifact."""
 
     name: str
     org: str

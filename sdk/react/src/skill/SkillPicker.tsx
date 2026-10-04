@@ -15,6 +15,8 @@ import { cn } from "@stigmer/theme";
 import { useSkillSearch } from "./useSkillSearch.js";
 import { useScrollShadows } from "../internal/useScrollShadows.js";
 import { ScrollFade } from "../internal/ScrollFade.js";
+import { OrgSlugText } from "../organization/OrgSlugText.js";
+import { useOrgIdForRef } from "../organization/useOrgRefs.js";
 
 /** Props for {@link SkillPicker}. */
 export interface SkillPickerProps {
@@ -79,14 +81,17 @@ export function SkillPicker({
   const results_ = useScrollShadows();
   const selected_ = useScrollShadows();
 
+  // A selection may name its org by slug (one a host or URL supplied) and
+  // a result names it by id, so both sides are compared by id.
+  const orgIdFor = useOrgIdForRef();
   const selectedKeys = useMemo(
-    () => new Set(value.map(refKey)),
-    [value],
+    () => new Set(value.map((ref) => `${orgIdFor(ref.org)}/${ref.slug}`)),
+    [value, orgIdFor],
   );
 
   const availableResults = useMemo(
-    () => results.filter((r) => !selectedKeys.has(`${r.org}/${r.slug}`)),
-    [results, selectedKeys],
+    () => results.filter((r) => !selectedKeys.has(`${orgIdFor(r.org)}/${r.slug}`)),
+    [results, selectedKeys, orgIdFor],
   );
 
   useEffect(() => {
@@ -254,7 +259,7 @@ export function SkillPicker({
                     <HighlightMatch text={result.name} query={query} />
                   </span>
                   <span className="stg:ml-auto stg:shrink-0 stg:text-[0.6rem] stg:text-muted-foreground">
-                    {result.org}
+                    <OrgSlugText orgId={result.org} />
                   </span>
                 </span>
                 {result.description && (

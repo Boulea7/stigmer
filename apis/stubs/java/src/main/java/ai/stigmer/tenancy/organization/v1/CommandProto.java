@@ -37,42 +37,49 @@ public final class CommandProto extends com.google.protobuf.GeneratedFile {
     java.lang.String[] descriptorData = {
       "\n0ai/stigmer/tenancy/organization/v1/com" +
       "mand.proto\022\"ai.stigmer.tenancy.organizat" +
-      "ion.v1\0328ai/stigmer/commons/apiresource/r" +
-      "pc_service_options.proto\032+ai/stigmer/com" +
-      "mons/rpc/method_options.proto\032,ai/stigme" +
-      "r/tenancy/organization/v1/api.proto\032+ai/" +
-      "stigmer/tenancy/organization/v1/io.proto" +
-      "2\330\004\n\035OrganizationCommandController\022k\n\005ap" +
-      "ply\0220.ai.stigmer.tenancy.organization.v1" +
-      ".Organization\0320.ai.stigmer.tenancy.organ" +
-      "ization.v1.Organization\022r\n\006create\0220.ai.s" +
-      "tigmer.tenancy.organization.v1.Organizat" +
-      "ion\0320.ai.stigmer.tenancy.organization.v1" +
-      ".Organization\"\004\320\270\030\001\022\250\001\n\006update\0220.ai.stig" +
-      "mer.tenancy.organization.v1.Organization" +
-      "\0320.ai.stigmer.tenancy.organization.v1.Or" +
-      "ganization\":\302\270\0306\010\002\020\036\"\013metadata.id*#unaut" +
-      "horized to update organization\022\244\001\n\006delet" +
-      "e\0222.ai.stigmer.tenancy.organization.v1.O" +
-      "rganizationId\0320.ai.stigmer.tenancy.organ" +
-      "ization.v1.Organization\"4\302\270\0300\010\003\020\036\"\005value" +
-      "*#unauthorized to delete organization\032\004\240" +
-      "\377+\036B\273\001B\014CommandProtoP\001\242\002\004ASTO\252\002\"Ai.Stigm" +
-      "er.Tenancy.Organization.V1\312\002\"Ai\\Stigmer\\" +
-      "Tenancy\\Organization\\V1\342\002.Ai\\Stigmer\\Ten" +
-      "ancy\\Organization\\V1\\GPBMetadata\352\002&Ai::S" +
-      "tigmer::Tenancy::Organization::V1b\006proto" +
-      "3"
+      "ion.v1\032\'ai/stigmer/commons/apiresource/i" +
+      "o.proto\0328ai/stigmer/commons/apiresource/" +
+      "rpc_service_options.proto\032+ai/stigmer/co" +
+      "mmons/rpc/method_options.proto\032,ai/stigm" +
+      "er/tenancy/organization/v1/api.proto\032+ai" +
+      "/stigmer/tenancy/organization/v1/io.prot" +
+      "o2\376\005\n\035OrganizationCommandController\022k\n\005a" +
+      "pply\0220.ai.stigmer.tenancy.organization.v" +
+      "1.Organization\0320.ai.stigmer.tenancy.orga" +
+      "nization.v1.Organization\022r\n\006create\0220.ai." +
+      "stigmer.tenancy.organization.v1.Organiza" +
+      "tion\0320.ai.stigmer.tenancy.organization.v" +
+      "1.Organization\"\004\320\270\030\001\022\250\001\n\006update\0220.ai.sti" +
+      "gmer.tenancy.organization.v1.Organizatio" +
+      "n\0320.ai.stigmer.tenancy.organization.v1.O" +
+      "rganization\":\302\270\0306\010\002\020\036\"\013metadata.id*#unau" +
+      "thorized to update organization\022\243\001\n\006rena" +
+      "me\022+.ai.stigmer.commons.apiresource.Rena" +
+      "meInput\0320.ai.stigmer.tenancy.organizatio" +
+      "n.v1.Organization\":\302\270\0306\010\003\020\036\"\013resource_id" +
+      "*#unauthorized to rename organization\022\244\001" +
+      "\n\006delete\0222.ai.stigmer.tenancy.organizati" +
+      "on.v1.OrganizationId\0320.ai.stigmer.tenanc" +
+      "y.organization.v1.Organization\"4\302\270\0300\010\003\020\036" +
+      "\"\005value*#unauthorized to delete organiza" +
+      "tion\032\004\240\377+\036B\273\001B\014CommandProtoP\001\242\002\004ASTO\252\002\"A" +
+      "i.Stigmer.Tenancy.Organization.V1\312\002\"Ai\\S" +
+      "tigmer\\Tenancy\\Organization\\V1\342\002.Ai\\Stig" +
+      "mer\\Tenancy\\Organization\\V1\\GPBMetadata\352" +
+      "\002&Ai::Stigmer::Tenancy::Organization::V1" +
+      "b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
         new com.google.protobuf.Descriptors.FileDescriptor[] {
+          ai.stigmer.commons.apiresource.IoProto.getDescriptor(),
           ai.stigmer.commons.apiresource.RpcServiceOptionsProto.getDescriptor(),
           ai.stigmer.commons.rpc.MethodOptionsProto.getDescriptor(),
           ai.stigmer.tenancy.organization.v1.ApiProto.getDescriptor(),
           ai.stigmer.tenancy.organization.v1.IoProto.getDescriptor(),
         });
     descriptor.resolveAllFeaturesImmutable();
+    ai.stigmer.commons.apiresource.IoProto.getDescriptor();
     ai.stigmer.commons.apiresource.RpcServiceOptionsProto.getDescriptor();
     ai.stigmer.commons.rpc.MethodOptionsProto.getDescriptor();
     ai.stigmer.tenancy.organization.v1.ApiProto.getDescriptor();

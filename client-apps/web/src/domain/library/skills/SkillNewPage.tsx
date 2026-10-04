@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   SkillUploader,
-  useActiveOrgSlug,
+  useActiveOrgId,
+  useOrgSlugForId,
   useBreadcrumbOverride,
 } from "@stigmer/react";
 
@@ -16,7 +17,8 @@ import {
  * completion (navigate to detail) and cancellation (navigate to list).
  */
 export function SkillNewPage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const slugForOrg = useOrgSlugForId();
   const router = useRouter();
   const { setLabel } = useBreadcrumbOverride();
 
@@ -31,7 +33,7 @@ export function SkillNewPage() {
       org={org}
       onComplete={(skill) =>
         router.push(
-          `/library/skills/${skill.metadata?.org}/${skill.metadata?.slug}`,
+          `/library/skills/${slugForOrg(skill.metadata?.org ?? "")}/${skill.metadata?.slug}`,
         )
       }
       onCancel={() => router.push("/library/skills")}

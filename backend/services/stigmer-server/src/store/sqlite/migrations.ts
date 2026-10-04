@@ -62,9 +62,11 @@ export const SCHEMA_VERSION_10 = 10;
 export const SCHEMA_VERSION_11 = 11;
 /** v12: the organization-slug ledger, filled with every slug taken before it. */
 export const SCHEMA_VERSION_12 = 12;
+/** v13: the resource-name table replaces the organization-slug ledger. */
+export const SCHEMA_VERSION_13 = 13;
 
 /** Target version for new databases. */
-export const CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_12;
+export const CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_13;
 
 /**
  * Applies every pending migration up to `targetVersion` in order — all of
@@ -96,6 +98,7 @@ export function runMigrations(
     [SCHEMA_VERSION_10, migrateToV10],
     [SCHEMA_VERSION_11, migrateToV11],
     [SCHEMA_VERSION_12, migrateToV12],
+    [SCHEMA_VERSION_13, migrateToV13],
   ];
 
   for (const [version, migrate] of chain) {
@@ -541,4 +544,40 @@ function migrateToV12(db: DatabaseSync): void {
   for (const slug of named) {
     retire.run(slug, recordedAt, recordedAt);
   }
+}
+
+/**
+ * v13: the resource-name table, the Postgres driver's v8 in this engine's
+ * terms (postgres/migrations.ts gives the reasons for the table and the
+ * fill). Runs inside applyInTransaction's BEGIN, so the table, its fill and
+ * the ledger's drop land together or not at all.
+ */
+function migrateToV13(db: DatabaseSync): void {
+  db.exec(`
+    CREATE TABLE resource_names (
+      kind TEXT NOT NULL,
+      org TEXT NOT NULL,
+      name TEXT NOT NULL,
+      id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      claimed_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (kind, org, name)
+    ) WITHOUT ROWID;
+
+    CREATE INDEX idx_resource_names_id ON resource_names (kind, org, id);
+  `);
+  db.prepare(
+    `INSERT INTO resource_names (kind, org, name, id, state, claimed_at)
+     SELECT 'organization', '', id, id, 'current', ?
+     FROM resources WHERE kind = 'organization'`,
+  ).run(new Date().toISOString());
+  // Every other slug the ledger held (a deleted organization's) stays
+  // reserved: a previous name equal to its id that never expires.
+  db.exec(`
+    INSERT OR IGNORE INTO resource_names (kind, org, name, id, state, claimed_at)
+    SELECT 'organization', '', slug, slug, 'previous', claimed_at
+    FROM organization_slugs
+  `);
+  db.exec(`DROP TABLE organization_slugs`);
 }

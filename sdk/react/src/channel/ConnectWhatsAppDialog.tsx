@@ -24,6 +24,7 @@ import { useInstallChannel } from "./useInstallChannel.js";
 import { useOrgAgentChannelList } from "./useOrgAgentChannelList.js";
 import { agentChannelToInput, useSaveAgentChannel } from "./useSaveAgentChannel.js";
 import { WhatsAppMarkIcon } from "./WhatsAppMarkIcon.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 /** Props for {@link ConnectWhatsAppDialog}. */
 export interface ConnectWhatsAppDialogProps {
@@ -157,6 +158,7 @@ function ConnectWhatsAppDialogBody({
   channelAppsHref,
   titleId,
 }: ConnectWhatsAppDialogBodyProps) {
+  const slugForOrg = useOrgSlugForId();
   const stigmer = useStigmer();
   const deploymentMode = useDeploymentMode();
   const agentName = agent.metadata?.name || agent.metadata?.slug || "this agent";
@@ -432,7 +434,7 @@ function ConnectWhatsAppDialogBody({
             </p>
             <p className="stg:text-xs stg:text-muted-foreground">
               Conversations from WhatsApp are billed to{" "}
-              <span className="stg:font-medium">{org}</span>. Each number serves
+              <span className="stg:font-medium">{slugForOrg(org)}</span>. Each number serves
               one agent per channel app.
             </p>
 

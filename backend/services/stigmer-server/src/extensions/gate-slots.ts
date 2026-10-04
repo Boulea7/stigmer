@@ -42,7 +42,7 @@
  * viewers. Never on `bootstrapPolicy`, the platform's structural lane.
  *
  * The ninth, `org-create:pre-side-effect-gate`: the organization create
- * chain after its last pure step (CopySlugToId) and before Persist, the
+ * chain after its last pure step (GuardReservedLabels) and before Persist, the
  * position the session chain's slot holds. It exists for a refusal that
  * must leave nothing behind: `org-create:post-persist` runs after the row
  * is written, so a limit enforced there would leave the organization it
@@ -58,9 +58,10 @@
  * and is loaded (EXISTING_RESOURCE_KEY) while its steps run. Whatever an
  * edition keeps for the organization must go before the row does, or be
  * refused: a row left behind is trust or state that nobody administers.
- * (The slug itself is never taken again, domain/organization/slug-ledger.ts,
- * so nothing left behind can pass to a new holder of the slug; the order
- * still keeps an edition's rows from outliving their organization.) Its
+ * (What is left behind names the organization's id, which no later
+ * organization carries, so nothing can pass to a new holder of its slug;
+ * the order still keeps an edition's rows from outliving their
+ * organization.) Its
  * steps may refuse (Enterprise refuses while an
  * identity provider still signs in platform-managed organizations) or
  * remove the edition's own rows; either way a throw fails the delete with

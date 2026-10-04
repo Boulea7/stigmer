@@ -1,6 +1,13 @@
+/**
+ * useDependencyGraph derives an agent's dependency tree from its spec: one
+ * node per MCP server, skill and sub-agent, each with a navigation ref, and a
+ * qualified label (the org's slug, then the resource's) for a reference into
+ * another organization.
+ */
 import { describe, it, expect } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { useDependencyGraph } from "../useDependencyGraph";
+import { ACME_ID, GLOBEX_ID, orgWrapper } from "../../organization/__tests__/org-fixture";
 
 const emptySpec = {
   mcpServerUsages: [],
@@ -88,5 +95,50 @@ describe("useDependencyGraph", () => {
 
     expect(isEmpty).toBe(true);
     expect(tree).toBeNull();
+  });
+
+  it("qualifies a cross-org reference with the org's slug while its ref keeps the id", async () => {
+    const { result } = renderHook(
+      () =>
+        useDependencyGraph({
+          agentName: "clinic-assistant",
+          agentOrg: ACME_ID,
+          spec: {
+            mcpServerUsages: [
+              {
+                mcpServerRef: { org: GLOBEX_ID, slug: "github" },
+                enabledTools: [],
+                toolApprovalOverrides: [],
+              },
+            ],
+            skillRefs: [
+              { org: GLOBEX_ID, slug: "shared-guide" },
+              { org: ACME_ID, slug: "own-guide" },
+            ],
+            subAgents: [
+              {
+                name: "researcher",
+                description: "",
+                mcpAccess: [],
+                skillRefs: [{ org: GLOBEX_ID, slug: "research-guide" }],
+                modelOverride: "",
+              },
+            ],
+          },
+        }),
+      { wrapper: orgWrapper() },
+    );
+
+    await waitFor(() =>
+      expect(result.current.tree!.root.children[0].qualifiedLabel).toBe("globex/github"),
+    );
+    const [mcp, crossSkill, ownSkill, subAgent] = result.current.tree!.root.children;
+    expect(mcp.ref).toEqual({ org: GLOBEX_ID, slug: "github" });
+    expect(crossSkill.qualifiedLabel).toBe("globex/shared-guide");
+    expect(crossSkill.ref).toEqual({ org: GLOBEX_ID, slug: "shared-guide" });
+    expect(ownSkill.qualifiedLabel).toBeUndefined();
+    const subSkill = subAgent.children[0];
+    expect(subSkill.qualifiedLabel).toBe("globex/research-guide");
+    expect(subSkill.ref).toEqual({ org: GLOBEX_ID, slug: "research-guide" });
   });
 });

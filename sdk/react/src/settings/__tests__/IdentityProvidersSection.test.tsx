@@ -132,7 +132,7 @@ describe("IdentityProvidersSection", () => {
 
   it("names the organization's admins, not an empty configuration, to a caller who may not create providers", () => {
     renderSection("cloud");
-    expect(stubs.listedOrg).toBe("acme");
+    expect(stubs.listedOrg).toBe("org_acme");
     expect(
       screen.getByText("Identity providers are managed by your organization's admins."),
     ).toBeTruthy();

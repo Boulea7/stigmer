@@ -26,6 +26,7 @@ import { TimeZoneField, browserTimeZone } from "./TimeZoneField.js";
 import { useCreateSchedule } from "./useCreateSchedule.js";
 import { cadenceToCron, validateCron, type CadencePreset } from "./cadence.js";
 import { SpinnerIcon } from "../internal/SpinnerIcon.js";
+import { useOrgSlugForId } from "../organization/useOrgRefs.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -34,7 +35,7 @@ import { SpinnerIcon } from "../internal/SpinnerIcon.js";
 /** Props for {@link ScheduleForm}. */
 export interface ScheduleFormProps {
   /**
-   * Organization slug. Schedules are org-local: the server requires the
+   * Organization id (a slug is also accepted). Schedules are org-local: the server requires the
    * target agent to live in this same org, which is the org the agent
    * picker searches.
    */
@@ -71,11 +72,18 @@ const MESSAGE_COUNTER_THRESHOLD = 500;
  * Creation only. Editing an existing schedule must not flow through
  * this form's curated input — see the note on {@link useCreateSchedule}.
  *
+ * The created schedule names its organization by id; the console URL
+ * carries the slug.
+ *
  * @example
  * ```tsx
+ * const slugForOrg = useOrgSlugForId();
+ *
  * <ScheduleForm
  *   org="acme"
- *   onComplete={(s) => navigate(`/library/schedules/${s.metadata?.org}/${s.metadata?.slug}`)}
+ *   onComplete={(s) =>
+ *     navigate(`/library/schedules/${slugForOrg(s.metadata?.org ?? "")}/${s.metadata?.slug}`)
+ *   }
  *   onCancel={() => navigate("/library/schedules")}
  * />
  * ```
@@ -86,6 +94,7 @@ export function ScheduleForm({
   onCancel,
   className,
 }: ScheduleFormProps) {
+  const slugForOrg = useOrgSlugForId();
   const baseId = useId();
   const { create, isCreating, error, clearError } = useCreateSchedule();
 
@@ -249,7 +258,7 @@ export function ScheduleForm({
           >
             <span className="stg:truncate">
               {agentRef
-                ? (agentName ?? `${agentRef.org}/${agentRef.slug}`)
+                ? (agentName ?? `${slugForOrg(agentRef.org)}/${agentRef.slug}`)
                 : "Choose an agent…"}
             </span>
             <ChevronIcon />
@@ -266,7 +275,7 @@ export function ScheduleForm({
         </Popover.Root>
         <p className={hintClasses}>
           Each fire runs this agent unattended in a fresh session. Only
-          agents in <span className="stg:font-medium">{org}</span> can be
+          agents in <span className="stg:font-medium">{slugForOrg(org)}</span> can be
           scheduled.
         </p>
       </div>

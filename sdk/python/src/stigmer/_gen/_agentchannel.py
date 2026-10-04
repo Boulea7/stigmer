@@ -174,7 +174,7 @@ class AgentChannelClient:
 
 @dataclass
 class AgentChannelInput:
-    """Input for creating or updating a AgentChannel."""
+    """Input for creating or updating an AgentChannel."""
 
     name: str
     org: str

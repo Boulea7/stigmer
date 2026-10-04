@@ -22,23 +22,30 @@ export async function ensureDefaultOrg(client: Stigmer): Promise<void> {
 
 /**
  * Ensures an organization with `slug` exists, for a spec that seeds into an
- * organization of its own. Idempotent, and tolerant of parallel workers
- * racing the same check-then-create: a loser sees ALREADY_EXISTS, which is
- * the desired end state.
+ * organization of its own, and answers its id (the console's active
+ * organization is stored by id). Idempotent, and tolerant of parallel
+ * workers racing the same check-then-create: a loser sees ALREADY_EXISTS,
+ * which is the desired end state, and reads the winner's id.
  */
-export async function ensureOrg(client: Stigmer, slug: string, name: string): Promise<void> {
-  const existing = await client.organization.findMyOrganizations();
-  if (existing.entries.some((o) => o.metadata?.slug === slug)) return;
+export async function ensureOrg(client: Stigmer, slug: string, name: string): Promise<string> {
+  const idOf = async () =>
+    (await client.organization.findMyOrganizations()).entries.find((o) => o.metadata?.slug === slug)?.metadata?.id;
+  const existing = await idOf();
+  if (existing !== undefined) return existing;
 
   try {
-    await client.organization.create({ name, slug, org: slug });
+    return (await client.organization.create({ name, slug })).metadata!.id;
   } catch (err) {
     if (!String(err).includes("already exists")) throw err;
   }
+  const raced = await idOf();
+  if (raced === undefined) throw new Error(`organization '${slug}' exists but is not one of the caller's`);
+  return raced;
 }
 
 export interface TestOrgResult {
   slug: string;
+  id: string;
   cleanup: () => Promise<void>;
 }
 
@@ -51,10 +58,11 @@ export interface TestOrgResult {
  */
 export async function createTestOrg(client: Stigmer): Promise<TestOrgResult> {
   const slug = `e2e-org-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  const org = await client.organization.create({ name: slug, slug, org: slug });
+  const org = await client.organization.create({ name: slug, slug });
   const id = org.metadata!.id;
   return {
     slug,
+    id,
     cleanup: async () => {
       await client.organization.delete(id).catch(() => {});
     },
@@ -64,7 +72,10 @@ export async function createTestOrg(client: Stigmer): Promise<TestOrgResult> {
 export interface TestAgentResult {
   id: string;
   slug: string;
+  /** The organization as the spec named it: its slug, for console URLs. */
   org: string;
+  /** The organization's id, as the agent stores it (share links carry it). */
+  orgId: string;
   cleanup: () => Promise<void>;
 }
 
@@ -94,6 +105,7 @@ export async function createTestAgent(
     id,
     slug,
     org,
+    orgId: agent.metadata!.org,
     cleanup: async () => {
       await client.agent.delete(id).catch(() => {});
     },

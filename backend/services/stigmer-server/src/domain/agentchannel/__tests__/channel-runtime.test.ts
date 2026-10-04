@@ -68,7 +68,10 @@ import { createLogger } from "../../../boot/logger.js";
 import { invalidArgumentError } from "../../../pipeline/errors.js";
 import type { CallerIdentity } from "../../../extensions/identity.js";
 import type { ChannelRuntime } from "../channel-runtime.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({
   level: "error",
@@ -77,7 +80,11 @@ const silentLogger = createLogger({
 });
 
 const API_VERSION = "agentic.stigmer.ai/v1";
+// Requests name the organization by slug; the serving chain resolves it
+// to the minted id before anything else sees the request, so the driver
+// receives the id.
 const ORG = "channel-runtime-test-org";
+let ORG_ID: string;
 
 /** The refusal the fake's write-constraint arm throws when armed. */
 const FAKE_PIN_REQUIRED_MESSAGE =
@@ -274,7 +281,7 @@ beforeAll(async () => {
   const transport: Transport = createGrpcTransport({
     baseUrl: `http://127.0.0.1:${port}`,
   });
-  await seedOrganizations(transport, [ORG]);
+  ORG_ID = organizationId(await seedOrganizations(transport, [ORG]), ORG);
   channels = createClient(AgentChannelCommandController, transport);
   query = createClient(AgentChannelQueryController, transport);
   agents = createClient(AgentCommandController, transport);
@@ -422,7 +429,7 @@ describe("conversation surface — whole-method delegation", () => {
   it("delegates every query, sentinel replies riding back", async () => {
     const list = await conversationQuery.listConversations({ org: ORG });
     expect(list.totalCount).toBe(42);
-    expect(lastCall("listConversations").inputMarker).toBe(ORG);
+    expect(lastCall("listConversations").inputMarker).toBe(ORG_ID);
 
     await conversationQuery.getConversation({
       agentChannelId: "ach_x",
@@ -474,7 +481,7 @@ describe("enforceWriteConstraints — the edition-split CRUD hook", () => {
     const call = lastCall("enforceWriteConstraints");
     // The request left agent_ref.org empty; the hook saw it resolved —
     // proof it runs AFTER the edition-neutral resolution.
-    expect(call.inputMarker).toBe(ORG);
+    expect(call.inputMarker).toBe(ORG_ID);
   });
 
   it("runs on update", async () => {

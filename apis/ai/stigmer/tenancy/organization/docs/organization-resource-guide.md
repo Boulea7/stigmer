@@ -39,7 +39,8 @@ All metadata fields are defined by `ApiResourceMetadata` in `ai/stigmer/commons/
 |---|---|---|
 | `metadata.name` | Yes | Human-readable name of the organization. |
 | `metadata.slug` | No | URL-friendly identifier. Auto-generated from `name` if omitted. Format: lowercase letters, numbers, and hyphens; must start with a lowercase letter; **2–15 characters** (shorter than other resources). |
-| `metadata.id` | No | System-generated unique identifier. Never set by users. |
+| `metadata.id` | No | The organization's permanent id (`org_<ulid>`), minted at creation. Every resource the organization owns names it by this id. Never set by users. |
+| `metadata.org` | No | Always empty: an organization belongs to no organization. |
 | `metadata.labels` | No | Key-value pairs for organization and filtering (e.g., `team: platform`). |
 | `metadata.annotations` | No | Key-value pairs for additional metadata not used for filtering (e.g., `docs-url: "https://..."`). |
 | `metadata.version` | No | System-managed version tracking. Contains `id`, `message`, and `previous_version_id` for audit trail. Never set directly in YAML. |
@@ -141,7 +142,7 @@ stigmer org get my-org --output yaml
 stigmer org update org.yaml
 
 # Delete an organization
-# Warning: irreversible, and its slug can never be used again
+# Warning: irreversible; its slug is released for anyone to take
 stigmer org delete my-org
 ```
 
@@ -152,7 +153,8 @@ stigmer org delete my-org
 | `create` | Any authenticated user | Creates a new organization. Creator automatically becomes owner. |
 | `apply` | Caller determined at runtime | Create or update, authorization resolved per operation. |
 | `update` | Organization admin (`can_edit`) | Updates an existing organization. |
-| `delete` | Organization owner (`can_delete`) | Deletes the organization and every access grant on it. Its slug is reserved: no organization can be created with it again. |
+| `rename` | Organization owner (`can_delete`) | Changes the slug. The id, and everything filed under it, stays; the old slug leads to the organization for 30 days. |
+| `delete` | Organization owner (`can_delete`) | Deletes the organization and every access grant on it. Its slug is released. |
 | `get` | Organization member (`can_view`) | Gets a single organization by ID. |
 | `list` | Platform admin | Paginated list of all organizations (admin only). |
 | `findMyOrganizations` | Any authenticated user | Returns organizations the caller is a member of. |

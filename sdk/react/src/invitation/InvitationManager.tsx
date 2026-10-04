@@ -29,7 +29,7 @@ import { LoadingRegion } from "../internal/LoadingRegion.js";
 
 /** Props for {@link InvitationManager}. */
 export interface InvitationManagerProps {
-  /** Organization slug whose invitations to manage. */
+  /** Id of the organization whose invitations to manage (a slug is also accepted). */
   readonly org: string;
   /**
    * Build the full invite URL from a token.

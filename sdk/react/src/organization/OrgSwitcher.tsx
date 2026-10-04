@@ -72,9 +72,9 @@ export function OrgSwitcher({ onOrgChanged, className }: OrgSwitcherProps) {
   const portalContainer = useStigmerPortalContainer();
 
   const handleOrgSwitch = useCallback(
-    (slug: string) => {
-      const org = orgs.find((o) => o.metadata?.slug === slug);
-      if (org && org.metadata?.slug !== activeOrg?.metadata?.slug) {
+    (id: string) => {
+      const org = orgs.find((o) => o.metadata?.id === id);
+      if (org && org.metadata?.id !== activeOrg?.metadata?.id) {
         setActiveOrg(org);
         onOrgChanged?.(org);
       }
@@ -85,7 +85,7 @@ export function OrgSwitcher({ onOrgChanged, className }: OrgSwitcherProps) {
   const handleCreated = useCallback(
     (org: Organization) => {
       setCreateOpen(false);
-      refresh(org.metadata?.slug);
+      refresh(org.metadata?.id);
       onOrgChanged?.(org);
     },
     [refresh, onOrgChanged],
@@ -150,13 +150,13 @@ export function OrgSwitcher({ onOrgChanged, className }: OrgSwitcherProps) {
         <MenuContent align="start" side="bottom" sideOffset={4}>
           {hasOrgs && (
             <MenuRadioGroup
-              value={activeOrg.metadata?.slug ?? ""}
+              value={activeOrg.metadata?.id ?? ""}
               onValueChange={handleOrgSwitch}
             >
               {personalOrgs.map((org) => (
                 <MenuRadioItem
-                  key={org.metadata?.slug}
-                  value={org.metadata?.slug ?? ""}
+                  key={org.metadata?.id}
+                  value={org.metadata?.id ?? ""}
                   className="stg:items-start"
                 >
                   <User className="stg:mt-0.5 stg:size-3.5 stg:shrink-0" />
@@ -168,8 +168,8 @@ export function OrgSwitcher({ onOrgChanged, className }: OrgSwitcherProps) {
               )}
               {teamOrgs.map((org) => (
                 <MenuRadioItem
-                  key={org.metadata?.slug}
-                  value={org.metadata?.slug ?? ""}
+                  key={org.metadata?.id}
+                  value={org.metadata?.id ?? ""}
                   className="stg:items-start"
                 >
                   <Building2 className="stg:mt-0.5 stg:size-3.5 stg:shrink-0" />

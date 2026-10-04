@@ -36,8 +36,12 @@ vi.mock("../../server-info.js", () => ({
   useServerInfo: () => serverInfo,
 }));
 
+// The id differs from the slug, as for every organization made today; an
+// organization belongs to no organization, so its metadata.org is unset.
+const ACME_ID = "org_01jaaaaaaaaaaaaaaaaaaaaaaa";
+
 const ORG: Organization = create(OrganizationSchema, {
-  metadata: { id: "acme", name: "Acme Corp", slug: "acme", org: "acme" },
+  metadata: { id: ACME_ID, name: "Acme Corp", slug: "acme" },
   spec: {
     description: "We make everything.",
     logoUrl: "https://acme.example/logo.png",
@@ -66,7 +70,7 @@ function renderPanel(client: unknown) {
   return render(
     <StigmerContext.Provider value={client as never}>
       <DeploymentModeContext.Provider value="local">
-        <OrgPreferencesPanel org="acme" />
+        <OrgPreferencesPanel org={ACME_ID} />
       </DeploymentModeContext.Provider>
     </StigmerContext.Provider>,
   );
@@ -113,7 +117,7 @@ describe("OrgPreferencesPanel", () => {
     expect(input.name).toBe("Acme Corp");
     expect(input.description).toBe("We make everything.");
     expect(input.logoUrl).toBe("https://acme.example/logo.png");
-    expect(input.org).toBe("acme");
+    expect(input.id).toBe(ACME_ID);
     expect(input.slug).toBe("acme");
   });
 
@@ -176,7 +180,7 @@ describe("OrgPreferencesPanel", () => {
 
   it("saving standing context preserves memory_enabled (the wipe-hazard regression)", async () => {
     const orgWithMemoryOn = create(OrganizationSchema, {
-      metadata: { id: "acme", name: "Acme Corp", slug: "acme", org: "acme" },
+      metadata: { id: ACME_ID, name: "Acme Corp", slug: "acme" },
       spec: {
         description: "We make everything.",
         logoUrl: "https://acme.example/logo.png",

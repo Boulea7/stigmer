@@ -32,9 +32,15 @@
  * boot; one who first signs in after the upgrade owns it). Only a store the
  * server made its organization on owes its people their roles.
  *
- * And a server that cannot make its organization (its slug retired before
- * the upgrade): the organization a person makes in the console later owes
- * nobody a role, so a member removed there stays removed across a reboot.
+ * And a server that cannot make its organization (its slug still held by a
+ * create that was interrupted moments before, so the claim is too young to
+ * count as abandoned): the organization a person makes in the console later
+ * owes nobody a role, so a member removed there stays removed across a
+ * reboot.
+ *
+ * Every organization is filed under a minted id (org_<ulid>), so the record
+ * of the server's organization and every role row name that id, while
+ * `stigmer` and `acme` stay the slugs people name them by.
  *
  * The unit vouches for unsigned JWT-shaped tokens and declares the
  * require-authentication posture with no Authorizer (composed-support.ts),
@@ -54,6 +60,7 @@ import { ApiResourceKind } from "@stigmer/protos/ai/stigmer/commons/apiresource/
 import { IamPolicySchema } from "@stigmer/protos/ai/stigmer/iam/iampolicy/v1/api_pb";
 import { IamPolicyCommandController } from "@stigmer/protos/ai/stigmer/iam/iampolicy/v1/command_pb";
 import { IdentityAccountCommandController } from "@stigmer/protos/ai/stigmer/iam/identityaccount/v1/command_pb";
+import { OrganizationSchema } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/api_pb";
 import { OrganizationCommandController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/command_pb";
 import { OrganizationQueryController } from "@stigmer/protos/ai/stigmer/tenancy/organization/v1/query_pb";
 
@@ -62,7 +69,11 @@ import { composeServer } from "../../boot/compose.js";
 import type { ComposedServer } from "../../boot/compose.js";
 import { SERVER_ORGANIZATION_ROLES_KEY } from "../../domain/iampolicy/constants.js";
 import { accountIdFor } from "../../domain/identityaccount/constants.js";
-import { SINGLE_ORG_KEY } from "../../domain/organization/limit.js";
+import {
+  SINGLE_ORGANIZATION_SLUG,
+  SINGLE_ORG_KEY,
+} from "../../domain/organization/limit.js";
+import { organizationNameKey } from "../../domain/organization/names.js";
 import {
   resetOperatorIdentityForTests,
   setOperatorIdentity,
@@ -81,6 +92,26 @@ const FIRST = "fake|first";
 const SECOND = "fake|second";
 const firstId = (): string => accountIdFor(FIRST);
 const secondId = (): string => accountIdFor(SECOND);
+
+/** An organization id as the server mints it. */
+const MINTED_ORGANIZATION_ID = /^org_[0-9a-z]{26}$/;
+
+/**
+ * The organization the store records as the server's: its minted id, read
+ * from SINGLE_ORG_KEY, and the slug of the row that id names.
+ */
+async function serverOrganization(
+  store: Store,
+): Promise<{ id: string; slug: string }> {
+  const id = await store.bootstrapState.get(SINGLE_ORG_KEY);
+  expect(id).toMatch(MINTED_ORGANIZATION_ID);
+  const row = await store.getResource(
+    ApiResourceKind.organization,
+    id,
+    OrganizationSchema,
+  );
+  return { id, slug: row.metadata?.slug ?? "" };
+}
 
 /** `principal:relation@organization|by:actor` per row, sorted: the whole role state of the store. */
 async function rolesIn(store: Store): Promise<ReadonlyArray<string>> {
@@ -121,6 +152,8 @@ describe("roles on the server's organization (composed server, OIDC with no unit
   const asFirst = () => transportFor(port, fakeJwt(FIRST, "first@example.com"));
   const asSecond = () =>
     transportFor(port, fakeJwt(SECOND, "second@example.com"));
+  /** The id boot 2 minted for `stigmer`; boot 3 names the organization by it. */
+  let stigmerId = "";
 
   beforeAll(async () => {
     dir = mkdtempSync(path.join(tmpdir(), "server-organization-roles-"));
@@ -154,13 +187,13 @@ describe("roles on the server's organization (composed server, OIDC with no unit
   it("boot 2: as a one-organization server it makes `stigmer`, and the people it held get their roles on it, as their own", async () => {
     await boot(oneOrganization);
 
-    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(
-      "stigmer",
-    );
+    const made = await serverOrganization(server.store);
+    expect(made.slug).toBe(SINGLE_ORGANIZATION_SLUG);
+    stigmerId = made.id;
     expect(await rolesIn(server.store)).toEqual(
       [
-        `${firstId()}:owner@stigmer|by:${firstId()}`,
-        `${secondId()}:member@stigmer|by:${secondId()}`,
+        `${firstId()}:owner@${stigmerId}|by:${firstId()}`,
+        `${secondId()}:member@${stigmerId}|by:${secondId()}`,
       ].sort(),
     );
     expect(
@@ -172,7 +205,7 @@ describe("roles on the server's organization (composed server, OIDC with no unit
         as(),
       ).findMyOrganizations({});
       expect(found.entries.map((entry) => entry.metadata?.id)).toEqual([
-        "stigmer",
+        stigmerId,
       ]);
     }
   });
@@ -186,8 +219,11 @@ describe("roles on the server's organization (composed server, OIDC with no unit
 
     await boot(oneOrganization);
 
+    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(
+      stigmerId,
+    );
     expect(await rolesIn(server.store)).toEqual([
-      `${firstId()}:owner@stigmer|by:${firstId()}`,
+      `${firstId()}:owner@${stigmerId}|by:${firstId()}`,
     ]);
     const found = await createClient(
       OrganizationQueryController,
@@ -232,8 +268,11 @@ describe("a laptop that turns sign-in on (composed server, trusted-local then OI
   });
 
   it("the first person to sign in owns the laptop's organization, and the next is a member", async () => {
-    const [laptopRow] = await rolesIn(server.store);
-    expect(laptopRow).toMatch(/:owner@stigmer\|by:/);
+    const laptopOrganization = await serverOrganization(server.store);
+    expect(laptopOrganization.slug).toBe(SINGLE_ORGANIZATION_SLUG);
+    const laptopRows = await rolesIn(server.store);
+    expect(laptopRows).toHaveLength(1);
+    expect(laptopRows[0]).toContain(`:owner@${laptopOrganization.id}|by:`);
     await server.shutdown();
 
     await boot(signedIn);
@@ -247,14 +286,18 @@ describe("a laptop that turns sign-in on (composed server, trusted-local then OI
     ).provisionMyAccount({});
 
     const roles = await rolesIn(server.store);
-    expect(roles).toContain(`${firstId()}:owner@stigmer|by:${firstId()}`);
-    expect(roles).toContain(`${secondId()}:member@stigmer|by:${secondId()}`);
+    expect(roles).toContain(
+      `${firstId()}:owner@${laptopOrganization.id}|by:${firstId()}`,
+    );
+    expect(roles).toContain(
+      `${secondId()}:member@${laptopOrganization.id}|by:${secondId()}`,
+    );
     const found = await createClient(
       OrganizationQueryController,
       transportFor(port, fakeJwt(FIRST, "first@example.com")),
     ).findMyOrganizations({});
     expect(found.entries.map((entry) => entry.metadata?.id)).toEqual([
-      "stigmer",
+      laptopOrganization.id,
     ]);
   });
 });
@@ -295,7 +338,7 @@ describe("an older release's laptop organization when sign-in is turned on (comp
   });
 
   it("the first person to sign in owns `acme`, and the next is a member", async () => {
-    await createClient(
+    const acme = await createClient(
       OrganizationCommandController,
       transportFor(port),
     ).create({
@@ -306,8 +349,11 @@ describe("an older release's laptop organization when sign-in is turned on (comp
     });
     await server.shutdown();
 
+    const acmeId = acme.metadata?.id ?? "";
+    expect(acmeId).toMatch(MINTED_ORGANIZATION_ID);
+
     await boot([signedIn]);
-    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe("acme");
+    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(acmeId);
     await createClient(
       IdentityAccountCommandController,
       transportFor(port, fakeJwt(FIRST, "first@example.com")),
@@ -318,8 +364,8 @@ describe("an older release's laptop organization when sign-in is turned on (comp
     ).provisionMyAccount({});
 
     const roles = await rolesIn(server.store);
-    expect(roles).toContain(`${firstId()}:owner@acme|by:${firstId()}`);
-    expect(roles).toContain(`${secondId()}:member@acme|by:${secondId()}`);
+    expect(roles).toContain(`${firstId()}:owner@${acmeId}|by:${firstId()}`);
+    expect(roles).toContain(`${secondId()}:member@${acmeId}|by:${secondId()}`);
   });
 });
 
@@ -362,12 +408,17 @@ describe("a sign-in install upgraded with its one organization (composed server,
       IdentityAccountCommandController,
       asFirst(),
     ).provisionMyAccount({});
-    await createClient(OrganizationCommandController, asFirst()).create({
+    const acme = await createClient(
+      OrganizationCommandController,
+      asFirst(),
+    ).create({
       apiVersion: "tenancy.stigmer.ai/v1",
       kind: "Organization",
       metadata: { name: "acme", slug: "acme", org: "" },
       spec: { description: "founded under sign-in" },
     });
+    const acmeId = acme.metadata?.id ?? "";
+    expect(acmeId).toMatch(MINTED_ORGANIZATION_ID);
     await createClient(
       IdentityAccountCommandController,
       transportFor(port, fakeJwt(SECOND, "second@example.com")),
@@ -377,15 +428,15 @@ describe("a sign-in install upgraded with its one organization (composed server,
       org: "acme",
     });
     expect(await rolesIn(server.store)).toEqual([
-      `${firstId()}:owner@acme|by:${firstId()}`,
+      `${firstId()}:owner@${acmeId}|by:${firstId()}`,
     ]);
     await server.shutdown();
 
     await boot({ ...anyNumber, orgLimit: 1 });
 
-    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe("acme");
+    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(acmeId);
     expect(await rolesIn(server.store)).toEqual([
-      `${firstId()}:owner@acme|by:${firstId()}`,
+      `${firstId()}:owner@${acmeId}|by:${firstId()}`,
     ]);
   });
 });
@@ -433,12 +484,17 @@ describe("a sign-in install with an operator email, upgraded with its one organi
       IdentityAccountCommandController,
       asFounder(),
     ).provisionMyAccount({});
-    await createClient(OrganizationCommandController, asFounder()).create({
+    const acme = await createClient(
+      OrganizationCommandController,
+      asFounder(),
+    ).create({
       apiVersion: "tenancy.stigmer.ai/v1",
       kind: "Organization",
       metadata: { name: "acme", slug: "acme", org: "" },
       spec: { description: "founded under sign-in" },
     });
+    const acmeId = acme.metadata?.id ?? "";
+    expect(acmeId).toMatch(MINTED_ORGANIZATION_ID);
     await createClient(
       IdentityAccountCommandController,
       transportFor(port, fakeJwt(OPERATOR, "operator@example.com")),
@@ -446,20 +502,20 @@ describe("a sign-in install with an operator email, upgraded with its one organi
     const before = await rolesIn(server.store);
     expect(before).toEqual(
       [
-        `${firstId()}:owner@acme|by:${firstId()}`,
-        `${operatorId()}:admin@acme|by:${operatorId()}`,
+        `${firstId()}:owner@${acmeId}|by:${firstId()}`,
+        `${operatorId()}:admin@${acmeId}|by:${operatorId()}`,
       ].sort(),
     );
     await server.shutdown();
 
     await boot({ ...anyNumber, orgLimit: 1 });
 
-    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe("acme");
+    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(acmeId);
     expect(await rolesIn(server.store)).toEqual(before);
   });
 });
 
-describe("a server that cannot make its organization (composed server, OIDC; its slug retired before the upgrade)", () => {
+describe("a server that cannot make its organization (composed server, OIDC; its slug held by an interrupted create)", () => {
   let dir: string;
   let server: ComposedServer;
   let port: number;
@@ -501,26 +557,35 @@ describe("a server that cannot make its organization (composed server, OIDC; its
   });
 
   it("an organization made in the console later owes nobody a role: a member removed there stays removed", async () => {
-    // Before the upgrade: `stigmer` made and deleted, so its slug is retired.
+    // Before the upgrade: a create of `stigmer` claimed the slug and died
+    // before its row was stored. A deleted organization's slug is released,
+    // so this young claim is the one way left for the slug to be taken with
+    // no organization behind it; the claim is seconds old, too young to
+    // count as abandoned, so the boot's create is refused as a duplicate.
     await createClient(
       IdentityAccountCommandController,
       asFirst(),
     ).provisionMyAccount({});
-    const made = await createClient(
-      OrganizationCommandController,
-      asFirst(),
-    ).create(organizationNamed("stigmer"));
-    await createClient(OrganizationCommandController, asFirst()).delete({
-      value: made.metadata?.id ?? "",
-    });
+    const interrupted = await server.store.resourceNames.claim(
+      organizationNameKey(SINGLE_ORGANIZATION_SLUG),
+      "org_01hzzzzzzzzzzzzzzzzzzzzzzz",
+      new Date().toISOString(),
+    );
+    expect(interrupted.claimed).toBe(true);
     await server.shutdown();
 
     // The one-organization server cannot make `stigmer`, and boots with none.
     await boot(oneOrganization);
     expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe("");
-    await createClient(OrganizationCommandController, asFirst()).create(
-      organizationNamed("acme"),
-    );
+    expect(
+      await server.store.listResources(ApiResourceKind.organization),
+    ).toHaveLength(0);
+    const acme = await createClient(
+      OrganizationCommandController,
+      asFirst(),
+    ).create(organizationNamed("acme"));
+    const acmeId = acme.metadata?.id ?? "";
+    expect(acmeId).toMatch(MINTED_ORGANIZATION_ID);
     await createClient(
       IdentityAccountCommandController,
       transportFor(port, fakeJwt(SECOND, "second@example.com")),
@@ -533,9 +598,9 @@ describe("a server that cannot make its organization (composed server, OIDC; its
 
     await boot(oneOrganization);
 
-    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe("acme");
+    expect(await server.store.bootstrapState.get(SINGLE_ORG_KEY)).toBe(acmeId);
     expect(await rolesIn(server.store)).toEqual([
-      `${firstId()}:owner@acme|by:${firstId()}`,
+      `${firstId()}:owner@${acmeId}|by:${firstId()}`,
     ]);
   });
 });

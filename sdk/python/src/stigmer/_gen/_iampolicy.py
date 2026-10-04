@@ -110,7 +110,7 @@ class IamPolicyClient:
 
 @dataclass
 class IamPolicyInput:
-    """Input for creating or updating a IamPolicy."""
+    """Input for creating or updating an IamPolicy."""
 
     name: str
     org: str

@@ -33,7 +33,7 @@ const DAYTONA_WORKSPACE_ROOT = "/home/daytona/workspace";
 export interface UseSessionPageFlowOptions {
   /** Session ID to load and manage. */
   readonly sessionId: string;
-  /** Organization slug. */
+  /** Organization id (a slug is also accepted). */
   readonly org: string;
   /**
    * Supplies host-app environment variables for every follow-up

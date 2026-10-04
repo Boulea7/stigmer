@@ -172,7 +172,7 @@ class AgentExecutionClient:
 
 @dataclass
 class AgentExecutionInput:
-    """Input for creating or updating a AgentExecution."""
+    """Input for creating or updating an AgentExecution."""
 
     name: str
     org: str

@@ -55,6 +55,14 @@ class UpdateVisibilityInput(_message.Message):
     visibility: _enum_pb2.ApiResourceVisibility
     def __init__(self, resource_id: _Optional[str] = ..., visibility: _Optional[_Union[_enum_pb2.ApiResourceVisibility, str]] = ...) -> None: ...
 
+class RenameInput(_message.Message):
+    __slots__ = ("resource_id", "slug")
+    RESOURCE_ID_FIELD_NUMBER: _ClassVar[int]
+    SLUG_FIELD_NUMBER: _ClassVar[int]
+    resource_id: str
+    slug: str
+    def __init__(self, resource_id: _Optional[str] = ..., slug: _Optional[str] = ...) -> None: ...
+
 class ApiResourceReference(_message.Message):
     __slots__ = ("org", "kind", "slug", "version")
     ORG_FIELD_NUMBER: _ClassVar[int]

@@ -33,7 +33,7 @@ const github = vi.hoisted(() => ({
 
 vi.mock("@stigmer/react", () => ({
   GITHUB_CALLBACK_MESSAGE_TYPE: "stigmer:github:callback-success",
-  useActiveOrgSlug: () => github.org,
+  useActiveOrgId: () => github.org,
   useGitHubConnection: () => ({
     handleCallback: github.handleCallback,
     isLoading: github.isLoading,

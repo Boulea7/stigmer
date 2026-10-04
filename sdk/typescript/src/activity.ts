@@ -11,7 +11,7 @@ export type { RecentActivityEntry };
 export interface ListRecentActivityParams {
   /** Maximum entries to return. Defaults to 30. */
   readonly pageSize?: number;
-  /** Organization slug for the org-scoped fast path. */
+  /** The organization for the org-scoped fast path, by id or slug. */
   readonly org?: string;
 }
 

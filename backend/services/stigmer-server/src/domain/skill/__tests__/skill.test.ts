@@ -30,11 +30,19 @@ import { loadConfig } from "../../../boot/config.js";
 import { composeServer } from "../../../boot/compose.js";
 import type { ComposedServer } from "../../../boot/compose.js";
 import { createLogger } from "../../../boot/logger.js";
-import { seedOrganizations } from "../../organization/__tests__/support.js";
+import {
+  organizationId,
+  seedOrganizations,
+} from "../../organization/__tests__/support.js";
 
 const silentLogger = createLogger({ level: "error", pretty: false, write: () => {} });
 
 const ORG = "acme";
+const OTHER_ORG = "other-org";
+// The ids the server minted for ORG and OTHER_ORG: a pushed skill stores
+// its organization by id, and the not-found copy names it the same way.
+let ORG_ID: string;
+let OTHER_ORG_ID: string;
 
 type CommandClient = Client<typeof SkillCommandController>;
 type QueryClient = Client<typeof SkillQueryController>;
@@ -69,7 +77,9 @@ beforeAll(async () => {
   const port = await server.start();
   baseUrl = `http://127.0.0.1:${port}`;
   const transport: Transport = createGrpcTransport({ baseUrl });
-  await seedOrganizations(transport, [ORG, "other-org"]);
+  const ids = await seedOrganizations(transport, [ORG, OTHER_ORG]);
+  ORG_ID = organizationId(ids, ORG);
+  OTHER_ORG_ID = organizationId(ids, OTHER_ORG);
   command = createClient(SkillCommandController, transport);
   query = createClient(SkillQueryController, transport);
 });
@@ -138,7 +148,7 @@ describe("push — identity and versioning", () => {
     expect(skill.metadata?.id).toMatch(/^skl_[0-9a-z]{26}$/);
     expect(skill.metadata?.name).toBe(name);
     expect(skill.metadata?.slug).toBe(name);
-    expect(skill.metadata?.org).toBe(ORG);
+    expect(skill.metadata?.org).toBe(ORG_ID);
     // Skill is a blueprint kind: default visibility is org (proto config).
     expect(skill.metadata?.visibility).toBe(ApiResourceVisibility.visibility_org);
     expect(skill.spec?.name).toBe(name);
@@ -208,9 +218,10 @@ describe("push — identity and versioning", () => {
   it("push into a different org creates an independent skill under the same slug", async () => {
     const name = uniqueName();
     const inAcme = await command.push({ org: ORG, artifact: makeArtifact(name) });
-    const inOther = await command.push({ org: "other-org", artifact: makeArtifact(name) });
+    const inOther = await command.push({ org: OTHER_ORG, artifact: makeArtifact(name) });
     expect(inOther.metadata?.id).not.toBe(inAcme.metadata?.id);
-    expect(inOther.metadata?.org).toBe("other-org");
+    expect(inAcme.metadata?.org).toBe(ORG_ID);
+    expect(inOther.metadata?.org).toBe(OTHER_ORG_ID);
   });
 });
 
@@ -343,7 +354,7 @@ describe("listVersions — pagination", () => {
       Code.NotFound,
       "listVersions unknown slug",
     );
-    expect(err.rawMessage).toBe(`skill not found: never-pushed (org: ${ORG})`);
+    expect(err.rawMessage).toBe(`skill not found: never-pushed (org: ${ORG_ID})`);
   });
 });
 

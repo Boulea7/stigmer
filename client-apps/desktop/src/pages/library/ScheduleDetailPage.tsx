@@ -5,6 +5,7 @@ import {
   ScheduleDetailView,
   useBreadcrumbOverride,
   useResolveAgentExecutionSession,
+  useOrgSlugForId,
 } from "@stigmer/react";
 
 /**
@@ -18,6 +19,7 @@ import {
 export default function ScheduleDetailPage() {
   const { org, slug } = useParams<{ org: string; slug: string }>();
   const navigate = useNavigate();
+  const slugForOrg = useOrgSlugForId();
   const { setLabel } = useBreadcrumbOverride();
 
   // A schedule's last execution is an agent execution (aex_…); on
@@ -50,7 +52,7 @@ export default function ScheduleDetailPage() {
       editable
       onResourceLoad={handleResourceLoad}
       onNavigateToAgent={(agentOrg, agentSlug) =>
-        navigate(`/library/agents/${agentOrg}/${agentSlug}`)
+        navigate(`/library/agents/${slugForOrg(agentOrg)}/${agentSlug}`)
       }
       onNavigateToExecution={setPendingExecutionId}
       onDeleted={() => navigate("/library/schedules")}

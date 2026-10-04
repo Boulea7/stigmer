@@ -6,7 +6,7 @@ import { usePersonalEnvironment } from "../environment/usePersonalEnvironment.js
 import { EnvironmentVariableEditor } from "../environment/EnvironmentVariableEditor.js";
 import { EnvironmentListPanel } from "../environment/EnvironmentListPanel.js";
 import { CreateEnvironmentForm } from "../environment/CreateEnvironmentForm.js";
-import { useActiveOrgSlug } from "../organization/OrgProvider.js";
+import { useActiveOrgId } from "../organization/OrgProvider.js";
 import { LoadingRegion } from "../internal/LoadingRegion.js";
 
 const ENV_EXCLUDE_LABELS: Record<string, string>[] = [
@@ -16,7 +16,7 @@ const ENV_EXCLUDE_LABELS: Record<string, string>[] = [
 
 /** Settings section for personal and organization environment variables. */
 export function EnvironmentsSection() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
 
   return (
     <div className="stg:space-y-10">

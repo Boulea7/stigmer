@@ -62,7 +62,7 @@ class InvitationClient:
 
 @dataclass
 class InvitationInput:
-    """Input for creating or updating a Invitation."""
+    """Input for creating or updating an Invitation."""
 
     name: str
     org: str

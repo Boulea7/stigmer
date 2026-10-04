@@ -733,7 +733,7 @@ its manifest declares, what the server warned about, and its versions.
     onStartSession: { type: "(agent: PluginMemberRef) => void", description: "Called when the user asks to start a session on the plugin's agent. When provided and the plugin carries an agent, \"Start session\" is the header's primary action; the host owns the route." },
     onTabChange: { type: "(tabId: string) => void", description: "" },
     onWorkflowClick: { type: "(ref: PluginMemberRef) => void", description: "" },
-    org: { type: "string", description: "Organization slug the plugin is installed in.", required: true },
+    org: { type: "string", description: "Id of the organization the plugin is installed in (a slug is also accepted).", required: true },
     slug: { type: "string", description: "Plugin slug (the plugin's name).", required: true },
   }}
 />

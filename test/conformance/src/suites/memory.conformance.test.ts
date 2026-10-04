@@ -75,8 +75,7 @@ async function createOrg(memoryEnabled: boolean): Promise<string> {
     spec: { preferences: { memoryEnabled } },
   });
   fixtures.defer(() => clients.organizationCommand.delete({ value: org.metadata!.id }));
-  // Organization id equals slug — the tenancy-root addressing rule.
-  return org.metadata!.slug;
+  return org.metadata!.id;
 }
 
 async function createMemory(org: string, content?: string) {

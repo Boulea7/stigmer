@@ -170,7 +170,7 @@ describe("InvitationsSection", () => {
 
     expect(await screen.findByRole("button", { name: /Create invite link/ })).toBeTruthy();
     await settle();
-    expect(server.listedOrgs).toEqual(["acme"]);
+    expect(server.listedOrgs).toEqual(["org_acme"]);
     expect(screen.queryByText(MANAGED_BY_ADMINS)).toBeNull();
   });
 

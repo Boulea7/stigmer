@@ -30,7 +30,7 @@ function useApplyManifest(org: string): UseApplyManifestReturn
 
 <TypeTable
   type={{
-    org: { type: "string", description: "Target organization slug for `metadata.org` injection.", required: true },
+    org: { type: "string", description: "Target organization id (a slug is also accepted) for `metadata.org` injection.", required: true },
   }}
 />
 
@@ -152,7 +152,7 @@ Zero Console dependencies — safe for platform builder embedding.
     onApplied: { type: "(applied: readonly ManifestPreviewEntry[]) => void", description: "Called when the dialog closes after at least one document applied, with the applied entries in apply order — on full success, and also when the operator dismisses the dialog after a partial apply (some documents applied, a later one failed). Use it to refresh a list so the newly applied resources appear without a reload. It never fires when nothing applied, and fires once per close. Mirrors EditResourceYamlDialog's `onApplied`." },
     onOpenChange: { type: "(open: boolean) => void", description: "Called when the dialog should open or close.", required: true },
     open: { type: "boolean", description: "Whether the dialog is open.", required: true },
-    org: { type: "string", description: "Target organization slug for documents that omit `metadata.org`.", required: true },
+    org: { type: "string", description: "Target organization (its id) for documents that omit `metadata.org`.", required: true },
   }}
 />
 

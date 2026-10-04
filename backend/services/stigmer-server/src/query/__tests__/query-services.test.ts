@@ -90,21 +90,25 @@ describe("query services on the composed server", () => {
   });
 
   it("serves synchronous index-on-write through list and query modes", async () => {
-    await organizations.create(
+    // The server mints the organization's id, so the index is read for
+    // the id the create answered.
+    const created = await organizations.create(
       create(OrganizationSchema, {
         apiVersion: "tenancy.stigmer.ai/v1",
         kind: "Organization",
-        metadata: { id: "searchwired", name: "Search Wired", slug: "searchwired" },
+        metadata: { name: "Search Wired", slug: "searchwired" },
         spec: { description: "a uniquely zebrawire description" },
       }),
     );
+    const createdId = created.metadata?.id ?? "";
+    expect(createdId).toMatch(/^org_[0-9a-z]{26}$/);
 
     // List mode: created_at ordering, score pinned 1.0, counts by kind.
     const listed = await search.search({
       kinds: [ApiResourceKind.organization],
     });
     const listedIds = listed.entries.map((entry) => entry.id);
-    expect(listedIds).toContain("searchwired");
+    expect(listedIds).toContain(createdId);
     expect(listed.countsByKind.organization).toBeGreaterThanOrEqual(1);
     for (const entry of listed.entries) {
       expect(entry.score).toBe(1);
@@ -116,7 +120,7 @@ describe("query services on the composed server", () => {
       kinds: [ApiResourceKind.organization],
       query: "zebrawire",
     });
-    expect(queried.entries.map((entry) => entry.id)).toEqual(["searchwired"]);
+    expect(queried.entries.map((entry) => entry.id)).toEqual([createdId]);
     expect(queried.entries[0]?.score).toBeGreaterThan(0);
   });
 

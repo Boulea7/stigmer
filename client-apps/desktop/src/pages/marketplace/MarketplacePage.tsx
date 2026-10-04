@@ -1,5 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import { MarketplaceCatalog, useActiveOrgSlug } from "@stigmer/react";
+import {
+  MarketplaceCatalog,
+  useActiveOrgId,
+  useActiveOrgSlug,
+  useOrgSlugForId,
+} from "@stigmer/react";
 
 /**
  * The Marketplace: where a user finds and installs plugins.
@@ -10,7 +15,9 @@ import { MarketplaceCatalog, useActiveOrgSlug } from "@stigmer/react";
  * from the Upload tile alike; the same wiring as the web console's page.
  */
 export default function MarketplacePage() {
-  const org = useActiveOrgSlug();
+  const org = useActiveOrgId();
+  const orgSlug = useActiveOrgSlug();
+  const slugForOrg = useOrgSlugForId();
   const navigate = useNavigate();
 
   if (!org) return null;
@@ -20,14 +27,14 @@ export default function MarketplacePage() {
       <div className="mb-6">
         <h1 className="text-foreground text-xl font-semibold">Marketplace</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Plugins you can install into {org}: from Stigmer&apos;s catalogue, from your computer, or from a catalogue you
+          Plugins you can install into {orgSlug}: from Stigmer&apos;s catalogue, from your computer, or from a catalogue you
           add. A plugin installs as an agent, as tools for your agents, or both.
         </p>
       </div>
       <MarketplaceCatalog
         org={org}
         onInstalled={({ plugin }) =>
-          navigate(`/library/plugins/${plugin.metadata?.org}/${plugin.metadata?.slug}`)
+          navigate(`/library/plugins/${slugForOrg(plugin.metadata?.org ?? "")}/${plugin.metadata?.slug}`)
         }
       />
     </div>

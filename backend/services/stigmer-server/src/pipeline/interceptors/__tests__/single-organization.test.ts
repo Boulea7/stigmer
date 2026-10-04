@@ -150,6 +150,7 @@ function harness(organization: SingleOrganization) {
             {
               errorBoundary: (next) => (request) => next(request),
               requestMetrics: (next) => (request) => next(request),
+              organizationNames: (next) => (request) => next(request),
               singleOrganization:
                 createSingleOrganizationInterceptor(organization),
             },

@@ -85,7 +85,7 @@ class AgentInstanceClient:
 
 @dataclass
 class AgentInstanceInput:
-    """Input for creating or updating a AgentInstance."""
+    """Input for creating or updating an AgentInstance."""
 
     name: str
     org: str

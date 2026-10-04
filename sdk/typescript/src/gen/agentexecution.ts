@@ -172,7 +172,7 @@ export class AgentExecutionClient {
   }
 }
 
-/** Input for creating/updating a AgentExecution. */
+/** Input for creating/updating an AgentExecution. */
 export interface AgentExecutionInput {
   /**
    * The resource's `metadata.id`, for exact update addressing when set

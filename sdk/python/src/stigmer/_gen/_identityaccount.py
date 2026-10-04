@@ -106,7 +106,7 @@ class IdentityAccountClient:
 
 @dataclass
 class IdentityAccountInput:
-    """Input for creating or updating a IdentityAccount."""
+    """Input for creating or updating an IdentityAccount."""
 
     name: str
     org: str

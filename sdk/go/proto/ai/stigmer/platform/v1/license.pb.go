@@ -280,9 +280,9 @@ type LicenseCustomer struct {
 	// The address renewal and expiry notices go to. Every license has one: a
 	// term that ends must be able to warn someone before it does.
 	ContactEmail string `protobuf:"bytes,3,opt,name=contact_email,json=contactEmail,proto3" json:"contact_email,omitempty"`
-	// The cloud organization this customer also holds, as its slug (the same
-	// value a resource's metadata.org carries). Empty when the customer has
-	// none.
+	// The cloud organization this customer also holds. A request may name it
+	// by slug or id; the server stores its id, the value a resource's
+	// metadata.org carries. Empty when the customer has none.
 	Org           string `protobuf:"bytes,4,opt,name=org,proto3" json:"org,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

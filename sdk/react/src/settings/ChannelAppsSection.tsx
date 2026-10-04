@@ -12,7 +12,7 @@ import { CHANNEL_APPS_MANAGED_BY_ADMINS } from "../channel-app/copy.js";
 import { useDeploymentMode } from "../deployment-mode.js";
 import { useCheckPermission } from "../iam-policy/useCheckPermission.js";
 import { CloudFeatureNotice } from "../internal/CloudFeatureNotice.js";
-import { useActiveOrgId, useActiveOrgSlug } from "../organization/OrgProvider.js";
+import { useActiveOrgId } from "../organization/OrgProvider.js";
 
 type FlowState =
   | { phase: "idle" }
@@ -48,13 +48,12 @@ type FlowState =
  */
 export function ChannelAppsSection() {
   const headingId = useId();
-  const org = useActiveOrgSlug();
-  const orgId = useActiveOrgId();
+  const org = useActiveOrgId();
   // Channel installs (the consumer of these credentials) are cloud-only;
   // gate the whole section the way the Channels tab gates connects.
   const installsAvailable = useDeploymentMode() === "cloud";
   const createCheck = useCheckPermission(
-    installsAvailable && orgId ? { kind: "organization", id: orgId } : null,
+    installsAvailable && org ? { kind: "organization", id: org } : null,
     "can_create_channel_app",
   );
   const canCreate = !createCheck.isLoading && createCheck.allowed;
